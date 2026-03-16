@@ -1,0 +1,71 @@
+# ══════════════════════════════════════════════════════════════
+#  SECRETS & CREDENTIALS — NEVER commit these
+# ══════════════════════════════════════════════════════════════
+.env
+*.env
+backend/.env
+backend/.fyers_token
+.fyers_token
+
+# ══════════════════════════════════════════════════════════════
+#  STATE FILES — contain trade data, tokens, session info
+# ══════════════════════════════════════════════════════════════
+backend/.auto_trader_state.json
+backend/.paper_trader_state.json
+backend/.swing_trader_state.json
+backend/.swing_paper_state.json
+backend/.options_auto_trader_state.json
+backend/.options_paper_trader_state.json
+backend/.options_swing_trader_state.json
+backend/.options_swing_paper_state.json
+backend/.futures_auto_trader_state.json
+backend/.futures_paper_trader_state.json
+backend/.futures_swing_trader_state.json
+backend/.futures_swing_paper_state.json
+backend/.trade_history.json
+backend/.capital_*.json
+backend/strategy_config.json
+
+# ══════════════════════════════════════════════════════════════
+#  DEPENDENCIES — rebuilt from requirements.txt / package.json
+# ══════════════════════════════════════════════════════════════
+backend/venv/
+frontend/node_modules/
+frontend/dist/
+mobile/node_modules/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/local.properties
+mobile/dist/
+
+# ══════════════════════════════════════════════════════════════
+#  PYTHON CACHE
+# ══════════════════════════════════════════════════════════════
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ══════════════════════════════════════════════════════════════
+#  OS FILES
+# ══════════════════════════════════════════════════════════════
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ══════════════════════════════════════════════════════════════
+#  LARGE FILES — PDFs, images, APKs (keep locally, too big for git)
+# ══════════════════════════════════════════════════════════════
+*.pdf
+*.rtf
+*.png
+*.apk
+
+# ══════════════════════════════════════════════════════════════
+#  LOGS & TEMP
+# ══════════════════════════════════════════════════════════════
+*.log
+/tmp/
