@@ -2,6 +2,13 @@ import { getApiBase, apiFetch } from './base'
 
 const api = () => getApiBase()
 
+// Equity Regime
+export const getEquityRegime = () => apiFetch(`${api()}/equity/regime`)
+export const startAutoTradingRegime = (capital) =>
+  apiFetch(`${api()}/auto/start-auto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capital }) })
+export const startPaperTradingRegime = (capital) =>
+  apiFetch(`${api()}/paper/start-auto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capital }) })
+
 // Auto-Trading (Intraday Live)
 export const startAutoTrading = (strategies, capital) =>
   apiFetch(`${api()}/auto/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ strategies, capital }) })

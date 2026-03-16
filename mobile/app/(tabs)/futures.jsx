@@ -13,6 +13,7 @@ import {
   startFuturesPaperTrading, stopFuturesPaperTrading, getFuturesPaperStatus,
   startFuturesSwingTrading, stopFuturesSwingTrading, getFuturesSwingStatus,
   startFuturesSwingPaperTrading, stopFuturesSwingPaperTrading, getFuturesSwingPaperStatus,
+  startFuturesAutoRegime, startFuturesPaperRegime, startFuturesSwingRegime, startFuturesSwingPaperRegime,
 } from '../../src/services/api'
 import { formatINR } from '../../src/utils/formatters'
 import { LOG_COLORS, POLL_INTERVAL, STRATEGY_NAMES } from '../../src/utils/constants'
@@ -26,10 +27,10 @@ const TABS = [
 ]
 
 const TAB_CONFIG = {
-  'intraday-live': { start: startFuturesAutoTrading, stop: stopFuturesAutoTrading, status: getFuturesAutoStatus, isLive: true, isSwing: false },
-  'intraday-paper': { start: startFuturesPaperTrading, stop: stopFuturesPaperTrading, status: getFuturesPaperStatus, isLive: false, isSwing: false },
-  'swing-live': { start: startFuturesSwingTrading, stop: stopFuturesSwingTrading, status: getFuturesSwingStatus, isLive: true, isSwing: true },
-  'swing-paper': { start: startFuturesSwingPaperTrading, stop: stopFuturesSwingPaperTrading, status: getFuturesSwingPaperStatus, isLive: false, isSwing: true },
+  'intraday-live': { start: startFuturesAutoTrading, stop: stopFuturesAutoTrading, status: getFuturesAutoStatus, autoStart: startFuturesAutoRegime, isLive: true, isSwing: false },
+  'intraday-paper': { start: startFuturesPaperTrading, stop: stopFuturesPaperTrading, status: getFuturesPaperStatus, autoStart: startFuturesPaperRegime, isLive: false, isSwing: false },
+  'swing-live': { start: startFuturesSwingTrading, stop: stopFuturesSwingTrading, status: getFuturesSwingStatus, autoStart: startFuturesSwingRegime, isLive: true, isSwing: true },
+  'swing-paper': { start: startFuturesSwingPaperTrading, stop: stopFuturesSwingPaperTrading, status: getFuturesSwingPaperStatus, autoStart: startFuturesSwingPaperRegime, isLive: false, isSwing: true },
 }
 
 const OI_COLORS = {
@@ -41,10 +42,11 @@ const OI_COLORS = {
 
 export default function FuturesScreen() {
   const [tab, setTab] = useState('intraday-live')
-  const [capital, setCapital] = useState('200000')
+  const [capital, setCapital] = useState('100000')
   const [strategies, setStrategies] = useState([])
   const [selectedStrategies, setSelectedStrategies] = useState({})
   const [loading, setLoading] = useState(false)
+  const [autoMode, setAutoMode] = useState(true)
 
   const config = TAB_CONFIG[tab]
   const statusPoll = usePolling(config.status, POLL_INTERVAL)
@@ -68,20 +70,19 @@ export default function FuturesScreen() {
   }, [])
 
   const handleStart = async () => {
-    const strats = Object.entries(selectedStrategies)
-      .filter(([, v]) => v.selected)
-      .map(([key, v]) => ({ strategy: key, timeframe: v.timeframe }))
-    if (strats.length === 0) return Alert.alert('Error', 'Select at least one strategy')
     const cap = parseFloat(capital)
     if (!cap || cap <= 0) return Alert.alert('Error', 'Enter valid capital')
-
     setLoading(true)
     try {
       let res
-      if (config.isSwing) {
-        res = await config.start(strats, cap, 240)
+      if (autoMode && config.autoStart) {
+        res = await config.autoStart(cap)
       } else {
-        res = await config.start(strats, cap)
+        const strats = Object.entries(selectedStrategies)
+          .filter(([, v]) => v.selected)
+          .map(([key, v]) => ({ strategy: key, timeframe: v.timeframe }))
+        if (strats.length === 0) { setLoading(false); return Alert.alert('Error', 'Select at least one strategy') }
+        res = config.isSwing ? await config.start(strats, cap, 240) : await config.start(strats, cap)
       }
       if (res?.error) Alert.alert('Error', res.error)
       else statusPoll.refresh()

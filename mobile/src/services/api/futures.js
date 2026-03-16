@@ -4,6 +4,17 @@ const api = () => getApiBase()
 
 export const getFuturesStrategies = () => apiFetch(`${api()}/futures/strategies`)
 export const getFuturesOI = (symbol) => apiFetch(`${api()}/futures/oi/${symbol}`)
+export const getFuturesRegime = () => apiFetch(`${api()}/futures/regime`)
+
+// Futures Auto Regime
+export const startFuturesAutoRegime = (capital) =>
+  apiFetch(`${api()}/futures/auto/start-auto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capital }) })
+export const startFuturesPaperRegime = (capital) =>
+  apiFetch(`${api()}/futures/paper/start-auto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capital }) })
+export const startFuturesSwingRegime = (capital) =>
+  apiFetch(`${api()}/futures/swing/start-auto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capital }) })
+export const startFuturesSwingPaperRegime = (capital) =>
+  apiFetch(`${api()}/futures/swing-paper/start-auto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capital }) })
 
 // Futures Auto (Intraday Live)
 export const startFuturesAutoTrading = (strategies, capital) =>

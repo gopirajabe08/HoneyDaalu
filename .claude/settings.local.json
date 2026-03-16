@@ -140,7 +140,8 @@
       "Bash(find frontend/src -name *.jsx -o -name *.js)",
       "Bash(find mobile/src mobile/app -name *.jsx -o -name *.js)",
       "Bash(xargs cat:*)",
-      "Bash(xargs du:*)"
+      "Bash(xargs du:*)",
+      "Bash(git config:*)"
     ]
   }
 }

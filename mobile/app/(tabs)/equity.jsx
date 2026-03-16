@@ -13,6 +13,7 @@ import {
   startPaperTrading, stopPaperTrading, getPaperStatus,
   startSwingTrading, stopSwingTrading, getSwingStatus,
   startSwingPaperTrading, stopSwingPaperTrading, getSwingPaperStatus,
+  startAutoTradingRegime, startPaperTradingRegime,
 } from '../../src/services/api'
 import { formatINR, formatTime } from '../../src/utils/formatters'
 import { STRATEGY_NAMES, LOG_COLORS, POLL_INTERVAL } from '../../src/utils/constants'
@@ -26,10 +27,10 @@ const TABS = [
 ]
 
 const TAB_CONFIG = {
-  'intraday-live': { start: startAutoTrading, stop: stopAutoTrading, status: getAutoStatus, isLive: true, isSwing: false },
-  'intraday-paper': { start: startPaperTrading, stop: stopPaperTrading, status: getPaperStatus, isLive: false, isSwing: false },
-  'swing-live': { start: startSwingTrading, stop: stopSwingTrading, status: getSwingStatus, isLive: true, isSwing: true },
-  'swing-paper': { start: startSwingPaperTrading, stop: stopSwingPaperTrading, status: getSwingPaperStatus, isLive: false, isSwing: true },
+  'intraday-live': { start: startAutoTrading, stop: stopAutoTrading, status: getAutoStatus, autoStart: startAutoTradingRegime, isLive: true, isSwing: false },
+  'intraday-paper': { start: startPaperTrading, stop: stopPaperTrading, status: getPaperStatus, autoStart: startPaperTradingRegime, isLive: false, isSwing: false },
+  'swing-live': { start: startSwingTrading, stop: stopSwingTrading, status: getSwingStatus, autoStart: null, isLive: true, isSwing: true },
+  'swing-paper': { start: startSwingPaperTrading, stop: stopSwingPaperTrading, status: getSwingPaperStatus, autoStart: null, isLive: false, isSwing: true },
 }
 
 export default function EquityScreen() {
@@ -37,6 +38,7 @@ export default function EquityScreen() {
   const [capital, setCapital] = useState('75000')
   const [selected, setSelected] = useState({ play3_vwap_pullback: '5m', play4_supertrend: '5m' })
   const [loading, setLoading] = useState(false)
+  const [autoMode, setAutoMode] = useState(true)
 
   const config = TAB_CONFIG[tab]
   const statusPoll = usePolling(config.status, POLL_INTERVAL)
@@ -62,13 +64,18 @@ export default function EquityScreen() {
   }
 
   const handleStart = async () => {
-    const strats = Object.entries(selected).map(([strategy, timeframe]) => ({ strategy, timeframe }))
-    if (strats.length === 0) return Alert.alert('Error', 'Select at least one strategy')
     const cap = parseFloat(capital)
     if (!cap || cap <= 0) return Alert.alert('Error', 'Enter valid capital')
     setLoading(true)
     try {
-      const res = await config.start(strats, cap)
+      let res
+      if (autoMode && config.autoStart) {
+        res = await config.autoStart(cap)
+      } else {
+        const strats = Object.entries(selected).map(([strategy, timeframe]) => ({ strategy, timeframe }))
+        if (strats.length === 0) { setLoading(false); return Alert.alert('Error', 'Select at least one strategy') }
+        res = config.isSwing ? await config.start(strats, cap, 240) : await config.start(strats, cap)
+      }
       if (res?.error) Alert.alert('Error', res.error)
       else statusPoll.refresh()
     } catch (e) { Alert.alert('Error', e.message) }

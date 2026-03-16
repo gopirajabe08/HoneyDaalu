@@ -29,7 +29,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow SmartAlgo to use Face ID for secure access"
+        }
+      ]
     ],
     "scheme": "intratrading"
   }
