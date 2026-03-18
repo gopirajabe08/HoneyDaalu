@@ -542,14 +542,14 @@ def trade_history(
     """Get all trades from the last N days, with estimated brokerage per trade."""
     from services.trade_logger import get_all_trades
     trades = get_all_trades(days)
-    if source == "live":
-        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing")]
-    elif source == "paper":
-        trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper")]
-    elif source in ("auto", "swing", "swing_paper",
-                     "options_auto", "options_paper", "options_swing", "options_swing_paper",
-                     "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper"):
+    if source in ("auto", "paper", "swing", "swing_paper",
+                   "options_auto", "options_paper", "options_swing", "options_swing_paper",
+                   "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper"):
         trades = [t for t in trades if t.get("source") == source]
+    elif source == "live":
+        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing")]
+    elif source == "all_paper":
+        trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper")]
     # Add brokerage estimate to each trade
     for t in trades:
         t["charges"] = _estimate_trade_brokerage(t)
@@ -647,14 +647,14 @@ def daily_pnl(
     from collections import defaultdict
 
     trades = get_all_trades(days)
-    if source == "live":
-        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing")]
-    elif source == "paper":
-        trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper")]
-    elif source in ("auto", "swing", "swing_paper",
-                     "options_auto", "options_paper", "options_swing", "options_swing_paper",
-                     "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper"):
+    if source in ("auto", "paper", "swing", "swing_paper",
+                   "options_auto", "options_paper", "options_swing", "options_swing_paper",
+                   "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper"):
         trades = [t for t in trades if t.get("source") == source]
+    elif source == "live":
+        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing")]
+    elif source == "all_paper":
+        trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper")]
     daily = defaultdict(lambda: {
         "total_pnl": 0.0,
         "trades": 0,

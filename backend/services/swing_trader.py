@@ -318,7 +318,7 @@ class SwingTrader:
             in_retry_window = now.hour < 14 and now.hour >= 9 and now.weekday() < 5
 
             if has_open_slot and in_retry_window:
-                retry_time = now + timedelta(minutes=30)
+                retry_time = now + timedelta(minutes=120)  # 2 hours — daily data doesn't change every 30 min
                 self._next_scan_at = retry_time.isoformat()
                 self._log("INFO", f"No position open — retry scan at {retry_time.strftime('%I:%M %p IST')}")
                 self._save_state()

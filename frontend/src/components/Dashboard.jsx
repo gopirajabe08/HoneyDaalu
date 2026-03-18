@@ -11,6 +11,7 @@ import {
   getFuturesAutoStatus, getFuturesPaperStatus, getFuturesSwingStatus, getFuturesSwingPaperStatus,
 } from '../services/api'
 import { formatINRCompact } from '../utils/formatters'
+import DailyStrategyStats from './DailyStrategyStats'
 
 const inr2 = (v) => `${Math.abs(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -136,23 +137,23 @@ export default function Dashboard({ fyersStatus }) {
 
   // P&L from Fyers — use 'pl' field which is total P&L (realized + unrealized) per position
   const totalPnlAllPositions = tradedPositions.reduce((s, p) => s + (p.pl || 0), 0)
-  const totalRealizedPnl = closedPositions.reduce((s, p) => s + (p.pl || p.realized_profit || 0), 0)
+  const totalRealizedPnl = closedPositions.reduce((s, p) => s + (p.pl || (p.pl || p.realized_profit || 0) || 0), 0)
   const unrealizedPnl = openPositions.reduce((s, p) => s + (p.pl || p.unrealized_profit || 0), 0)
 
   // Win/Loss from Fyers closed positions
-  const winners = closedPositions.filter(p => (p.pl || p.realized_profit || 0) > 0)
-  const losers = closedPositions.filter(p => (p.pl || p.realized_profit || 0) < 0)
+  const winners = closedPositions.filter(p => (p.pl || (p.pl || p.realized_profit || 0) || 0) > 0)
+  const losers = closedPositions.filter(p => (p.pl || (p.pl || p.realized_profit || 0) || 0) < 0)
   const winRate = closedPositions.length > 0 ? Math.round((winners.length / closedPositions.length) * 100) : 0
-  const avgWin = winners.length > 0 ? winners.reduce((s, p) => s + p.realized_profit, 0) / winners.length : 0
-  const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s, p) => s + p.realized_profit, 0) / losers.length) : 0
+  const avgWin = winners.length > 0 ? winners.reduce((s, p) => s + (p.pl || p.realized_profit || 0), 0) / winners.length : 0
+  const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s, p) => s + (p.pl || p.realized_profit || 0), 0) / losers.length) : 0
   const avgRR = avgLoss > 0 ? (avgWin / avgLoss).toFixed(1) : '--'
 
   // Best / Worst from Fyers closed
   const bestTrade = closedPositions.length > 0
-    ? closedPositions.reduce((b, p) => (p.realized_profit || 0) > (b.realized_profit || 0) ? p : b, closedPositions[0])
+    ? closedPositions.reduce((b, p) => ((p.pl || p.realized_profit || 0) || 0) > (b.realized_profit || 0) ? p : b, closedPositions[0])
     : null
   const worstTrade = closedPositions.length > 0
-    ? closedPositions.reduce((w, p) => (p.realized_profit || 0) < (w.realized_profit || 0) ? p : w, closedPositions[0])
+    ? closedPositions.reduce((w, p) => ((p.pl || p.realized_profit || 0) || 0) < (w.realized_profit || 0) ? p : w, closedPositions[0])
     : null
 
   // Orders summary
@@ -192,18 +193,8 @@ export default function Dashboard({ fyersStatus }) {
   const hasIntraStats = Object.keys(intraStats).some(k => intraStats[k].total > 0)
   const hasSwingStats = Object.keys(swingStats).some(k => swingStats[k].total > 0)
 
-  // ── Not connected state ──
-  if (!fyersStatus?.connected) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center">
-          <AlertCircle size={40} className="text-gray-600 mx-auto mb-3" />
-          <h3 className="text-white font-semibold mb-1">Fyers Not Connected</h3>
-          <p className="text-gray-500 text-xs">Connect your Fyers account to see today's trading data.</p>
-        </div>
-      </div>
-    )
-  }
+  // ── Not connected banner (non-blocking) ──
+  const showFyersData = fyersStatus?.connected
 
   return (
     <div className="space-y-5">
@@ -236,7 +227,16 @@ export default function Dashboard({ fyersStatus }) {
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-400">{error}</div>
       )}
 
-      {/* ── Row 1: Key Metrics ── */}
+      {/* Fyers not connected banner */}
+      {!showFyersData && (
+        <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 flex items-center gap-3">
+          <AlertCircle size={16} className="text-yellow-400 flex-shrink-0" />
+          <p className="text-xs text-yellow-400">Fyers not connected — P&L, positions, and funds will appear after connecting. Engine statuses and strategy performance are available below.</p>
+        </div>
+      )}
+
+      {/* ── Row 1: Key Metrics (Fyers data) ── */}
+      {showFyersData && (
       <div className="grid grid-cols-5 gap-3">
         <MetricCard
           label="Today's P&L (Fyers)"
@@ -285,8 +285,10 @@ export default function Dashboard({ fyersStatus }) {
           sub={availableBalance ? `Total: ${formatINRCompact(availableBalance.total)}` : 'Loading...'}
         />
       </div>
+      )}
 
-      {/* ── Row 2: Positions Table + Trade Highlights ── */}
+      {/* ── Row 2: Positions Table + Trade Highlights (Fyers data) ── */}
+      {showFyersData && (
       <div className="grid grid-cols-3 gap-4">
         {/* Positions table — grouped by strategy */}
         <div className="col-span-2 bg-dark-700 rounded-2xl border border-dark-500 p-5">
@@ -402,128 +404,13 @@ export default function Dashboard({ fyersStatus }) {
           </div>
         </div>
       </div>
+      )}
 
-      {/* ── Row 3: Strategy Performance — Intraday & Swing ── */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Intraday Strategies */}
-        <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Zap size={16} className="text-orange-400" />
-            Intraday Strategies
-          </h3>
-          {!hasIntraStats ? (
-            <p className="text-xs text-gray-600 text-center py-6">No intraday trades yet</p>
-          ) : (
-            <div className="space-y-3">
-              {intraRank.best && (
-                <StratRankCard
-                  label="Best Strategy"
-                  name={STRAT_NAMES[intraRank.best.id] || intraRank.best.id}
-                  stats={intraRank.best}
-                  color="green"
-                />
-              )}
-              {intraRank.worst && intraRank.worst.id !== intraRank.best?.id && (
-                <StratRankCard
-                  label="Worst Strategy"
-                  name={STRAT_NAMES[intraRank.worst.id] || intraRank.worst.id}
-                  stats={intraRank.worst}
-                  color="red"
-                />
-              )}
-              {intraRank.active && intraRank.active.id !== intraRank.best?.id && intraRank.active.id !== intraRank.worst?.id && (
-                <StratRankCard
-                  label="Most Active"
-                  name={STRAT_NAMES[intraRank.active.id] || intraRank.active.id}
-                  stats={intraRank.active}
-                  color="blue"
-                />
-              )}
-              {/* All strategies mini list */}
-              <div className="pt-3 border-t border-dark-500 space-y-1.5">
-                {Object.entries(intraStats)
-                  .filter(([, s]) => s.total > 0)
-                  .sort((a, b) => b[1].total_pnl - a[1].total_pnl)
-                  .map(([id, s]) => (
-                    <div key={id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-1.5 h-1.5 rounded-full ${s.total_pnl > 0 ? 'bg-green-400' : s.total_pnl < 0 ? 'bg-red-400' : 'bg-gray-500'}`} />
-                        <span className="text-[11px] text-gray-300">{STRAT_NAMES[id] || id}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-gray-500">{s.total} trades · {s.win_rate}%</span>
-                        <span className={`text-[11px] font-semibold tabular-nums ${s.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {s.total_pnl >= 0 ? '+' : '-'}{formatINRCompact(s.total_pnl)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
+      {/* ── Row 3: Strategy Performance — All Engines (always visible) ── */}
+      <DashboardStrategyPerformance />
 
-        {/* Swing Strategies */}
-        <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Activity size={16} className="text-emerald-400" />
-            Swing Strategies
-          </h3>
-          {!hasSwingStats ? (
-            <p className="text-xs text-gray-600 text-center py-6">No swing trades yet</p>
-          ) : (
-            <div className="space-y-3">
-              {swingRank.best && (
-                <StratRankCard
-                  label="Best Strategy"
-                  name={STRAT_NAMES[swingRank.best.id] || swingRank.best.id}
-                  stats={swingRank.best}
-                  color="green"
-                />
-              )}
-              {swingRank.worst && swingRank.worst.id !== swingRank.best?.id && (
-                <StratRankCard
-                  label="Worst Strategy"
-                  name={STRAT_NAMES[swingRank.worst.id] || swingRank.worst.id}
-                  stats={swingRank.worst}
-                  color="red"
-                />
-              )}
-              {swingRank.active && swingRank.active.id !== swingRank.best?.id && swingRank.active.id !== swingRank.worst?.id && (
-                <StratRankCard
-                  label="Most Active"
-                  name={STRAT_NAMES[swingRank.active.id] || swingRank.active.id}
-                  stats={swingRank.active}
-                  color="blue"
-                />
-              )}
-              {/* All strategies mini list */}
-              <div className="pt-3 border-t border-dark-500 space-y-1.5">
-                {Object.entries(swingStats)
-                  .filter(([, s]) => s.total > 0)
-                  .sort((a, b) => b[1].total_pnl - a[1].total_pnl)
-                  .map(([id, s]) => (
-                    <div key={id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-1.5 h-1.5 rounded-full ${s.total_pnl > 0 ? 'bg-green-400' : s.total_pnl < 0 ? 'bg-red-400' : 'bg-gray-500'}`} />
-                        <span className="text-[11px] text-gray-300">{STRAT_NAMES[id] || id}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-gray-500">{s.total} trades · {s.win_rate}%</span>
-                        <span className={`text-[11px] font-semibold tabular-nums ${s.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {s.total_pnl >= 0 ? '+' : '-'}{formatINRCompact(s.total_pnl)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Row 4: Per-stock P&L bars ── */}
-      {tradedPositions.length > 0 && (
+      {/* ── Row 4: Per-stock P&L bars (Fyers data) ── */}
+      {showFyersData && tradedPositions.length > 0 && (
         <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
           <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <BarChart3 size={16} className="text-purple-400" />
@@ -534,7 +421,7 @@ export default function Dashboard({ fyersStatus }) {
               .sort((a, b) => (b.pl || 0) - (a.pl || 0))
               .map((p, i) => {
                 const sym = (p.symbol || '').replace('NSE:', '').replace('-EQ', '')
-                const pnl = p.pl || p.realized_profit || 0
+                const pnl = p.pl || (p.pl || p.realized_profit || 0) || 0
                 const maxPnl = Math.max(...tradedPositions.map(x => Math.abs(x.pl || 0)), 1)
                 const width = Math.round((Math.abs(pnl) / maxPnl) * 100)
 
@@ -782,7 +669,7 @@ function PositionsGroupedByStrategy({ tradedPositions, autoStatus, closedPositio
         const positionsInGroup = groups[strat]
         const label = STRAT_LABELS[strat] || 'Other / Manual'
         const colors = stratColorMap[strat] || stratColorMap._unknown
-        const groupPnl = positionsInGroup.reduce((s, p) => s + (p.pl || p.realized_profit || 0), 0)
+        const groupPnl = positionsInGroup.reduce((s, p) => s + (p.pl || (p.pl || p.realized_profit || 0) || 0), 0)
         const groupOpen = positionsInGroup.filter(p => (p.netQty || 0) !== 0).length
 
         return (
@@ -813,7 +700,7 @@ function PositionsGroupedByStrategy({ tradedPositions, autoStatus, closedPositio
                 {positionsInGroup.map((p, i) => {
                   const sym = (p.symbol || '').replace('NSE:', '').replace('-EQ', '')
                   const netQty = p.netQty || 0
-                  const pnl = p.pl || p.realized_profit || 0
+                  const pnl = p.pl || (p.pl || p.realized_profit || 0) || 0
                   const isOpen = netQty !== 0
                   const isBuy = (p.buyQty || 0) > 0
 
@@ -873,6 +760,93 @@ function PositionsGroupedByStrategy({ tradedPositions, autoStatus, closedPositio
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+function DashboardStrategyPerformance() {
+  const [engineTab, setEngineTab] = useState('equity_intraday')
+  const [modeTab, setModeTab] = useState('paper')
+
+  const ENGINE_TABS = [
+    { id: 'equity_intraday', label: 'Equity Intraday', color: 'orange' },
+    { id: 'equity_swing', label: 'Equity Swing', color: 'emerald' },
+    { id: 'options_intraday', label: 'Options Intraday', color: 'violet' },
+    { id: 'options_swing', label: 'Options Swing', color: 'teal' },
+    { id: 'futures_intraday', label: 'Futures Intraday', color: 'amber' },
+    { id: 'futures_swing', label: 'Futures Swing', color: 'cyan' },
+  ]
+
+  const SOURCE_MAP = {
+    equity_intraday: { live: 'auto', paper: 'paper' },
+    equity_swing: { live: 'swing', paper: 'swing_paper' },
+    options_intraday: { live: 'options_auto', paper: 'options_paper' },
+    options_swing: { live: 'options_swing', paper: 'options_swing_paper' },
+    futures_intraday: { live: 'futures_auto', paper: 'futures_paper' },
+    futures_swing: { live: 'futures_swing', paper: 'futures_swing_paper' },
+  }
+
+  const TAB_COLORS = {
+    orange: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    emerald: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    violet: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+    teal: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+    amber: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    cyan: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+  }
+
+  const current = ENGINE_TABS.find(t => t.id === engineTab)
+  const source = SOURCE_MAP[engineTab]?.[modeTab] || 'paper'
+  const days = engineTab.includes('swing') ? 14 : 7
+
+  return (
+    <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+          <BarChart3 size={16} className="text-purple-400" />
+          Strategy Performance
+        </h3>
+
+        {/* Live / Paper toggle */}
+        <div className="flex items-center gap-1 bg-dark-800 rounded-lg p-0.5 border border-dark-600">
+          <button
+            onClick={() => setModeTab('live')}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
+              modeTab === 'live' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'text-gray-500'
+            }`}
+          >
+            Live
+          </button>
+          <button
+            onClick={() => setModeTab('paper')}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
+              modeTab === 'paper' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-gray-500'
+            }`}
+          >
+            Paper
+          </button>
+        </div>
+      </div>
+
+      {/* Engine tabs */}
+      <div className="flex items-center gap-1 mb-4 bg-dark-800 rounded-xl p-1 border border-dark-600 overflow-x-auto">
+        {ENGINE_TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setEngineTab(tab.id)}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all ${
+              engineTab === tab.id
+                ? TAB_COLORS[tab.color] + ' border'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Strategy stats for selected engine + mode */}
+      <DailyStrategyStats source={source} days={days} accent={current?.color || 'blue'} />
     </div>
   )
 }

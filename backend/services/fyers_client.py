@@ -166,7 +166,7 @@ def headless_login() -> dict:
     try:
         # Step 1: Initiate login
         r1 = req.post(
-            "https://api-t2.fyers.in/vagator/v2/send_login_otp_v2",
+            "https://api-t2.fyers.in/vagator/v2/send_login_otp",
             json={"fy_id": fy_id, "app_id": "2"},
         )
         if r1.status_code != 200:
@@ -187,11 +187,10 @@ def headless_login() -> dict:
         if not request_key:
             return {"error": f"TOTP rejected: {r2.json()}"}
 
-        # Step 3: Verify PIN (SHA-256 hashed)
-        pin_hash = hashlib.sha256(pin.encode()).hexdigest()
+        # Step 3: Verify PIN (raw string, not hashed)
         r3 = req.post(
-            "https://api-t2.fyers.in/vagator/v2/verify_pin_v2",
-            json={"request_key": request_key, "identity_type": "pin", "identifier": pin_hash},
+            "https://api-t2.fyers.in/vagator/v2/verify_pin",
+            json={"request_key": request_key, "identity_type": "pin", "identifier": str(pin)},
         )
         if r3.status_code != 200:
             return {"error": f"PIN verification failed: {r3.text}"}
@@ -199,12 +198,13 @@ def headless_login() -> dict:
         if not access_token:
             return {"error": f"No access_token from PIN step: {r3.json()}"}
 
-        # Step 4: Exchange for auth_code
+        # Step 4: Exchange for auth_code (app_id without -100 suffix)
+        app_id_short = FYERS_APP_ID.split("-")[0] if "-" in FYERS_APP_ID else FYERS_APP_ID
         r4 = req.post(
             "https://api-t1.fyers.in/api/v3/token",
             json={
                 "fyers_id": fy_id,
-                "app_id": FYERS_APP_ID,
+                "app_id": app_id_short,
                 "redirect_uri": FYERS_REDIRECT_URI,
                 "appType": "100",
                 "code_challenge": "",

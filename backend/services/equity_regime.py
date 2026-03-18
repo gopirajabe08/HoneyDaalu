@@ -180,22 +180,53 @@ REGIME_STRATEGY_MAP = {
 }
 
 
+def _get_intraday_direction() -> dict:
+    """Check NIFTY intraday direction — is today bullish or bearish from open?"""
+    try:
+        ticker = yf.Ticker("^NSEI")
+        intra = ticker.history(period="1d", interval="5m")
+        if intra is None or len(intra) < 5:
+            return {"direction": "neutral", "change_pct": 0}
+
+        session_open = float(intra["Open"].iloc[0])
+        current = float(intra["Close"].iloc[-1])
+        change_pct = (current - session_open) / session_open * 100
+
+        if change_pct > 0.3:
+            direction = "intraday_bullish"
+        elif change_pct < -0.3:
+            direction = "intraday_bearish"
+        else:
+            direction = "intraday_neutral"
+
+        return {
+            "direction": direction,
+            "change_pct": round(change_pct, 2),
+            "session_open": round(session_open, 2),
+            "current": round(current, 2),
+        }
+    except Exception as e:
+        logger.warning(f"[EquityRegime] Intraday direction error: {e}")
+        return {"direction": "neutral", "change_pct": 0}
+
+
 def detect_equity_regime() -> dict:
     """
     Detect market regime and auto-select equity strategies + timeframes.
+    Uses daily trend + VIX + ADX + INTRADAY DIRECTION.
 
-    Returns:
-        {
-            "regime": str,
-            "strategies": [{"strategy": key, "timeframe": tf}, ...],
-            "components": {nifty, vix},
-            "reasoning": str
-        }
+    Intraday direction overrides daily trend when they conflict:
+    - Daily bearish but intraday bullish → mixed (use BB Contra + VWAP, not trend strategies)
+    - Daily bullish but intraday bearish → mixed
+    - Both agree → strong conviction, use trend strategies
     """
     nifty = _get_nifty_analysis()
     vix = _get_vix()
+    intraday = _get_intraday_direction()
 
-    trend = nifty.get("trend", "neutral")
+    daily_trend = nifty.get("trend", "neutral")
+    intraday_dir = intraday.get("direction", "neutral")
+    intraday_change = intraday.get("change_pct", 0)
 
     # VIX classification
     if vix > 20:
@@ -205,14 +236,30 @@ def detect_equity_regime() -> dict:
     else:
         vol_level = "normal"
 
+    # Determine effective trend — intraday direction can override daily
+    if daily_trend in ("bearish",) and intraday_dir == "intraday_bullish":
+        # Daily says bearish but today is green — CONFLICT
+        # Don't trust bearish SELL signals — use neutral/reversal strategies
+        effective_trend = "bounce_in_downtrend"
+    elif daily_trend in ("bullish",) and intraday_dir == "intraday_bearish":
+        # Daily says bullish but today is red — CONFLICT
+        effective_trend = "pullback_in_uptrend"
+    elif nifty.get("is_reversal", False):
+        effective_trend = "reversal"
+    else:
+        # Daily and intraday agree, or intraday is neutral
+        effective_trend = daily_trend
+
     # Get strategies from map
-    key = (trend, vol_level)
+    key = (effective_trend, vol_level)
     strat_list = REGIME_STRATEGY_MAP.get(key, [("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m")])
 
     strategies = [{"strategy": s, "timeframe": tf} for s, tf in strat_list]
     strategy_ids = [s for s, _ in strat_list]
 
-    regime_label = f"{trend}_{vol_level}"
+    regime_label = f"{effective_trend}_{vol_level}"
+    if effective_trend != daily_trend:
+        regime_label += f"_override_{intraday_dir}"
 
     STRAT_NAMES = {
         "play1_ema_crossover": "EMA Crossover",
@@ -224,9 +271,10 @@ def detect_equity_regime() -> dict:
     }
 
     reasoning_parts = [
-        f"NIFTY: {trend} (ADX {nifty.get('adx', 0)}, strength: {nifty.get('strength', '?')})",
+        f"Daily: {daily_trend} (ADX {nifty.get('adx', 0)})",
+        f"Intraday: {intraday_dir} ({intraday_change:+.2f}%)",
+        f"Effective: {effective_trend}",
         f"VIX: {vix:.1f} ({vol_level.replace('_', ' ')})",
-        f"Range: {nifty.get('intraday_range_pct', 0):.1f}%",
         f"Selected: {', '.join(STRAT_NAMES.get(s, s) for s in strategy_ids)}",
     ]
 
@@ -238,6 +286,7 @@ def detect_equity_regime() -> dict:
             "nifty": nifty,
             "vix": round(vix, 1),
             "vix_level": vol_level,
+            "intraday": intraday,
         },
         "reasoning": " | ".join(reasoning_parts),
     }

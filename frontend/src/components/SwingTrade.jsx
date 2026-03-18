@@ -7,6 +7,7 @@ import { strategies } from '../data/mockData'
 import {
   startSwingTrading, stopSwingTrading, getSwingStatus,
   startSwingPaperTrading, stopSwingPaperTrading, getSwingPaperStatus,
+  getPositions,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
 import DailyStrategyStats from './DailyStrategyStats'
@@ -39,6 +40,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
   const [countdown, setCountdown] = useState(null)
   const [selected, setSelected] = useState({})
   const [refreshing, setRefreshing] = useState(false)
+  const [fyersPositions, setFyersPositions] = useState([])
   const scanInterval = getAutoScanInterval(selected)
   const pollRef = useRef(null)
   const countdownRef = useRef(null)
@@ -63,6 +65,13 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
     try {
       const data = isLive ? await getSwingStatus() : await getSwingPaperStatus()
       setStatus(data)
+      if (isLive) {
+        try {
+          const posRes = await getPositions()
+          const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
+          setFyersPositions(posArr.filter(p => p.productType === 'CNC' && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0)))
+        } catch {}
+      }
       if (data.next_scan_at) {
         const diff = Math.max(0, Math.floor((new Date(data.next_scan_at) - Date.now()) / 1000))
         setCountdown(diff)
@@ -174,7 +183,8 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
   const activeTrades = status?.active_trades ?? []
   const tradeHistory = status?.trade_history ?? []
   const runningStrategies = status?.strategies ?? []
-  const totalPnl = status?.total_pnl ?? 0
+  const fyersTotalPnl = fyersPositions.reduce((s, p) => s + (p.pl || 0), 0)
+  const totalPnl = isLive && fyersPositions.length > 0 ? fyersTotalPnl : (status?.total_pnl ?? 0)
 
   const allClosed = tradeHistory
   const winners = allClosed.filter(t => (t.pnl ?? 0) > 0)
@@ -204,7 +214,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
           {(running || allClosed.length > 0 || activeTrades.length > 0) && (
             <div className="grid grid-cols-6 gap-3">
               <StatCard label="Capital" value={status?.capital > 0 ? `₹${(status.capital >= 100000 ? (status.capital/100000).toFixed(1)+'L' : (status.capital/1000).toFixed(0)+'K')}` : '--'} color="text-white" />
-              <StatCard label={isLive ? 'P&L' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
+              <StatCard label={isLive ? 'P&L (Fyers)' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
                 color={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'} />
               <StatCard label="Win Rate" value={allClosed.length > 0 ? `${winRate}%` : '--'}
                 sub={allClosed.length > 0 ? `${winners.length}W / ${losers.length}L` : ''} />
@@ -215,8 +225,8 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
             </div>
           )}
 
-          {/* Active swing position */}
-          {activeTrades.length > 0 && (
+          {/* Active swing position — hidden for live */}
+          {!isLive && activeTrades.length > 0 && (
             <div className={`bg-dark-700 rounded-2xl border ${accentBorder} p-5`}>
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Activity size={16} className={accentText} />
@@ -266,14 +276,17 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
             </div>
           )}
 
-          {/* Trade History */}
-          {tradeHistory.length > 0 && (
+          {/* Trade History — hidden for live */}
+          {!isLive && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Clock size={16} className="text-gray-400" />
                 Completed Swing Trades
                 <span className="text-[10px] text-gray-500 font-normal">{tradeHistory.length} trades</span>
               </h3>
+              {tradeHistory.length === 0 ? (
+                <p className="text-xs text-gray-600 text-center py-4">No completed swing trades yet.</p>
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -321,8 +334,12 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           )}
+
+          {/* Daily Strategy Performance — right after completed trades */}
+          <DailyStrategyStats source={isLive ? 'swing' : 'swing_paper'} days={14} accent={isLive ? 'emerald' : 'violet'} />
 
           {/* Empty state */}
           {!running && activeTrades.length === 0 && tradeHistory.length === 0 && (
@@ -528,7 +545,6 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
       </div>
 
       {/* Daily Strategy Performance */}
-      <DailyStrategyStats source={isLive ? 'swing' : 'swing_paper'} days={14} accent={isLive ? 'emerald' : 'violet'} />
     </div>
   )
 }

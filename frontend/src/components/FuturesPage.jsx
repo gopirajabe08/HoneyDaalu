@@ -12,6 +12,7 @@ import {
   startFuturesAutoRegime, startFuturesPaperRegime, startFuturesSwingRegime, startFuturesSwingPaperRegime,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
+import DailyStrategyStats from './DailyStrategyStats'
 import { LOG_COLORS } from '../utils/constants'
 
 const TABS = [
@@ -478,8 +479,8 @@ export default function FuturesPage({ capital, setCapital }) {
         </div>
       )}
 
-      {/* Active Positions */}
-      {positions.length > 0 && (
+      {/* Active Positions — hidden for live */}
+      {!isLive && positions.length > 0 && (
         <div className="bg-dark-700 rounded-xl p-4 border border-dark-500">
           <h3 className="text-xs font-semibold text-gray-400 mb-3">Active Positions</h3>
           <div className="space-y-2">
@@ -511,9 +512,12 @@ export default function FuturesPage({ capital, setCapital }) {
       )}
 
       {/* Trade History */}
-      {history.length > 0 && (
+      {!isLive && (
         <div className="bg-dark-700 rounded-xl p-4 border border-dark-500">
           <h3 className="text-xs font-semibold text-gray-400 mb-3">Recent Trades</h3>
+          {history.length === 0 ? (
+            <p className="text-xs text-gray-600 text-center py-4">No completed futures trades yet.</p>
+          ) : (
           <div className="space-y-1.5">
             {history.slice(-10).reverse().map((t, i) => (
               <div key={i} className="flex items-center justify-between text-xs bg-dark-800 rounded px-3 py-1.5">
@@ -528,8 +532,16 @@ export default function FuturesPage({ capital, setCapital }) {
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
+
+      {/* Daily Strategy Performance — after trades, before logs */}
+      <DailyStrategyStats
+        source={isLive ? (isSwing ? 'futures_swing' : 'futures_auto') : (isSwing ? 'futures_swing_paper' : 'futures_paper')}
+        days={isSwing ? 14 : 7}
+        accent={isLive ? 'orange' : 'blue'}
+      />
 
       {/* Logs */}
       {logs.length > 0 && (
@@ -547,6 +559,7 @@ export default function FuturesPage({ capital, setCapital }) {
           </div>
         </div>
       )}
+
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
   getMarketRegime,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
+import DailyStrategyStats from './DailyStrategyStats'
 import { LOG_COLORS, CONVICTION_COLORS, CONVICTION_LABELS, UNDERLYING_OPTIONS } from '../utils/constants'
 import { formatINR, formatLegs } from '../utils/formatters'
 
@@ -205,8 +206,8 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
             </div>
           )}
 
-          {/* Active trades */}
-          {activeTrades.length > 0 && (
+          {/* Active trades — hidden for live (Fyers Dashboard is source of truth) */}
+          {!isLive && activeTrades.length > 0 && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Activity size={16} className={accentText} />
@@ -262,13 +263,16 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
           )}
 
           {/* Trade History */}
-          {tradeHistory.length > 0 && (
+          {!isLive && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Clock size={16} className="text-gray-400" />
                 Completed Trades
                 <span className="text-[10px] text-gray-500 font-normal">{tradeHistory.length} trades</span>
               </h3>
+              {tradeHistory.length === 0 ? (
+                <p className="text-xs text-gray-600 text-center py-4">No completed options trades yet.</p>
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -316,8 +320,12 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           )}
+
+          {/* Daily Strategy Performance — right after completed trades */}
+          <DailyStrategyStats source={isLive ? 'options_auto' : 'options_paper'} days={7} accent={isLive ? 'orange' : 'blue'} />
 
           {/* Empty state */}
           {!running && activeTrades.length === 0 && tradeHistory.length === 0 && (
@@ -501,6 +509,7 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
           </div>
         </div>
       </div>
+
     </div>
   )
 }

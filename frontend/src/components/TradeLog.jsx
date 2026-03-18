@@ -272,7 +272,7 @@ export default function TradeLog() {
 
             {/* Date presets */}
             <div className="flex items-center gap-1 bg-dark-700 rounded-lg border border-dark-500 px-1.5 py-0.5">
-              {[7, 14, 30, 90].map(d => (
+              {[1, 7, 14, 30, 90].map(d => (
                 <button
                   key={d}
                   onClick={() => { setDays(d); setDateFrom(''); setDateTo('') }}
@@ -282,7 +282,7 @@ export default function TradeLog() {
                       : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
-                  {d}d
+                  {d === 1 ? 'Today' : `${d}d`}
                 </button>
               ))}
             </div>

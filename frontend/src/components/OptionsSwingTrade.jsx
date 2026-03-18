@@ -10,6 +10,7 @@ import {
   getMarketRegime,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
+import DailyStrategyStats from './DailyStrategyStats'
 import { LOG_COLORS, CONVICTION_COLORS, CONVICTION_LABELS, UNDERLYING_OPTIONS } from '../utils/constants'
 import { formatINR, formatLegs } from '../utils/formatters'
 
@@ -213,8 +214,8 @@ export default function OptionsSwingTrade({ mode, capital, setCapital }) {
             </div>
           )}
 
-          {/* Active trades */}
-          {activeTrades.length > 0 && (
+          {/* Active trades — hidden for live */}
+          {!isLive && activeTrades.length > 0 && (
             <div className={`bg-dark-700 rounded-2xl border ${accentBorder} p-5`}>
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Activity size={16} className={accentText} />
@@ -285,14 +286,17 @@ export default function OptionsSwingTrade({ mode, capital, setCapital }) {
             </div>
           )}
 
-          {/* Trade History */}
-          {tradeHistory.length > 0 && (
+          {/* Trade History — hidden for live */}
+          {!isLive && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Clock size={16} className="text-gray-400" />
                 Completed Swing Trades
                 <span className="text-[10px] text-gray-500 font-normal">{tradeHistory.length} trades</span>
               </h3>
+              {tradeHistory.length === 0 ? (
+                <p className="text-xs text-gray-600 text-center py-4">No completed swing options trades yet.</p>
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -340,8 +344,12 @@ export default function OptionsSwingTrade({ mode, capital, setCapital }) {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           )}
+
+          {/* Daily Strategy Performance */}
+          <DailyStrategyStats source={isLive ? 'options_swing' : 'options_swing_paper'} days={14} accent={isLive ? 'emerald' : 'teal'} />
 
           {/* Empty state */}
           {!running && activeTrades.length === 0 && tradeHistory.length === 0 && (
@@ -522,6 +530,7 @@ export default function OptionsSwingTrade({ mode, capital, setCapital }) {
           </div>
         </div>
       </div>
+
     </div>
   )
 }

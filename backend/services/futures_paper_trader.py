@@ -18,10 +18,11 @@ from services.futures_client import get_futures_ltp_batch
 from services.trade_logger import log_trade
 from services.fyers_client import is_authenticated
 from fno_stocks import get_fno_symbols
-from utils.time_utils import now_ist, is_past_time
+from utils.time_utils import now_ist, is_past_time, is_before_time
 from utils.state_manager import get_state_path, save_state, load_state
 from utils.trader_log import TraderLogger
 from config import (
+    FUTURES_ORDER_START_HOUR, FUTURES_ORDER_START_MIN,
     FUTURES_ORDER_CUTOFF_HOUR, FUTURES_ORDER_CUTOFF_MIN,
     FUTURES_SQUAREOFF_HOUR, FUTURES_SQUAREOFF_MIN,
     FUTURES_PAPER_MAX_POSITIONS, FUTURES_POSITION_CHECK_INTERVAL,
@@ -31,6 +32,10 @@ from config import (
 logger = logging.getLogger(__name__)
 
 STATE_FILE = get_state_path(".futures_paper_trader_state.json")
+
+
+def _is_before_order_start() -> bool:
+    return is_before_time(FUTURES_ORDER_START_HOUR, FUTURES_ORDER_START_MIN)
 
 
 def _is_past_order_cutoff() -> bool:
@@ -228,8 +233,16 @@ class FuturesPaperTrader:
     def _run_loop(self):
         self._log("INFO", "Background thread started")
 
-        if not _is_past_order_cutoff() and is_market_open():
-            self._log("SCAN", "Initial scan to fill slots")
+        # Wait for 12:00 PM order window
+        while self._running and _is_before_order_start():
+            self._log("INFO", "Waiting for 12:00 PM order window...")
+            for _ in range(60):
+                if not self._running or not _is_before_order_start():
+                    break
+                time.sleep(1)
+
+        if not _is_past_order_cutoff() and is_market_open() and self._running:
+            self._log("SCAN", "12:00 PM — initial scan to fill slots")
             self._execute_scan_cycle()
 
         prev_open = len(self._active_trades)
@@ -330,11 +343,13 @@ class FuturesPaperTrader:
         self._log("SCAN", f"Scan #{self._scan_count} — {len(unique)} signals")
         self._save_state()
 
+        max_orders_per_scan = min(2, slots)
         orders = 0
         active_syms = {t["symbol"] for t in self._active_trades}
 
         for signal in unique:
-            if orders >= slots:
+            if orders >= max_orders_per_scan:
+                self._log("INFO", f"Max 2 orders per scan — remaining slots will fill on next scan")
                 break
             if _is_past_order_cutoff():
                 break
@@ -356,15 +371,23 @@ class FuturesPaperTrader:
         if not all([symbol, signal_type, entry, sl, target, qty]):
             return False
 
+        # Simulate slippage (0.1% worse entry)
+        slippage = entry * 0.001
+        side = 1 if signal_type == "BUY" else -1
+        entry = round(entry + slippage if side == 1 else entry - slippage, 2)
+
+        # Estimate brokerage (₹20/order × 2 + STT for futures)
+        est_brokerage = round(40 + entry * qty * 0.0002, 2)
+
         order_id = f"FPAPER-{self._next_order_id:04d}"
         self._next_order_id += 1
 
-        self._log("ORDER", f"Virtual {signal_type}: {symbol} | {signal.get('num_lots', 0)} lots ({qty} qty) | Entry=₹{entry} | SL=₹{sl} | Target=₹{target}")
+        self._log("ORDER", f"Virtual {signal_type}: {symbol} | {signal.get('num_lots', 0)} lots ({qty} qty) | Entry=₹{entry} (incl slippage) | SL=₹{sl} | Target=₹{target}")
 
         trade = {
             "symbol": symbol,
             "signal_type": signal_type,
-            "side": 1 if signal_type == "BUY" else -1,
+            "side": side,
             "entry_price": entry,
             "stop_loss": sl,
             "target": target,
@@ -379,6 +402,7 @@ class FuturesPaperTrader:
             "status": "OPEN",
             "pnl": 0.0,
             "ltp": entry,
+            "est_brokerage": est_brokerage,
         }
 
         self._active_trades.append(trade)
@@ -402,17 +426,21 @@ class FuturesPaperTrader:
             side = trade["side"]
             pnl = round((ltp - trade["entry_price"]) * trade["quantity"] * (1 if side == 1 else -1), 2)
 
-            trade["pnl"] = pnl
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(pnl - brokerage, 2)
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = pnl
+            trade["charges"] = brokerage
             trade["ltp"] = ltp
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_price"] = ltp
             trade["exit_reason"] = "SQUARE_OFF"
-            self._total_pnl += pnl
-            self._daily_realized_pnl += pnl
+            self._total_pnl += net_pnl
+            self._daily_realized_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="futures_paper")
-            self._log("SQUAREOFF", f"{symbol} — ₹{ltp} | P&L: ₹{pnl:,.2f}")
+            self._log("SQUAREOFF", f"{symbol} — ₹{ltp} | Net P&L: ₹{net_pnl:,.2f} (charges: ₹{brokerage})")
 
         self._active_trades = []
         self._log("ALERT", f"Virtual square-off complete. P&L: ₹{self._total_pnl:,.2f}")
@@ -444,10 +472,16 @@ class FuturesPaperTrader:
                 trades_to_close.append(trade)
 
         for trade in trades_to_close:
+            gross_pnl = trade["pnl"]
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(gross_pnl - brokerage, 2)
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = gross_pnl
+            trade["charges"] = brokerage
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_price"] = trade["ltp"]
-            self._total_pnl += trade["pnl"]
+            self._total_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="futures_paper")
             self._daily_realized_pnl += trade["pnl"]

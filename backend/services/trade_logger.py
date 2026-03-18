@@ -273,10 +273,14 @@ def get_strategy_stats(source_filter: str = None) -> dict:
 
 
 def get_all_trades(days: int = 30) -> list[dict]:
-    """Get all trades from the last N days."""
+    """Get all trades from the last N days. days=1 means today only."""
     history = _load_history()
     if days <= 0:
         return history
+
+    if days == 1:
+        today = datetime.now(IST).strftime("%Y-%m-%d")
+        return [t for t in history if t.get("date", "") == today]
 
     cutoff = (datetime.now(IST) - timedelta(days=days)).strftime("%Y-%m-%d")
     return [t for t in history if t.get("date", "") >= cutoff]

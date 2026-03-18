@@ -423,12 +423,27 @@ class OptionsPaperTrader:
             self._log("WARN", f"{underlying} {strategy_id} — no legs in signal, skipping")
             return False
 
+        # Simulate realistic slippage (0.1% worse entry on each leg's premium)
+        for leg in legs:
+            leg_price = leg.get("price", 0)
+            if leg_price > 0:
+                slippage = leg_price * 0.001
+                leg_side = leg.get("side", 0)
+                if leg_side == 1:  # BUY leg: pay slightly more
+                    leg["price"] = round(leg_price + slippage, 2)
+                elif leg_side == -1:  # SELL leg: receive slightly less
+                    leg["price"] = round(leg_price - slippage, 2)
+
+        # Estimate brokerage: ₹20 per leg × 2 (entry + exit)
+        num_legs = len(legs)
+        est_brokerage = round(20 * num_legs * 2, 2)  # ₹20 × legs × 2 (entry + exit)
+
         order_id = f"OPT-PAPER-{self._next_order_id:04d}"
         self._next_order_id += 1
 
         legs_str = " | ".join(f"{'BUY' if l.get('side', 0) == 1 else 'SELL'} {l.get('symbol', '')}" for l in legs)
         self._log("ORDER", f"Virtual {spread_type} on {underlying}: {legs_str}")
-        self._log("ORDER", f"  Premium={net_premium:.2f} | Risk={max_risk:.2f} | Reward={max_reward:.2f} | Lots={num_lots} | Expiry={expiry}")
+        self._log("ORDER", f"  Premium={net_premium:.2f} | Risk={max_risk:.2f} | Reward={max_reward:.2f} | Lots={num_lots} | Expiry={expiry} | Est charges=₹{est_brokerage}")
 
         trade = {
             "underlying": underlying,
@@ -449,6 +464,7 @@ class OptionsPaperTrader:
             "current_net_premium": net_premium,
             "regime": signal.get("regime", ""),
             "strategy_type": signal.get("strategy_type", ""),
+            "est_brokerage": est_brokerage,
         }
 
         self._active_positions.append(trade)
@@ -468,20 +484,24 @@ class OptionsPaperTrader:
 
         for trade in self._active_positions:
             # Calculate final P&L from current LTP
-            pnl = self._calculate_position_pnl(trade)
-            trade["pnl"] = round(pnl, 2)
+            gross_pnl = self._calculate_position_pnl(trade)
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(gross_pnl - brokerage, 2)
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = round(gross_pnl, 2)
+            trade["charges"] = brokerage
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_reason"] = "SQUARE_OFF"
 
-            self._total_pnl += pnl
-            self._daily_realized_pnl += pnl
+            self._total_pnl += net_pnl
+            self._daily_realized_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="options_paper")
 
             underlying = trade.get("underlying", "")
             spread = trade.get("strategy", "")
-            self._log("SQUAREOFF", f"{underlying} {spread} — closed | P&L: {pnl:,.2f}")
+            self._log("SQUAREOFF", f"{underlying} {spread} — closed | Net P&L: {net_pnl:,.2f} (charges: ₹{brokerage})")
 
         self._active_positions = []
         self._log("ALERT", f"Virtual square-off complete. Total P&L: {self._total_pnl:,.2f}")
@@ -528,20 +548,25 @@ class OptionsPaperTrader:
 
         for trade in trades_to_close:
             reason = trade.get("exit_reason", "STRATEGY_EXIT")
-            pnl = trade.get("pnl", 0)
+            gross_pnl = trade.get("pnl", 0)
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(gross_pnl - brokerage, 2)
             underlying = trade.get("underlying", "")
             spread = trade.get("strategy", "")
 
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = gross_pnl
+            trade["charges"] = brokerage
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
-            self._total_pnl += pnl
-            self._daily_realized_pnl += pnl
-            if pnl < 0:
+            self._total_pnl += net_pnl
+            self._daily_realized_pnl += net_pnl
+            if net_pnl < 0:
                 self._last_loss_at = now_ist()
             self._trade_history.append(trade)
             log_trade(trade, source="options_paper")
 
-            self._log("ORDER", f"{underlying} {spread} — {reason} | P&L: {pnl:,.2f}")
+            self._log("ORDER", f"{underlying} {spread} — {reason} | Net P&L: {net_pnl:,.2f} (charges: ₹{brokerage})")
 
         self._active_positions = [p for p in self._active_positions if p["status"] == "OPEN"]
         self._save_state()

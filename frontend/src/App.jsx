@@ -34,19 +34,7 @@ export default function App() {
   function renderPage() {
     switch (activePage) {
       case 'dashboard':
-        return (
-          <div className="flex gap-6">
-            <div className="flex-1 min-w-0">
-              <Dashboard fyersStatus={fyersStatus} />
-            </div>
-            <div className="w-[280px] flex-shrink-0 space-y-4">
-              <FyersConnect
-                fyersStatus={fyersStatus}
-                setFyersStatus={setFyersStatus}
-              />
-            </div>
-          </div>
-        )
+        return <Dashboard fyersStatus={fyersStatus} />
 
       case 'equity':
         return <EquityPage capital={equityCapital} setCapital={setEquityCapital} />

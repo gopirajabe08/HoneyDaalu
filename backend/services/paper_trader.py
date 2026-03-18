@@ -14,10 +14,11 @@ from typing import Optional
 from services.scanner import run_scan, is_market_open
 from services.trade_logger import log_trade, log_trades_batch
 from services.fyers_client import get_quotes, is_authenticated
-from utils.time_utils import now_ist, is_past_time
+from utils.time_utils import now_ist, is_past_time, is_before_time
 from utils.state_manager import get_state_path, save_state, load_state
 from utils.trader_log import TraderLogger
 from config import (
+    INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN,
     INTRADAY_ORDER_CUTOFF_HOUR, INTRADAY_ORDER_CUTOFF_MIN,
     INTRADAY_SQUAREOFF_HOUR, INTRADAY_SQUAREOFF_MIN,
     INTRADAY_PAPER_MAX_POSITIONS, INTRADAY_POSITION_CHECK_INTERVAL,
@@ -253,11 +254,19 @@ class PaperTrader:
           4. At 3:15 PM — square off everything.
         """
         self._log("INFO", "Background thread started")
-        self._log("INFO", "Scan mode: ON-DEMAND — initial scan now, then re-scan only when a slot opens")
+        self._log("INFO", "Scan mode: ON-DEMAND — scan at 12:00 PM, then re-scan only when a slot opens")
+
+        # ── Wait for 12:00 PM order window ──
+        while self._running and is_before_time(INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN):
+            self._log("INFO", "Waiting for 12:00 PM order window...")
+            for _ in range(60):
+                if not self._running or not is_before_time(INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN):
+                    break
+                time.sleep(1)
 
         # ── Initial full scan ──
-        if not _is_past_order_cutoff() and is_market_open():
-            self._log("SCAN", "Executing initial full scan to fill all slots")
+        if not _is_past_order_cutoff() and is_market_open() and self._running:
+            self._log("SCAN", "12:00 PM — initial scan to fill all slots")
             self._execute_scan_cycle()
         elif not is_market_open():
             self._log("INFO", "Market closed — stopping paper trader")
@@ -452,7 +461,17 @@ class PaperTrader:
             return False
 
         side = 1 if signal_type == "BUY" else -1
+
+        # Simulate realistic slippage (0.1% worse entry — matches live market orders)
+        slippage = entry_price * 0.001
+        if side == 1:  # BUY: fill slightly higher
+            entry_price = round(entry_price + slippage, 2)
+        else:  # SELL: fill slightly lower
+            entry_price = round(entry_price - slippage, 2)
+
+        # Estimate brokerage for this trade (₹20/order × 2 legs + STT + charges)
         capital_req = qty * entry_price
+        est_brokerage = round(40 + capital_req * 0.0003, 2)  # ~₹40 + 0.03% of turnover
 
         order_id = f"PAPER-{self._next_order_id:04d}"
         self._next_order_id += 1
@@ -476,6 +495,7 @@ class PaperTrader:
             "status": "OPEN",
             "pnl": 0.0,
             "ltp": entry_price,
+            "est_brokerage": est_brokerage,
         }
 
         self._active_trades.append(trade)
@@ -508,18 +528,22 @@ class PaperTrader:
                 pnl = (trade["entry_price"] - ltp) * trade["quantity"]
 
             pnl = round(pnl, 2)
-            trade["pnl"] = pnl
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(pnl - brokerage, 2)
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = pnl
+            trade["charges"] = brokerage
             trade["ltp"] = ltp
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_price"] = ltp
             trade["exit_reason"] = "SQUARE_OFF"
 
-            self._total_pnl += pnl; self._daily_realized_pnl += pnl
+            self._total_pnl += net_pnl; self._daily_realized_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="paper")
 
-            self._log("SQUAREOFF", f"{symbol} — closed at ₹{ltp} | P&L: ₹{pnl:,.2f}")
+            self._log("SQUAREOFF", f"{symbol} — closed at ₹{ltp} | Gross: ₹{pnl:,.2f} | Charges: ₹{brokerage} | Net P&L: ₹{net_pnl:,.2f}")
 
         self._active_trades = []
         self._log("ALERT", f"Virtual square-off complete. Total P&L: ₹{self._total_pnl:,.2f}")
@@ -567,19 +591,24 @@ class PaperTrader:
         for trade in trades_to_close:
             symbol = trade["symbol"]
             reason = trade["exit_reason"]
-            pnl = trade["pnl"]
+            gross_pnl = trade["pnl"]
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(gross_pnl - brokerage, 2)
 
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = gross_pnl
+            trade["charges"] = brokerage
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_price"] = trade["ltp"]
-            self._total_pnl += pnl; self._daily_realized_pnl += pnl
+            self._total_pnl += net_pnl; self._daily_realized_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="paper")
 
             if reason == "SL_HIT":
-                self._log("ORDER", f"{symbol} — SL HIT at ₹{trade['ltp']} | P&L: ₹{pnl:,.2f}")
+                self._log("ORDER", f"{symbol} — SL HIT at ₹{trade['ltp']} | Net P&L: ₹{net_pnl:,.2f} (charges: ₹{brokerage})")
             else:
-                self._log("ORDER", f"{symbol} — TARGET HIT at ₹{trade['ltp']} | P&L: ₹{pnl:,.2f}")
+                self._log("ORDER", f"{symbol} — TARGET HIT at ₹{trade['ltp']} | Net P&L: ₹{net_pnl:,.2f} (charges: ₹{brokerage})")
 
         self._active_trades = [t for t in self._active_trades if t["status"] == "OPEN"]
         self._save_state()

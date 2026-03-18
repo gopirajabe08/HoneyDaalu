@@ -99,11 +99,11 @@ export default function DailyPnL() {
         const orders = ordRes?.orderBook || ordRes?.data?.orderBook || []
         const traded = positions.filter(p => (p.buyQty || 0) > 0 || (p.sellQty || 0) > 0)
         const closed = traded.filter(p => (p.netQty || 0) === 0)
-        const fWins = closed.filter(p => (p.realized_profit || 0) > 0)
-        const fLosers = closed.filter(p => (p.realized_profit || 0) < 0)
-        const fRealizedPnl = closed.reduce((s, p) => s + (p.realized_profit || 0), 0)
-        const fGrossProfit = fWins.reduce((s, p) => s + p.realized_profit, 0)
-        const fGrossLoss = fLosers.reduce((s, p) => s + p.realized_profit, 0)
+        const fWins = closed.filter(p => (p.pl || p.realized_profit || 0) > 0)
+        const fLosers = closed.filter(p => (p.pl || p.realized_profit || 0) < 0)
+        const fRealizedPnl = closed.reduce((s, p) => s + (p.pl || p.realized_profit || 0), 0)
+        const fGrossProfit = fWins.reduce((s, p) => s + (p.pl || p.realized_profit || 0), 0)
+        const fGrossLoss = fLosers.reduce((s, p) => s + (p.pl || p.realized_profit || 0), 0)
         const fWinRate = (fWins.length + fLosers.length) > 0
           ? Math.round((fWins.length / (fWins.length + fLosers.length)) * 100 * 10) / 10 : 0
         const brokerageToday = calcFyersBrokerage(positions, orders)
@@ -239,7 +239,7 @@ export default function DailyPnL() {
           {/* Days filter */}
           <div className="flex items-center gap-1.5 bg-dark-700 rounded-lg border border-dark-500 px-2 py-1">
             <Calendar size={12} className="text-gray-500" />
-            {[7, 14, 30, 90].map(d => (
+            {[1, 7, 14, 30, 90].map(d => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
@@ -247,7 +247,7 @@ export default function DailyPnL() {
                   days === d ? accentActive : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
-                {d}d
+                {d === 1 ? 'Today' : `${d}d`}
               </button>
             ))}
           </div>

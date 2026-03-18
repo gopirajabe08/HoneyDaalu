@@ -141,7 +141,9 @@
       "Bash(find mobile/src mobile/app -name *.jsx -o -name *.js)",
       "Bash(xargs cat:*)",
       "Bash(xargs du:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(git ls-remote:*)",
+      "Read(//Users/vgopiraja/Documents/MY Applications/IntraTrading/**)"
     ]
   }
 }

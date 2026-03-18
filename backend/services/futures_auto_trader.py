@@ -401,11 +401,13 @@ class FuturesAutoTrader:
         if not unique:
             return
 
+        max_orders_per_scan = min(2, slots_available)
         orders_placed = 0
         active_symbols = {t["symbol"] for t in self._active_trades}
 
         for signal in unique:
-            if orders_placed >= slots_available:
+            if orders_placed >= max_orders_per_scan:
+                self._log("INFO", f"Max 2 orders per scan — remaining slots will fill on next scan")
                 break
             if _is_past_order_cutoff():
                 break

@@ -222,14 +222,19 @@ class SwingPaperTrader:
             trade["exit_reason"] = "MANUAL_CLOSE"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_price"] = trade.get("ltp", trade["entry_price"])
-            pnl = trade.get("pnl", 0)
-            self._total_pnl += pnl
+            gross_pnl = trade.get("pnl", 0)
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(gross_pnl - brokerage, 2)
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = gross_pnl
+            trade["charges"] = brokerage
+            self._total_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="swing_paper")
             self._active_trades = [t for t in self._active_trades if t["status"] == "OPEN"]
-            self._log("ORDER", f"{symbol} — MANUAL CLOSE | P&L: ₹{pnl:,.2f}")
+            self._log("ORDER", f"{symbol} — MANUAL CLOSE | Net P&L: ₹{net_pnl:,.2f} (charges: ₹{brokerage})")
             self._save_state()
-            return {"status": "closed", "symbol": symbol, "pnl": round(pnl, 2)}
+            return {"status": "closed", "symbol": symbol, "pnl": round(net_pnl, 2)}
 
     def trigger_scan(self) -> dict:
         """Trigger an immediate scan (on-demand)."""
@@ -320,7 +325,7 @@ class SwingPaperTrader:
             in_retry_window = now.hour < 14 and now.hour >= 9 and now.weekday() < 5
 
             if has_open_slot and in_retry_window:
-                retry_time = now + timedelta(minutes=30)
+                retry_time = now + timedelta(minutes=120)  # 2 hours — daily data doesn't change every 30 min
                 self._next_scan_at = retry_time.isoformat()
                 self._log("INFO", f"No position open — retry scan at {retry_time.strftime('%I:%M %p IST')}")
                 self._save_state()
@@ -489,12 +494,23 @@ class SwingPaperTrader:
             return False
 
         side = 1 if signal_type == "BUY" else -1
+
+        # Simulate realistic slippage (0.1% worse entry — matches live market orders)
+        slippage = entry_price * 0.001
+        if side == 1:  # BUY: fill slightly higher
+            entry_price = round(entry_price + slippage, 2)
+        else:  # SELL: fill slightly lower
+            entry_price = round(entry_price - slippage, 2)
+
         capital_req = qty * entry_price
+
+        # Estimate brokerage for this trade (₹20/order × 2 legs + STT + charges)
+        est_brokerage = round(40 + capital_req * 0.0003, 2)  # ~₹40 + 0.03% of turnover
 
         order_id = f"SWING-P-{self._next_order_id:04d}"
         self._next_order_id += 1
 
-        self._log("ORDER", f"Virtual SWING {signal_type}: {symbol} | Qty={qty} | Entry=₹{entry_price} | SL=₹{stop_loss} | Target=₹{target} | R:R={rr}")
+        self._log("ORDER", f"Virtual SWING {signal_type}: {symbol} | Qty={qty} | Entry=₹{entry_price} (incl slippage) | SL=₹{stop_loss} | Target=₹{target} | R:R={rr}")
 
         trade = {
             "symbol": symbol,
@@ -513,6 +529,7 @@ class SwingPaperTrader:
             "status": "OPEN",
             "pnl": 0.0,
             "ltp": entry_price,
+            "est_brokerage": est_brokerage,
         }
 
         self._active_trades.append(trade)
@@ -571,19 +588,24 @@ class SwingPaperTrader:
         for trade in trades_to_close:
             symbol = trade["symbol"]
             reason = trade["exit_reason"]
-            pnl = trade["pnl"]
+            gross_pnl = trade["pnl"]
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(gross_pnl - brokerage, 2)
 
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = gross_pnl
+            trade["charges"] = brokerage
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_price"] = trade["ltp"]
-            self._total_pnl += pnl
+            self._total_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="swing_paper")
 
             if reason == "SL_HIT":
-                self._log("ORDER", f"{symbol} — SL HIT at ₹{trade['ltp']} | P&L: ₹{pnl:,.2f}")
+                self._log("ORDER", f"{symbol} — SL HIT at ₹{trade['ltp']} | Net P&L: ₹{net_pnl:,.2f} (charges: ₹{brokerage})")
             else:
-                self._log("ORDER", f"{symbol} — TARGET HIT at ₹{trade['ltp']} | P&L: ₹{pnl:,.2f}")
+                self._log("ORDER", f"{symbol} — TARGET HIT at ₹{trade['ltp']} | Net P&L: ₹{net_pnl:,.2f} (charges: ₹{brokerage})")
 
         self._active_trades = [t for t in self._active_trades if t["status"] == "OPEN"]
         self._save_state()

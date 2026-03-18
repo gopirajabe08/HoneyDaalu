@@ -79,6 +79,7 @@ STRATEGY_TIMEFRAMES = {
 SWING_STRATEGY_TIMEFRAMES = {
     "play1_ema_crossover": ["1h", "1d"],
     "play2_triple_ma": ["1h", "1d"],
+    "play4_supertrend": ["1d"],
     "play5_bb_squeeze": ["1d"],
     "play6_bb_contra": ["1d"],
 }
@@ -175,11 +176,11 @@ OPTIONS_SWING_EXIT_DAYS_BEFORE_EXPIRY = 2
 
 # Strategy parameters
 OPTIONS_STRATEGY_PARAMS = {
-    "bull_call_spread": {"otm_offset": 2, "profit_target_pct": 0.50, "stop_loss_mult": 1.5},
-    "bull_put_spread": {"otm_offset": 2, "profit_target_pct": 0.50, "stop_loss_mult": 1.5},
-    "bear_call_spread": {"otm_offset": 2, "profit_target_pct": 0.50, "stop_loss_mult": 1.5},
-    "bear_put_spread": {"otm_offset": 2, "profit_target_pct": 0.50, "stop_loss_mult": 1.5},
-    "iron_condor": {"otm_offset": 3, "profit_target_pct": 0.50, "stop_loss_mult": 1.5},
+    "bull_call_spread": {"otm_offset": 2, "profit_target_pct": 0.50, "stop_loss_mult": 1.0},
+    "bull_put_spread": {"otm_offset": 2, "profit_target_pct": 0.50, "stop_loss_mult": 1.0},
+    "bear_call_spread": {"otm_offset": 2, "profit_target_pct": 0.50, "stop_loss_mult": 1.0},
+    "bear_put_spread": {"otm_offset": 2, "profit_target_pct": 0.50, "stop_loss_mult": 1.0},
+    "iron_condor": {"otm_offset": 3, "profit_target_pct": 0.50, "stop_loss_mult": 1.0},
     "long_straddle": {"profit_target_pct": 0.30, "stop_loss_mult": 0.50},
 }
 
@@ -209,8 +210,8 @@ FUTURES_RISK_PER_TRADE_PCT = 0.05  # 5% default — adjustable for small capital
 FUTURES_DAILY_LOSS_LIMIT_PCT = 5.0
 
 # Liquidity filters — skip futures contracts with low OI/volume
-FUTURES_MIN_OI = 5000         # minimum open interest (in shares, not lots)
-FUTURES_MIN_DAILY_VOLUME = 50000  # minimum daily volume (in shares)
+FUTURES_MIN_OI = 1000         # minimum open interest (in shares, not lots)
+FUTURES_MIN_DAILY_VOLUME = 10000  # minimum daily volume — lowered from 50K to include more liquid stocks
 
 # Square-off retry
 FUTURES_SQUAREOFF_MAX_RETRIES = 3

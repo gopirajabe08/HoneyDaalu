@@ -314,62 +314,70 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
             </div>
           )}
 
-          {/* Trade History — show for paper mode, hide for live (use Trade Log page for full history) */}
-          {!isLive && tradeHistory.length > 0 && (
+          {/* Completed Trades — always visible */}
+          {/* Completed Trades — always visible */}
+          {!isLive && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Clock size={16} className="text-gray-400" />
                 Completed Trades
                 <span className="text-[10px] text-gray-500 font-normal">{tradeHistory.length} trades</span>
               </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-dark-500">
-                      {['Symbol', 'Signal', 'Strategy', 'Entry', 'Exit', 'Qty', 'P&L', 'Result'].map(h => (
-                        <th key={h} className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...tradeHistory].reverse().map((t, i) => {
-                      const isBuy = t.signal_type === 'BUY' || t.side === 1
-                      const pnl = t.pnl ?? 0
-                      const stratName = strategies.find(s => s.id === t.strategy)?.shortName || t.strategy
-                      const reason = t.exit_reason || ''
-                      const resultColor = reason === 'TARGET_HIT' ? 'bg-green-500/15 text-green-400' :
-                        reason === 'SL_HIT' ? 'bg-red-500/15 text-red-400' : 'bg-gray-500/15 text-gray-400'
-                      const resultLabel = reason === 'TARGET_HIT' ? 'TARGET' :
-                        reason === 'SL_HIT' ? 'SL HIT' : reason === 'SQUARE_OFF' ? 'SQ OFF' : 'CLOSED'
+              {tradeHistory.length === 0 ? (
+                <p className="text-xs text-gray-600 text-center py-4">No completed trades yet. Trades will appear here after SL, target, or square-off.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-dark-500">
+                        {['Symbol', 'Signal', 'Strategy', 'Entry', 'Exit', 'Qty', 'P&L', 'Result'].map(h => (
+                          <th key={h} className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...tradeHistory].reverse().map((t, i) => {
+                        const isBuy = t.signal_type === 'BUY' || t.side === 1
+                        const pnl = t.pnl ?? 0
+                        const stratName = strategies.find(s => s.id === t.strategy)?.shortName || t.strategy
+                        const reason = t.exit_reason || ''
+                        const resultColor = reason === 'TARGET_HIT' ? 'bg-green-500/15 text-green-400' :
+                          reason === 'SL_HIT' ? 'bg-red-500/15 text-red-400' : 'bg-gray-500/15 text-gray-400'
+                        const resultLabel = reason === 'TARGET_HIT' ? 'TARGET' :
+                          reason === 'SL_HIT' ? 'SL HIT' : reason === 'SQUARE_OFF' ? 'SQ OFF' : 'CLOSED'
 
-                      return (
-                        <tr key={i} className="border-b border-dark-600/30 hover:bg-dark-600/20">
-                          <td className="px-3 py-2.5 text-sm font-medium text-white">{t.symbol}</td>
-                          <td className="px-3 py-2.5">
-                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold ${isBuy ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
-                              {isBuy ? 'BUY' : 'SELL'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-[11px] text-gray-400">{stratName}</td>
-                          <td className="px-3 py-2.5 text-xs text-gray-300">{'\u20B9'}{t.entry_price}</td>
-                          <td className="px-3 py-2.5 text-xs text-gray-300">{'\u20B9'}{t.exit_price || t.ltp || '--'}</td>
-                          <td className="px-3 py-2.5 text-xs text-gray-300">{t.quantity}</td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-xs font-bold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {pnl >= 0 ? '+' : '-'}{formatINR(pnl)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${resultColor}`}>{resultLabel}</span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                        return (
+                          <tr key={i} className="border-b border-dark-600/30 hover:bg-dark-600/20">
+                            <td className="px-3 py-2.5 text-sm font-medium text-white">{t.symbol}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold ${isBuy ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                                {isBuy ? 'BUY' : 'SELL'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-[11px] text-gray-400">{stratName}</td>
+                            <td className="px-3 py-2.5 text-xs text-gray-300">{'\u20B9'}{t.entry_price}</td>
+                            <td className="px-3 py-2.5 text-xs text-gray-300">{'\u20B9'}{t.exit_price || t.ltp || '--'}</td>
+                            <td className="px-3 py-2.5 text-xs text-gray-300">{t.quantity}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`text-xs font-bold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {pnl >= 0 ? '+' : '-'}{formatINR(pnl)}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${resultColor}`}>{resultLabel}</span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
+
+          {/* Daily Strategy Performance — right after completed trades */}
+          <DailyStrategyStats source={isLive ? 'auto' : 'paper'} days={7} accent={accent} />
 
           {/* Empty state */}
           {!running && activeTrades.length === 0 && tradeHistory.length === 0 && (
@@ -625,8 +633,6 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
         </div>
       </div>
 
-      {/* Daily Strategy Performance */}
-      <DailyStrategyStats source={isLive ? 'auto' : 'paper'} days={7} accent={accent} />
     </div>
   )
 }

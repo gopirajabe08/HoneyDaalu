@@ -325,20 +325,29 @@ class FuturesSwingPaperTrader:
         if not all([symbol, signal_type, entry, sl, target, qty]):
             return False
 
+        # Simulate slippage (0.1% worse entry)
+        side = 1 if signal_type == "BUY" else -1
+        slippage = entry * 0.001
+        entry = round(entry + slippage if side == 1 else entry - slippage, 2)
+
+        # Estimate brokerage (₹20/order × 2 + STT for futures)
+        est_brokerage = round(40 + entry * qty * 0.0002, 2)
+
         order_id = f"FSWPAPER-{self._next_order_id:04d}"
         self._next_order_id += 1
 
-        self._log("ORDER", f"Virtual SWING {signal_type}: {symbol} | {signal.get('num_lots', 0)} lots | Entry=₹{entry}")
+        self._log("ORDER", f"Virtual SWING {signal_type}: {symbol} | {signal.get('num_lots', 0)} lots | Entry=₹{entry} (incl slippage)")
 
         trade = {
             "symbol": symbol, "signal_type": signal_type,
-            "side": 1 if signal_type == "BUY" else -1,
+            "side": side,
             "entry_price": entry, "stop_loss": sl, "target": target,
             "quantity": qty, "lot_size": signal.get("lot_size", 0),
             "num_lots": signal.get("num_lots", 0), "order_id": order_id,
             "strategy": signal.get("_strategy", ""), "timeframe": signal.get("_timeframe", ""),
             "oi_sentiment": signal.get("oi_sentiment", ""),
             "placed_at": now_ist().isoformat(), "status": "OPEN", "pnl": 0.0, "ltp": entry,
+            "est_brokerage": est_brokerage,
         }
 
         self._active_trades.append(trade)
@@ -353,17 +362,22 @@ class FuturesSwingPaperTrader:
         for trade in self._active_trades:
             ltp = ltp_map.get(trade["symbol"], trade.get("ltp", trade["entry_price"]))
             side = trade["side"]
-            pnl = round((ltp - trade["entry_price"]) * trade["quantity"] * (1 if side == 1 else -1), 2)
-            trade["pnl"] = pnl
+            gross_pnl = round((ltp - trade["entry_price"]) * trade["quantity"] * (1 if side == 1 else -1), 2)
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(gross_pnl - brokerage, 2)
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = gross_pnl
+            trade["charges"] = brokerage
+            trade["ltp"] = ltp
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_price"] = ltp
             trade["exit_reason"] = "EXPIRY_CLOSE"
-            self._total_pnl += pnl
-            self._daily_realized_pnl += pnl
+            self._total_pnl += net_pnl
+            self._daily_realized_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="futures_swing_paper")
-            self._log("ORDER", f"{trade['symbol']} — expiry close | P&L: ₹{pnl:,.2f}")
+            self._log("ORDER", f"{trade['symbol']} — expiry close | Net P&L: ₹{net_pnl:,.2f} (charges: ₹{brokerage})")
 
         self._active_trades = []
         self._save_state()
@@ -396,14 +410,20 @@ class FuturesSwingPaperTrader:
                 trades_to_close.append(trade)
 
         for trade in trades_to_close:
+            gross_pnl = trade["pnl"]
+            brokerage = trade.get("est_brokerage", 0)
+            net_pnl = round(gross_pnl - brokerage, 2)
+            trade["pnl"] = net_pnl
+            trade["gross_pnl"] = gross_pnl
+            trade["charges"] = brokerage
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
             trade["exit_price"] = trade["ltp"]
-            self._total_pnl += trade["pnl"]
-            self._daily_realized_pnl += trade["pnl"]
+            self._total_pnl += net_pnl
+            self._daily_realized_pnl += net_pnl
             self._trade_history.append(trade)
             log_trade(trade, source="futures_swing_paper")
-            self._log("ORDER", f"{trade['symbol']} — {trade['exit_reason']} | P&L: ₹{trade['pnl']:,.2f}")
+            self._log("ORDER", f"{trade['symbol']} — {trade['exit_reason']} | Net P&L: ₹{net_pnl:,.2f} (charges: ₹{brokerage})")
 
         self._active_trades = [t for t in self._active_trades if t["status"] == "OPEN"]
         self._save_state()
