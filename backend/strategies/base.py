@@ -45,13 +45,14 @@ class BaseStrategy(ABC):
     stop_loss_rules: str = ""
 
     @abstractmethod
-    def scan(self, df: pd.DataFrame, symbol: str) -> Optional[dict]:
+    def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
         """
         Scan a stock's OHLCV data for entry signals.
 
         Args:
             df: DataFrame with columns [Open, High, Low, Close, Volume]
             symbol: Stock symbol
+            **kwargs: Extra arguments (e.g. oi_data when called from futures scanner)
 
         Returns:
             dict with signal details or None if no signal.
@@ -195,12 +196,43 @@ def calc_sma(series: pd.Series, period: int) -> pd.Series:
     return series.rolling(window=period).mean()
 
 
+def calc_rsi(series: pd.Series, period: int = 14) -> pd.Series:
+    """Calculate Relative Strength Index."""
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = (-delta).where(delta < 0, 0.0)
+    avg_gain = gain.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
 def calc_vwap(df: pd.DataFrame) -> pd.Series:
-    """Calculate session VWAP (assumes single-day session data)."""
+    """Calculate session VWAP — resets at each trading day boundary (9:15 AM IST)."""
     typical_price = (df["High"] + df["Low"] + df["Close"]) / 3
-    cum_tp_vol = (typical_price * df["Volume"]).cumsum()
-    cum_vol = df["Volume"].cumsum()
-    return cum_tp_vol / cum_vol
+    tp_vol = typical_price * df["Volume"]
+
+    # Try to detect day boundaries for proper VWAP reset
+    try:
+        if hasattr(df.index, 'date'):
+            dates = df.index.date
+        else:
+            dates = pd.to_datetime(df.index).date
+
+        # Group by date and calculate cumulative VWAP per session
+        vwap = pd.Series(index=df.index, dtype=float)
+        for date in pd.unique(dates):
+            mask = dates == date
+            day_tp_vol = tp_vol[mask].cumsum()
+            day_vol = df["Volume"][mask].cumsum()
+            vwap[mask] = day_tp_vol / day_vol.replace(0, float('nan'))
+        return vwap
+    except Exception:
+        # Fallback: simple cumulative (for daily data where no session reset needed)
+        cum_tp_vol = tp_vol.cumsum()
+        cum_vol = df["Volume"].cumsum()
+        return cum_tp_vol / cum_vol
 
 
 def calc_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3.0):
@@ -282,7 +314,7 @@ def calc_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
 
 def atr_stop_loss(df: pd.DataFrame, entry: float, side: str = "BUY",
-                  atr_mult: float = 1.5, atr_period: int = 14,
+                  atr_mult: float = 2.5, atr_period: int = 14,
                   min_pct: float = 0.012) -> float:
     """
     Calculate ATR-based stop loss with a minimum % floor.
@@ -303,3 +335,52 @@ def atr_stop_loss(df: pd.DataFrame, entry: float, side: str = "BUY",
         return round(entry - sl_distance, 2)
     else:
         return round(entry + sl_distance, 2)
+
+
+# ── Pivot Point Calculation ──────────────────────────────────────────────
+
+
+def calc_pivot_points(df: pd.DataFrame) -> dict:
+    """
+    Calculate daily pivot points from previous day's OHLC.
+    Used to enhance SL/target placement for all strategies.
+
+    Returns dict with: pivot, r1, r2, r3, s1, s2, s3
+    Returns empty dict if insufficient data.
+    """
+    if df is None or len(df) < 2:
+        return {}
+
+    # For intraday data: find previous day's high, low, close
+    # Group by date, take the second-to-last day's data
+    try:
+        df_copy = df.copy()
+        df_copy['date'] = df_copy.index.date if hasattr(df_copy.index, 'date') else pd.to_datetime(df_copy.index).date
+        daily = df_copy.groupby('date').agg({'High': 'max', 'Low': 'min', 'Close': 'last'})
+
+        if len(daily) < 2:
+            # For daily data, use iloc[-2]
+            if len(df) >= 2:
+                prev = df.iloc[-2]
+                h, l, c = float(prev['High']), float(prev['Low']), float(prev['Close'])
+            else:
+                return {}
+        else:
+            prev_day = daily.iloc[-2]
+            h, l, c = float(prev_day['High']), float(prev_day['Low']), float(prev_day['Close'])
+
+        pivot = (h + l + c) / 3
+        r1 = 2 * pivot - l
+        s1 = 2 * pivot - h
+        r2 = pivot + (h - l)
+        s2 = pivot - (h - l)
+        r3 = h + 2 * (pivot - l)
+        s3 = l - 2 * (h - pivot)
+
+        return {
+            'pivot': round(pivot, 2),
+            'r1': round(r1, 2), 'r2': round(r2, 2), 'r3': round(r3, 2),
+            's1': round(s1, 2), 's2': round(s2, 2), 's3': round(s3, 2),
+        }
+    except Exception:
+        return {}

@@ -17,7 +17,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 
-from services.scanner import run_scan, is_market_open
+from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.trade_logger import log_trade
 from services.fyers_client import (
     place_order,
@@ -431,13 +431,13 @@ class SwingTrader:
             all_signals.extend(signals)
             self._log("SCAN", f"  {strategy_key}({timeframe}): {len(signals)} signals ({scan_time}s)")
 
-        # Deduplicate
+        # Deduplicate by symbol — keep highest conviction signal per symbol
         seen_symbols = {}
         for sig in all_signals:
             sym = sig.get("symbol", "")
-            rr_val = sig.get("reward", 0) / max(sig.get("risk", 1), 0.01)
-            if sym not in seen_symbols or rr_val > seen_symbols[sym][1]:
-                seen_symbols[sym] = (sig, rr_val)
+            conv = _calc_conviction(sig)
+            if sym not in seen_symbols or conv > seen_symbols[sym][1]:
+                seen_symbols[sym] = (sig, conv)
 
         unique_signals = [s[0] for s in sorted(seen_symbols.values(), key=lambda x: x[1], reverse=True)]
         self._log("SCAN", f"Swing scan #{self._scan_count} — {len(unique_signals)} signals ({total_time:.1f}s)")

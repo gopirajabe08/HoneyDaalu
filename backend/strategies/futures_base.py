@@ -100,8 +100,8 @@ def calc_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
 
 def atr_stop_loss(df: pd.DataFrame, entry: float, side: str = "BUY",
-                  atr_mult: float = 1.5, atr_period: int = 14,
-                  min_pct: float = 0.005) -> float:
+                  atr_mult: float = 2.5, atr_period: int = 14,
+                  min_pct: float = 0.012) -> float:
     """ATR-based stop loss with minimum % floor."""
     atr = calc_atr(df, atr_period)
     atr_val = atr.iloc[-1] if pd.notna(atr.iloc[-1]) else entry * min_pct

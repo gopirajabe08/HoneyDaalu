@@ -14,6 +14,9 @@ const EXTRA_STRAT_NAMES = {
   futures_candlestick_reversal: 'Reversal',
   futures_mean_reversion: 'Mean Rev',
   futures_ema_rsi_pullback: 'EMA Pullback',
+  play7_orb: 'ORB Breakout',
+  play8_rsi_divergence: 'RSI Divergence',
+  play9_gap_analysis: 'Gap Analysis',
 }
 
 const STRAT_COLORS = [

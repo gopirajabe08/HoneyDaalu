@@ -1,23 +1,45 @@
 """
-Market data service — fetches OHLCV candles and Nifty 50 trend via yfinance.
+Market data service — fetches OHLCV candles via Fyers API (primary) with yfinance fallback.
 
-Provides helpers for individual stock data, batch fetching with thread-pool
-concurrency, and a cached Nifty 50 trend check used by strategies that
-require broad-market confirmation (e.g. 200 SMA filter).
+Fyers provides real-time data with 10 req/sec rate limit.
+yfinance is used as fallback when Fyers is not authenticated or fails.
+All consumers get the same DataFrame format: [Open, High, Low, Close, Volume].
 """
 
 import yfinance as yf
 import pandas as pd
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
-from functools import lru_cache
 from datetime import datetime, timezone, timedelta
 import time
 
 from nifty500 import get_yfinance_symbol
 from config import INTERVAL_PERIOD_MAP
 
+logger = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
+
+# Fyers interval mapping: our interval → Fyers resolution string
+FYERS_INTERVAL_MAP = {
+    "1m": "1",
+    "3m": "3",
+    "5m": "5",
+    "10m": "10",
+    "15m": "15",
+    "30m": "30",
+    "1h": "60",
+    "1d": "D",
+}
+
+# How many calendar days of data to request per interval
+FYERS_DAYS_MAP = {
+    "5m": 30,
+    "15m": 60,
+    "30m": 60,
+    "1h": 90,
+    "1d": 365,
+}
 
 
 def _is_market_hours() -> bool:
@@ -48,26 +70,97 @@ def _set_cache(symbol: str, interval: str, df: pd.DataFrame):
     _cache[(symbol, interval)] = (time.time(), df)
 
 
-def fetch_stock_data(
-    nse_symbol: str,
-    interval: str = "15m",
-    period: Optional[str] = None,
-) -> Optional[pd.DataFrame]:
+# Rate limiter for Fyers API (max 10 req/sec)
+_last_fyers_call = 0.0
+_FYERS_MIN_INTERVAL = 0.1  # 100ms between calls = 10/sec
+
+
+def _rate_limit_fyers():
+    """Ensure we don't exceed Fyers rate limit."""
+    global _last_fyers_call
+    now = time.time()
+    elapsed = now - _last_fyers_call
+    if elapsed < _FYERS_MIN_INTERVAL:
+        time.sleep(_FYERS_MIN_INTERVAL - elapsed)
+    _last_fyers_call = time.time()
+
+
+def _fetch_via_fyers(nse_symbol: str, interval: str) -> Optional[pd.DataFrame]:
     """
-    Fetch OHLCV data for a single NSE stock.
-
-    Args:
-        nse_symbol: NSE symbol (e.g., "RELIANCE")
-        interval: Candle interval (e.g., "5m", "15m", "1d")
-        period: Data period (e.g., "5d", "30d"). Auto-selected if None.
-
-    Returns:
-        DataFrame with [Open, High, Low, Close, Volume] or None on error.
+    Fetch OHLCV data from Fyers history API.
+    Returns DataFrame with [Open, High, Low, Close, Volume] or None.
     """
-    cached = _get_cached(nse_symbol, interval)
-    if cached is not None:
-        return cached
+    try:
+        from services.fyers_client import get_fyers, is_authenticated, format_fyers_symbol
 
+        if not is_authenticated():
+            return None
+
+        fyers = get_fyers()
+        if fyers is None:
+            return None
+
+        fyers_resolution = FYERS_INTERVAL_MAP.get(interval)
+        if not fyers_resolution:
+            return None
+
+        # Calculate date range
+        days = FYERS_DAYS_MAP.get(interval, 30)
+        now = datetime.now(IST)
+        date_from = (now - timedelta(days=days)).strftime("%Y-%m-%d")
+        date_to = now.strftime("%Y-%m-%d")
+
+        fyers_symbol = format_fyers_symbol(nse_symbol)
+
+        _rate_limit_fyers()
+
+        data = {
+            "symbol": fyers_symbol,
+            "resolution": fyers_resolution,
+            "date_format": "1",
+            "range_from": date_from,
+            "range_to": date_to,
+            "cont_flag": "1",
+        }
+
+        response = fyers.history(data=data)
+
+        if not response or response.get("s") != "ok":
+            return None
+
+        candles = response.get("candles", [])
+        if not candles or len(candles) < 5:
+            return None
+
+        # Fyers candle format: [timestamp, open, high, low, close, volume]
+        df = pd.DataFrame(candles, columns=["Timestamp", "Open", "High", "Low", "Close", "Volume"])
+        df["Datetime"] = pd.to_datetime(df["Timestamp"], unit="s", utc=True).dt.tz_convert(IST)
+        df.set_index("Datetime", inplace=True)
+        df.drop(columns=["Timestamp"], inplace=True)
+
+        # Ensure correct types
+        for col in ["Open", "High", "Low", "Close"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0).astype(int)
+
+        df.dropna(subset=["Open", "High", "Low", "Close"], inplace=True)
+
+        # Drop incomplete daily candle during market hours
+        if interval == "1d" and _is_market_hours() and len(df) > 1:
+            df = df.iloc[:-1]
+
+        if len(df) < 5:
+            return None
+
+        return df[["Open", "High", "Low", "Close", "Volume"]]
+
+    except Exception as e:
+        logger.debug(f"[MarketData] Fyers fetch failed for {nse_symbol} ({interval}): {e}")
+        return None
+
+
+def _fetch_via_yfinance(nse_symbol: str, interval: str, period: Optional[str] = None) -> Optional[pd.DataFrame]:
+    """Fallback: Fetch via yfinance (15-min delayed)."""
     if period is None:
         period = INTERVAL_PERIOD_MAP.get(interval, "30d")
 
@@ -80,7 +173,6 @@ def fetch_stock_data(
         if df is None or df.empty:
             return None
 
-        # Keep only OHLCV columns
         required = ["Open", "High", "Low", "Close", "Volume"]
         for col in required:
             if col not in df.columns:
@@ -89,20 +181,51 @@ def fetch_stock_data(
         df = df[required].copy()
         df.dropna(inplace=True)
 
-        # Drop incomplete daily candle during market hours.
-        # yfinance includes today's in-progress candle for "1d" interval,
-        # which produces unreliable indicator signals.
         if interval == "1d" and _is_market_hours() and len(df) > 1:
             df = df.iloc[:-1]
 
         if len(df) < 5:
             return None
 
-        _set_cache(nse_symbol, interval, df)
         return df
 
     except Exception:
         return None
+
+
+def fetch_stock_data(
+    nse_symbol: str,
+    interval: str = "15m",
+    period: Optional[str] = None,
+) -> Optional[pd.DataFrame]:
+    """
+    Fetch OHLCV data for a single NSE stock.
+    Primary: Fyers API (real-time). Fallback: yfinance (delayed).
+
+    Args:
+        nse_symbol: NSE symbol (e.g., "RELIANCE")
+        interval: Candle interval (e.g., "5m", "15m", "1d")
+        period: Data period — used for yfinance fallback only.
+
+    Returns:
+        DataFrame with [Open, High, Low, Close, Volume] or None on error.
+    """
+    cached = _get_cached(nse_symbol, interval)
+    if cached is not None:
+        return cached
+
+    # Try Fyers first (real-time)
+    df = _fetch_via_fyers(nse_symbol, interval)
+
+    # Fallback to yfinance if Fyers fails
+    if df is None:
+        df = _fetch_via_yfinance(nse_symbol, interval, period)
+
+    if df is not None and not df.empty:
+        _set_cache(nse_symbol, interval, df)
+        return df
+
+    return None
 
 
 def get_nifty_trend(timeframe: str = "5m") -> str:
@@ -110,27 +233,52 @@ def get_nifty_trend(timeframe: str = "5m") -> str:
     Check Nifty 50 trend direction using VWAP and 20 EMA.
 
     Returns:
-        "BULLISH"  — Nifty above both VWAP and 20 EMA (favour longs)
-        "BEARISH"  — Nifty below both VWAP and 20 EMA (favour shorts)
-        "NEUTRAL"  — mixed signals (allow both)
+        "BULLISH"  — Nifty above both VWAP and 20 EMA
+        "BEARISH"  — Nifty below both
+        "NEUTRAL"  — mixed signals
         "UNKNOWN"  — data unavailable
     """
     try:
-        # Nifty 50 index on yfinance: ^NSEI
         cached = _get_cached("^NSEI_TREND", timeframe)
         if cached is not None:
-            # cached stores a 1-row DF with trend info
             return cached.iloc[0]["trend"]
 
-        ticker = yf.Ticker("^NSEI")
-        period = INTERVAL_PERIOD_MAP.get(timeframe, "5d")
-        df = ticker.history(period=period, interval=timeframe)
+        # Try Fyers for NIFTY index
+        df = None
+        try:
+            from services.fyers_client import get_fyers, is_authenticated
+            if is_authenticated():
+                fyers = get_fyers()
+                if fyers:
+                    fyers_resolution = FYERS_INTERVAL_MAP.get(timeframe, "15")
+                    now = datetime.now(IST)
+                    data = {
+                        "symbol": "NSE:NIFTY50-INDEX",
+                        "resolution": fyers_resolution,
+                        "date_format": "1",
+                        "range_from": (now - timedelta(days=30)).strftime("%Y-%m-%d"),
+                        "range_to": now.strftime("%Y-%m-%d"),
+                        "cont_flag": "1",
+                    }
+                    _rate_limit_fyers()
+                    response = fyers.history(data=data)
+                    if response and response.get("s") == "ok":
+                        candles = response.get("candles", [])
+                        if candles and len(candles) >= 20:
+                            df = pd.DataFrame(candles, columns=["Timestamp", "Open", "High", "Low", "Close", "Volume"])
+                            df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
+        except Exception:
+            pass
 
-        if df is None or df.empty or len(df) < 20:
-            return "UNKNOWN"
-
-        df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
-        df.dropna(inplace=True)
+        # Fallback to yfinance
+        if df is None or len(df) < 20:
+            ticker = yf.Ticker("^NSEI")
+            period = INTERVAL_PERIOD_MAP.get(timeframe, "5d")
+            df = ticker.history(period=period, interval=timeframe)
+            if df is None or df.empty or len(df) < 20:
+                return "UNKNOWN"
+            df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
+            df.dropna(inplace=True)
 
         if len(df) < 20:
             return "UNKNOWN"
@@ -155,7 +303,6 @@ def get_nifty_trend(timeframe: str = "5m") -> str:
         else:
             trend = "NEUTRAL"
 
-        # Cache the result (uses standard 2-min TTL)
         result_df = pd.DataFrame([{"trend": trend}])
         _set_cache("^NSEI_TREND", timeframe, result_df)
 
@@ -168,10 +315,11 @@ def get_nifty_trend(timeframe: str = "5m") -> str:
 def fetch_bulk_data(
     symbols: list[str],
     interval: str = "15m",
-    max_workers: int = 10,
+    max_workers: int = 8,
 ) -> dict[str, pd.DataFrame]:
     """
     Fetch data for multiple symbols concurrently.
+    Uses Fyers with rate limiting, falls back to yfinance per-symbol.
 
     Returns:
         dict mapping symbol -> DataFrame (only successful fetches).

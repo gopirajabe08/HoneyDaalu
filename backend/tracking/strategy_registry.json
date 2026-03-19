@@ -1,0 +1,362 @@
+{
+  "_meta": {
+    "description": "Master registry of ALL strategy parameters. Claude and the daily tracker reference this file before making ANY changes. Every parameter change MUST be logged in changelog.json with date + reason + data backing.",
+    "last_updated": "2026-03-18",
+    "version": "2.0.0 \u2014 auto-tuned Mar 18"
+  },
+  "equity_intraday": {
+    "play1_ema_crossover": {
+      "file": "backend/strategies/play1_ema_crossover.py",
+      "indicators": {
+        "ema_fast": 9,
+        "ema_slow": 21,
+        "sma_filter": 50,
+        "adx_period": 14,
+        "adx_min": 25
+      },
+      "entry_rules": {
+        "crossover": "9 EMA crosses 21 EMA",
+        "trend_filter": "price above/below 50 SMA",
+        "min_ema_gap_pct": 0.003,
+        "sma50_slope_lookback": 5,
+        "min_sma50_distance_pct": 0.015,
+        "nifty_regime_threshold_pct": 0.01,
+        "volume_confirmation": "volume > 1.3x SMA20 required"
+      },
+      "risk_management": {
+        "sl_method": "min(swing_low, ATR-based)",
+        "atr_multiplier": 2.5,
+        "min_sl_pct": 0.012,
+        "swing_lookback": 10,
+        "rr_ratio": "1:2"
+      },
+      "signal_ranking": "conviction score (volume_ratio \u00d7 price_range \u00d7 strategy_boost 0.9x) [P1-001]",
+      "known_issues": [
+        "ADX filter only on swing mode, missing for intraday",
+        "SMA50 slope 5-bar lookback too short"
+      ],
+      "performance_notes": {
+        "30d_win_rate": "40%",
+        "30d_trades": 5,
+        "30d_pnl": -512.25,
+        "best_signal": "SELL in bearish regime on 15m",
+        "worst_signal": "SELL in bullish intraday \u2014 counter-trend"
+      }
+    },
+    "play2_triple_ma": {
+      "file": "backend/strategies/play2_triple_ma.py",
+      "indicators": {
+        "ema": 20,
+        "sma_mid": 50,
+        "sma_long": 200,
+        "min_candles": 210
+      },
+      "entry_rules": {
+        "stacking": "20 EMA > 50 SMA > 200 SMA (BUY), inverse (SELL)",
+        "slope_check": "EMA20 and SMA50 must slope in direction (3-bar lookback)",
+        "pullback_tolerance_pct": 0.005,
+        "candle_pattern": "hammer, doji, engulfing, or bullish close required",
+        "volume_confirmation": "volume > 1.3x SMA20 required"
+      },
+      "risk_management": {
+        "sl_method": "min(swing_low/high, ATR-based)",
+        "atr_multiplier": 2.5,
+        "swing_lookback": 8,
+        "rr_ratio": "1:2"
+      },
+      "signal_ranking": "conviction score (volume_ratio \u00d7 price_range \u00d7 strategy_boost 0.7x) [P1-001]",
+      "known_issues": [
+        "Pullback tolerance 0.5% is too tight \u2014 misses valid setups",
+        "Slope check only 3 bars \u2014 too short to confirm trend",
+        "SMA200 slope not required \u2014 can be flat/rolling over"
+      ],
+      "performance_notes": {
+        "30d_win_rate": "44%",
+        "30d_trades": 32,
+        "30d_pnl": -5531.22,
+        "observation": "WORST performer. Strategy boost set to 0.7x to deprioritize."
+      }
+    },
+    "play3_vwap_pullback": {
+      "file": "backend/strategies/play3_vwap_pullback.py",
+      "indicators": {
+        "vwap": "session VWAP",
+        "min_candles": 15
+      },
+      "entry_rules": {
+        "trending_window": "5 candles (iloc[-8:-3])",
+        "min_trending_above_vwap": 3,
+        "pullback_zone": "2 candles (iloc[-3:-1])",
+        "vwap_touch_tolerance_pct": 0.002,
+        "near_vwap_tolerance_pct": 0.005,
+        "entry_type": "trigger candle HIGH (aggressive)",
+        "volume_confirmation": "volume > 1.3x SMA20 required"
+      },
+      "risk_management": {
+        "sl_method": "min(swing_low, VWAP-0.2%, ATR-based)",
+        "atr_multiplier": 2.5,
+        "swing_lookback": 10,
+        "target_lookback": 15,
+        "rr_ratio_t1": "1:2",
+        "rr_ratio_t2": "1:3"
+      },
+      "signal_ranking": "conviction score (volume_ratio \u00d7 price_range \u00d7 strategy_boost 1.2x) [P1-001]",
+      "performance_notes": {
+        "30d_win_rate": "75%",
+        "30d_trades": 4,
+        "30d_pnl": 1314.07,
+        "observation": "Best win rate but fewest trades. Only runs on 5m, skipped when VIX > 18"
+      }
+    },
+    "play4_supertrend": {
+      "file": "backend/strategies/play4_supertrend.py",
+      "indicators": {
+        "supertrend_period": 10,
+        "supertrend_multiplier": 3.0,
+        "ema": 20,
+        "min_candles": 25
+      },
+      "entry_rules": {
+        "trend": "Supertrend GREEN (BUY) or RED (SELL)",
+        "ema_filter": "price above/below 20 EMA",
+        "power_zone_tolerance_pct": 0.005,
+        "power_zone_candles": 3,
+        "candle_pattern": "bullish/bearish reversal required",
+        "entry_type": "trigger candle HIGH/LOW (aggressive)",
+        "volume_confirmation": "volume > 1.3x SMA20 required"
+      },
+      "risk_management": {
+        "sl_method": "ATR-based only",
+        "atr_multiplier": 2.5,
+        "target_lookback": 15,
+        "rr_ratio_t1": "1:2",
+        "rr_ratio_t2": "1:3"
+      },
+      "signal_ranking": "conviction score (volume_ratio \u00d7 price_range \u00d7 strategy_boost 1.3x \u2014 HIGHEST) [P1-001]",
+      "performance_notes": {
+        "30d_win_rate": "52%",
+        "30d_trades": 23,
+        "30d_pnl": 4133.13,
+        "observation": "BEST performer. Gets 1.3x conviction boost \u2014 prioritized in signal selection."
+      }
+    },
+    "play5_bb_squeeze": {
+      "file": "backend/strategies/play5_bb_squeeze.py",
+      "indicators": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "min_candles": 30
+      },
+      "entry_rules": {
+        "squeeze_window": 10,
+        "squeeze_threshold": 0.85,
+        "longer_bw_period": 20,
+        "breakout_body_mult": 1.5,
+        "entry_type": "current candle HIGH (aggressive)",
+        "volume_confirmation": "volume > 1.3x SMA20 required"
+      },
+      "risk_management": {
+        "sl_method": "min(BB middle band, ATR-based)",
+        "atr_multiplier": 2.5,
+        "rr_ratio": "1:1.5"
+      },
+      "signal_ranking": "conviction score (volume_ratio \u00d7 price_range \u00d7 strategy_boost 1.0x) [P1-001]"
+    },
+    "play6_bb_contra": {
+      "file": "backend/strategies/play6_bb_contra.py",
+      "indicators": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "sma_long": 200,
+        "min_candles": 210
+      },
+      "entry_rules": {
+        "trend_filter": "price above 200 SMA (BUY), below (SELL)",
+        "sma200_slope_lookback": 10,
+        "band_touch_tolerance_pct": 0.002,
+        "reversal_candle": "hammer, doji, or engulfing required",
+        "entry_type": "reversal candle HIGH/LOW",
+        "volume_confirmation": "volume > 1.3x SMA20 required"
+      },
+      "risk_management": {
+        "sl_method": "min(reversal candle low, ATR-based)",
+        "atr_multiplier": 2.5,
+        "target": "BB middle band (SMA20)",
+        "rr_ratio": "dynamic"
+      },
+      "signal_ranking": "conviction score (volume_ratio \u00d7 price_range \u00d7 strategy_boost 1.1x) [P1-001]"
+    }
+  },
+  "futures": {
+    "futures_volume_breakout": {
+      "file": "backend/strategies/futures_volume_breakout.py",
+      "indicators": {
+        "high_low_lookback": 20,
+        "volume_sma_period": 20,
+        "atr_period": 14
+      },
+      "entry_rules": {
+        "breakout": "close above/below 20-period high/low",
+        "volume_threshold": 1.5,
+        "breakout_magnitude_atr": 0.3,
+        "oi_filter": "HARD \u2014 blocks counter-sentiment trades [P1-003]",
+        "volume_confirmation": "1.5x SMA20"
+      },
+      "risk_management": {
+        "atr_multiplier": 2.5,
+        "min_sl_pct": 0.012,
+        "rr_ratio": "1:2",
+        "risk_per_trade_pct": 0.02
+      },
+      "known_issues_resolved": [
+        "[P0-002] ATR mult 1.5\u21922.5, min_pct 0.005\u21920.012",
+        "[P0-003] Risk per trade 5%\u21922%",
+        "[P1-003] OI soft\u2192hard filter"
+      ]
+    },
+    "futures_ema_rsi_pullback": {
+      "file": "backend/strategies/futures_ema_rsi_pullback.py",
+      "indicators": {
+        "ema_period": 50,
+        "rsi_period": 14,
+        "volume_sma_period": 20
+      },
+      "entry_rules": {
+        "trend": "close above/below 50 EMA",
+        "ema_proximity_pct": 0.05,
+        "rsi_long_range": [
+          35,
+          60
+        ],
+        "rsi_short_range": [
+          40,
+          65
+        ],
+        "volume_threshold": 1.0,
+        "oi_filter": "HARD \u2014 blocks counter-sentiment trades [P1-003]"
+      },
+      "risk_management": {
+        "atr_multiplier": 2.5,
+        "min_sl_pct": 0.012,
+        "rr_ratio": "1:2",
+        "risk_per_trade_pct": 0.02
+      },
+      "known_issues_remaining": [
+        "RSI 35-60 is still wide \u2014 monitor if too many false pullbacks",
+        "Volume 1.0x is still low \u2014 consider raising to 1.3x after observation",
+        "EMA proximity 5% is still wide"
+      ]
+    }
+  },
+  "options": {
+    "strategies": {
+      "bull_call_spread": {
+        "otm_offset": 2,
+        "profit_target_pct": 0.5,
+        "stop_loss_mult": 1.0
+      },
+      "bull_put_spread": {
+        "otm_offset": 2,
+        "profit_target_pct": 0.5,
+        "stop_loss_mult": 1.0
+      },
+      "bear_call_spread": {
+        "otm_offset": 2,
+        "profit_target_pct": 0.5,
+        "stop_loss_mult": 1.0
+      },
+      "bear_put_spread": {
+        "otm_offset": 2,
+        "profit_target_pct": 0.5,
+        "stop_loss_mult": 1.0
+      },
+      "iron_condor": {
+        "otm_offset": 3,
+        "profit_target_pct": 0.5,
+        "stop_loss_mult": 1.0,
+        "vix_gate": "blocked when VIX > 16 [P1-002]"
+      },
+      "long_straddle": {
+        "profit_target_pct": 0.3,
+        "stop_loss_mult": 0.5
+      }
+    },
+    "known_issues_resolved": [
+      "[P1-002] Iron condor now blocked when VIX > 16"
+    ],
+    "known_issues_remaining": [
+      "Credit spreads always included regardless of regime",
+      "LTP fallback to entry price masks real P&L"
+    ]
+  },
+  "global_config": {
+    "file": "backend/config.py",
+    "timing": {
+      "intraday_order_start": "12:00 PM",
+      "intraday_order_cutoff": "2:00 PM",
+      "intraday_squareoff": "3:15 PM",
+      "options_order_start": "10:00 AM",
+      "options_order_cutoff": "2:00 PM",
+      "options_squareoff": "3:00 PM"
+    },
+    "position_sizing": {
+      "intraday_capital_per_position": 25000,
+      "intraday_max_positions_live": 6,
+      "intraday_max_positions_paper": 10,
+      "options_capital_per_position": 20000,
+      "options_max_positions": 4,
+      "futures_max_positions_paper": 8
+    },
+    "risk": {
+      "intraday_position_check_interval_sec": 20,
+      "options_position_check_interval_sec": 15,
+      "futures_risk_per_trade_pct": 0.02,
+      "futures_daily_loss_limit_pct": 5.0,
+      "options_daily_loss_limit_pct": 5.0,
+      "futures_min_oi": 1000,
+      "futures_min_daily_volume": 10000
+    },
+    "price_filters": {
+      "intraday_min": 50,
+      "intraday_max": 5000,
+      "swing_min": 100,
+      "swing_max": 1500
+    }
+  },
+  "signal_ranking": {
+    "method": "conviction score [P1-001]",
+    "factors": {
+      "volume_ratio": "1.5x boost for vol >= 2.0, 1.2x for >= 1.5",
+      "rr_ratio_bonus": "1.3x for R:R >= 2.5, 1.1x for >= 2.0",
+      "price_range": "1.2x for \u20b9200-\u20b92000, 0.6x for < \u20b9100, 0.8x for > \u20b93000",
+      "strategy_boost": {
+        "play4_supertrend": 1.3,
+        "play3_vwap_pullback": 1.2,
+        "play6_bb_contra": 1.1,
+        "play1_ema_crossover": 0.9,
+        "play5_bb_squeeze": 1.0,
+        "play2_triple_ma": 0.7
+      }
+    },
+    "applied_in": [
+      "scanner.py",
+      "paper_trader.py",
+      "auto_trader.py",
+      "swing_trader.py",
+      "swing_paper_trader.py"
+    ]
+  },
+  "candlestick_definitions": {
+    "file": "backend/strategies/base.py",
+    "hammer_body_ratio_max": 0.35,
+    "doji_body_ratio_max": 0.1,
+    "strong_candle_body_ratio_min": 0.5,
+    "atr_sl_default_mult": 2.5,
+    "atr_sl_default_min_pct": 0.012,
+    "known_issues_remaining": [
+      "Hammer 35% body is still loose (P2 fix)",
+      "Doji 10% is still loose (P2 fix)",
+      "is_strong_green alone counts as reversal (P2 fix)"
+    ]
+  }
+}

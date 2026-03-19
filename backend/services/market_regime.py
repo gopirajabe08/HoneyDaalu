@@ -175,7 +175,35 @@ def detect_regime(underlying: str = "NIFTY") -> dict:
     else:
         intraday_score = 0.0
 
-    score = vix_score + pcr_score + trend_score + intraday_score
+    # RSI divergence on NIFTY — enhances reversal detection for options
+    rsi_score = 0.0
+    try:
+        from services.market_data import fetch_stock_data
+        nifty_df = fetch_stock_data("NIFTY 50", "15m")
+        if nifty_df is None:
+            nifty_df = fetch_stock_data("^NSEI", "15m")
+        if nifty_df is not None and len(nifty_df) >= 20:
+            from strategies.base import calc_rsi
+            rsi = calc_rsi(nifty_df, 14)
+            rsi_val = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50
+            if rsi_val > 70:
+                rsi_score = -0.15  # Overbought — slight bearish bias for options
+            elif rsi_val < 30:
+                rsi_score = 0.15   # Oversold — slight bullish bias
+    except Exception:
+        pass
+
+    # Gap detection on NIFTY — morning gaps influence option premium direction
+    gap_score = 0.0
+    try:
+        gap_pct = intraday.get("change_pct", 0)
+        if abs(gap_pct) > 1.0:
+            # Large gap — strong directional signal for options
+            gap_score = 0.2 if gap_pct > 0 else -0.2
+    except Exception:
+        pass
+
+    score = vix_score + pcr_score + trend_score + intraday_score + rsi_score + gap_score
 
     # ── Map score to conviction ──
     if vix > 22 and abs(intraday_change) < 0.3:
@@ -214,6 +242,8 @@ def detect_regime(underlying: str = "NIFTY") -> dict:
                 "pcr_score": round(pcr_score, 3),
                 "trend_score": round(trend_score, 3),
                 "intraday_score": round(intraday_score, 3),
+                "rsi_score": round(rsi_score, 3),
+                "gap_score": round(gap_score, 3),
             }
         }
     }

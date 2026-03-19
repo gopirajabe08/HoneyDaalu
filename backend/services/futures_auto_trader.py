@@ -5,7 +5,7 @@ Rules:
   - Scans F&O stocks with OI sentiment filter during market hours
   - Places futures orders via Fyers (INTRADAY product type)
   - Places exchange-level SL-M order immediately after entry (exchange protection)
-  - Order window: 12:00 PM - 2:00 PM IST
+  - Order window: 11:00 AM - 2:00 PM IST
   - Squares off all positions at 3:15 PM IST (with retry logic)
   - Max positions from capital / margin per lot
   - Strict 2% risk per trade
@@ -182,6 +182,20 @@ class FuturesAutoTrader:
             return True
         return False
 
+    def _check_drawdown_breaker(self) -> bool:
+        """Check if multi-day drawdown exceeds 15% of capital. Returns True if breaker triggered."""
+        try:
+            from services.trade_logger import get_all_trades
+            recent = get_all_trades(days=5)
+            trades = [t for t in recent if t.get("source") == "futures_auto"]
+            if len(trades) >= 5:
+                pnl = sum(t.get("pnl", 0) for t in trades)
+                if pnl < -self._capital * 0.15:
+                    return True
+        except Exception:
+            pass
+        return False
+
     # ── Controls ──────────────────────────────────────────────────────────
 
     def start(self, strategies: list[dict], capital: float) -> dict:
@@ -290,7 +304,7 @@ class FuturesAutoTrader:
 
         # Wait for order start time
         while self._running and _is_before_order_start():
-            self._log("INFO", "Waiting for 12:00 PM order window...")
+            self._log("INFO", "Waiting for 11:00 AM order window...")
             for _ in range(60):
                 if not self._running or not _is_before_order_start():
                     break
@@ -303,6 +317,7 @@ class FuturesAutoTrader:
 
         # Monitor loop
         prev_open_count = len(self._active_trades)
+        _monitor_tick = 0
 
         while self._running:
             if _is_squareoff_time() and not self._squared_off:
@@ -323,6 +338,21 @@ class FuturesAutoTrader:
                 break
 
             self._update_position_pnl()
+            _monitor_tick += 1
+
+            # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
+            if _monitor_tick % 5 == 0:
+                try:
+                    if not is_authenticated():
+                        self._log("WARN", "Fyers disconnected — attempting reconnect...")
+                        from services.fyers_client import headless_login
+                        result = headless_login()
+                        if "error" in result:
+                            self._log("ALERT", f"Fyers reconnect FAILED: {result['error']} — positions at risk!")
+                        else:
+                            self._log("INFO", "Fyers reconnected successfully")
+                except Exception:
+                    pass
 
             # Check daily loss limit
             if self._check_daily_loss_limit():
@@ -344,6 +374,10 @@ class FuturesAutoTrader:
     def _execute_scan_cycle(self):
         self._scan_count += 1
         self._log("SCAN", f"Futures scan #{self._scan_count}...")
+
+        # Multi-day drawdown breaker
+        if self._check_drawdown_breaker():
+            self._log("ALERT", "5-day drawdown > 15% — reducing to 1 order per scan (safety mode)")
 
         if len(self._active_trades) >= self._max_positions:
             self._log("INFO", f"Max positions reached ({len(self._active_trades)}/{self._max_positions})")
@@ -401,7 +435,7 @@ class FuturesAutoTrader:
         if not unique:
             return
 
-        max_orders_per_scan = min(2, slots_available)
+        max_orders_per_scan = 1 if self._check_drawdown_breaker() else min(2, slots_available)
         orders_placed = 0
         active_symbols = {t["symbol"] for t in self._active_trades}
 
@@ -568,6 +602,15 @@ class FuturesAutoTrader:
         self._active_trades = []
         self._log("ALERT", f"Square-off complete. Total P&L: ₹{self._total_pnl:,.2f}")
         self._save_state()
+
+        # End-of-day pipeline (runs once per day, shared across all engines)
+        try:
+            from services.auto_tuner import run_eod_pipeline
+            eod = run_eod_pipeline("futures_live")
+            if eod.get("status") == "completed":
+                self._log("TRACKER", f"EOD pipeline completed — {eod.get('report', {}).get('total_trades', 0)} trades analyzed")
+        except Exception as e:
+            logger.warning(f"[FuturesAuto] EOD pipeline failed: {e}")
 
     # ── Position Monitoring ───────────────────────────────────────────────
 

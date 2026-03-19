@@ -1,0 +1,394 @@
+{
+  "date": "2026-03-18",
+  "generated_at": "2026-03-18T17:54:04.142936+05:30",
+  "market_snapshot": {},
+  "engines_active": {},
+  "strategy_performance": {
+    "play1_ema_crossover|paper": {
+      "trades": 2,
+      "wins": 1,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 1,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": -720.98,
+      "charges": 0,
+      "net_pnl": -720.98,
+      "total_time_seconds": 13675.518630999999,
+      "trades_detail": [
+        {
+          "symbol": "UNITDSPR",
+          "direction": "SELL",
+          "entry": 1307.79,
+          "exit": 1320.7,
+          "sl": 1318.26,
+          "target": 1290.78,
+          "pnl": -798.23,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-18T12:00:16.831256+05:30",
+          "time_closed": "2026-03-18T12:33:28.480052+05:30"
+        },
+        {
+          "symbol": "IDBI",
+          "direction": "SELL",
+          "entry": 75.06,
+          "exit": 74.92,
+          "sl": 76.39,
+          "target": 72.64,
+          "pnl": 77.25,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-18T12:00:16.830712+05:30",
+          "time_closed": "2026-03-18T15:15:00.700547+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 2,
+          "pnl": -720.98
+        }
+      },
+      "strategy": "play1_ema_crossover",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 50.0,
+      "avg_time_minutes": 114.0,
+      "avg_win": 77.25,
+      "avg_loss": -798.23,
+      "expectancy_per_trade": -360.49
+    },
+    "play4_supertrend|paper": {
+      "trades": 2,
+      "wins": 1,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 1,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": 939.02,
+      "charges": 0,
+      "net_pnl": 939.02,
+      "total_time_seconds": 18837.783596,
+      "trades_detail": [
+        {
+          "symbol": "SBICARD",
+          "direction": "BUY",
+          "entry": 699.7,
+          "exit": 710.35,
+          "sl": 694.11,
+          "target": 710.05,
+          "pnl": 1077.09,
+          "exit_reason": "TARGET_HIT",
+          "time_placed": "2026-03-18T12:33:43.820272+05:30",
+          "time_closed": "2026-03-18T15:06:24.716499+05:30"
+        },
+        {
+          "symbol": "DEVYANI",
+          "direction": "BUY",
+          "entry": 109.15,
+          "exit": 109.04,
+          "sl": 108.04,
+          "target": 111.15,
+          "pnl": -138.07,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-18T12:33:43.822579+05:30",
+          "time_closed": "2026-03-18T15:15:00.709948+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 2,
+          "pnl": 939.02
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "play4_supertrend",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 50.0,
+      "avg_time_minutes": 157.0,
+      "avg_win": 1077.09,
+      "avg_loss": -138.07,
+      "expectancy_per_trade": 469.51
+    },
+    "bull_put_spread|options_paper": {
+      "trades": 4,
+      "wins": 3,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": 1091.0,
+      "charges": 0,
+      "net_pnl": 1091.0,
+      "total_time_seconds": 17079.921717,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 427.75,
+          "exit_reason": "PROFIT_TARGET",
+          "time_placed": "2026-03-18T10:00:07.972656+05:30",
+          "time_closed": "2026-03-18T10:26:56.936370+05:30"
+        },
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 390.25,
+          "exit_reason": "PROFIT_TARGET",
+          "time_placed": "2026-03-18T10:42:08.293172+05:30",
+          "time_closed": "2026-03-18T11:27:27.500934+05:30"
+        },
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 394.0,
+          "exit_reason": "PROFIT_TARGET",
+          "time_placed": "2026-03-18T11:27:28.343219+05:30",
+          "time_closed": "2026-03-18T13:56:08.835930+05:30"
+        },
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": -121.0,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-18T13:56:09.718284+05:30",
+          "time_closed": "2026-03-18T15:00:00.975814+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "bull_put_spread",
+      "source": "options_paper",
+      "timeframe": "",
+      "win_rate_pct": 75.0,
+      "avg_time_minutes": 71.2,
+      "avg_win": 404.0,
+      "avg_loss": -121.0,
+      "expectancy_per_trade": 272.75
+    },
+    "iron_condor|options_paper": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": -1562.25,
+      "charges": 0,
+      "net_pnl": -1562.25,
+      "total_time_seconds": 14920.708575,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": -1562.25,
+          "exit_reason": "STOP_LOSS",
+          "time_placed": "2026-03-18T10:00:07.970195+05:30",
+          "time_closed": "2026-03-18T14:08:48.678770+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "iron_condor",
+      "source": "options_paper",
+      "timeframe": "",
+      "win_rate_pct": 0.0,
+      "avg_time_minutes": 248.7,
+      "avg_win": 0,
+      "avg_loss": -1562.25,
+      "expectancy_per_trade": -1562.25
+    },
+    "bear_call_spread|options_paper": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": -249.5,
+      "charges": 0,
+      "net_pnl": -249.5,
+      "total_time_seconds": 17992.890406,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": -249.5,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-18T10:00:07.971450+05:30",
+          "time_closed": "2026-03-18T15:00:00.861856+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "bear_call_spread",
+      "source": "options_paper",
+      "timeframe": "",
+      "win_rate_pct": 0.0,
+      "avg_time_minutes": 299.9,
+      "avg_win": 0,
+      "avg_loss": -249.5,
+      "expectancy_per_trade": -249.5
+    },
+    "futures_ema_rsi_pullback|futures_paper": {
+      "trades": 2,
+      "wins": 0,
+      "losses": 2,
+      "breakeven": 0,
+      "sl_hits": 1,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": -6751.55,
+      "charges": 0,
+      "net_pnl": -6751.55,
+      "total_time_seconds": 17772.185836999997,
+      "trades_detail": [
+        {
+          "symbol": "BAJFINANCE",
+          "direction": "SELL",
+          "entry": 868.03,
+          "exit": 878.7,
+          "sl": 878.65,
+          "target": 849.4,
+          "pnl": -5461.8,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-18T12:00:04.587631+05:30",
+          "time_closed": "2026-03-18T13:41:20.922085+05:30"
+        },
+        {
+          "symbol": "NESTLEIND",
+          "direction": "SELL",
+          "entry": 1207.39,
+          "exit": 1209,
+          "sl": 1216.0,
+          "target": 1193.8,
+          "pnl": -1289.75,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-18T12:00:04.587212+05:30",
+          "time_closed": "2026-03-18T15:15:00.438595+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 2,
+          "pnl": -6751.55
+        }
+      },
+      "strategy": "futures_ema_rsi_pullback",
+      "source": "futures_paper",
+      "timeframe": "15m",
+      "win_rate_pct": 0.0,
+      "avg_time_minutes": 148.1,
+      "avg_win": 0,
+      "avg_loss": -3375.78,
+      "expectancy_per_trade": -3375.78
+    }
+  },
+  "source_pnl_summary": {
+    "paper": 218.0399999999999,
+    "options_paper": -720.75,
+    "futures_paper": -6751.55
+  },
+  "total_trades": 12,
+  "total_net_pnl": -7254.26,
+  "best_trade": {
+    "symbol": "SBICARD",
+    "strategy": "play4_supertrend",
+    "pnl": 1077.09,
+    "source": "paper"
+  },
+  "worst_trade": {
+    "symbol": "BAJFINANCE",
+    "strategy": "futures_ema_rsi_pullback",
+    "pnl": -5461.8,
+    "source": "futures_paper"
+  },
+  "auto_insights": [
+    "\u26a0\ufe0f play1_ema_crossover (paper): negative expectancy \u20b9-360.49 per trade",
+    "\u26a0\ufe0f play1_ema_crossover (paper): SELL signals lost \u20b9721 today \u2014 possible regime mismatch",
+    "\u2705 bull_put_spread (options_paper): 75.0% win rate \u2014 strong performer",
+    "\u26a0\ufe0f iron_condor (options_paper): negative expectancy \u20b9-1562.25 per trade",
+    "\u26a0\ufe0f bear_call_spread (options_paper): 100% square-off rate \u2014 trades not reaching target within session",
+    "\u26a0\ufe0f bear_call_spread (options_paper): negative expectancy \u20b9-249.5 per trade",
+    "\u26a0\ufe0f futures_ema_rsi_pullback (futures_paper): negative expectancy \u20b9-3375.78 per trade",
+    "\u26a0\ufe0f futures_ema_rsi_pullback (futures_paper): SELL signals lost \u20b96,752 today \u2014 possible regime mismatch"
+  ],
+  "parameter_changes_today": [],
+  "recommendations": [
+    {
+      "type": "info",
+      "title": "First day with tracker",
+      "detail": "No previous data to compare. Tomorrow's report will show day-over-day trends.",
+      "action": "none"
+    }
+  ]
+}

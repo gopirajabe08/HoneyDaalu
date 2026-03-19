@@ -100,6 +100,12 @@ class BBSqueeze(BaseStrategy):
         if last["High"] < prev["High"]:
             return None
 
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
+
         entry = last["High"]  # Use confirmation candle's high (not stale breakout bar)
         bb_sl = last["bb_mid"]
         cfg = get_strategy_config(_KEY)
@@ -140,6 +146,12 @@ class BBSqueeze(BaseStrategy):
 
         if last["Low"] > prev["Low"]:
             return None
+
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
 
         entry = last["Low"]  # Use confirmation candle's low (not stale breakout bar)
         bb_sl = last["bb_mid"]  # above middle band

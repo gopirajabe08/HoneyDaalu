@@ -18,7 +18,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 
-from services.scanner import run_scan, is_market_open
+from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.market_data import get_nifty_trend
 from services.trade_logger import log_trade, log_trades_batch
 from services.fyers_client import (
@@ -47,7 +47,7 @@ STATE_FILE = get_state_path(".auto_trader_state.json")
 
 
 def _is_before_order_start() -> bool:
-    """True if current time is before 12:00 PM IST — too early for orders."""
+    """True if current time is before 10:30 AM IST — too early for orders."""
     return is_before_time(INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN)
 
 
@@ -322,9 +322,9 @@ class AutoTrader:
 
             strat_names = ", ".join(f"{k}({self._timeframes[k]})" for k in self._strategy_keys)
             self._log("START", f"Auto-trader STARTED — {len(self._strategy_keys)} strateg{'y' if len(self._strategy_keys) == 1 else 'ies'}: {strat_names} | Capital=₹{capital:,.0f}")
-            self._log("INFO", f"Orders: 12:00 PM - 2:00 PM IST | Square-off: 3:15 PM IST | Max positions: {self.max_open_positions} (auto: ₹{INTRADAY_CAPITAL_PER_POSITION:,.0f}/slot)")
+            self._log("INFO", f"Orders: 10:30 AM - 2:00 PM IST | Square-off: 3:15 PM IST | Max positions: {self.max_open_positions} (auto: ₹{INTRADAY_CAPITAL_PER_POSITION:,.0f}/slot)")
             if _is_before_order_start():
-                self._log("INFO", "Started before 12:00 PM — scanning will begin but orders will only be placed after 12:00 PM IST")
+                self._log("INFO", "Started before 10:30 AM — scanning will begin but orders will only be placed after 10:30 AM IST")
 
             # Prevent Mac from sleeping (works even with lid closed if setup_sleep_prevention.sh was run)
             self._prevent_sleep()
@@ -407,16 +407,16 @@ class AutoTrader:
         """Background loop: scan-on-demand, monitor positions, square off.
 
         Strategy:
-          1. Wait for 12:00 PM, then run ONE full scan to fill all slots.
+          1. Wait for 10:30 AM, then run ONE full scan to fill all slots.
           2. Monitor positions every 60s.  When a position closes and a slot
              opens up (before 2:00 PM cutoff), trigger an immediate scan.
           3. After 2:00 PM — monitor only, no new scans.
           4. At 3:15 PM — square off everything.
         """
         self._log("INFO", "Background thread started")
-        self._log("INFO", f"Scan mode: ON-DEMAND — initial scan at 12:00 PM, then re-scan only when a slot opens")
+        self._log("INFO", f"Scan mode: ON-DEMAND — initial scan at 10:30 AM, then re-scan only when a slot opens")
 
-        # ── Phase 1: Wait for 12:00 PM ──
+        # ── Phase 1: Wait for 10:30 AM ──
         while self._running and _is_before_order_start():
             if _is_squareoff_time() and not self._squared_off:
                 break
@@ -425,14 +425,14 @@ class AutoTrader:
             order_start = now.replace(hour=INTRADAY_ORDER_START_HOUR, minute=INTRADAY_ORDER_START_MIN, second=0, microsecond=0)
             mins_left = max(0, int((order_start - now).total_seconds() / 60))
             if mins_left % 15 == 0 and mins_left > 0:
-                self._log("INFO", f"Waiting for 12:00 PM IST — {mins_left} min left")
+                self._log("INFO", f"Waiting for 10:30 AM IST — {mins_left} min left")
             time.sleep(60)
 
         if not self._running:
             self._log("INFO", "Background thread exited")
             return
 
-        # ── Phase 2: Initial full scan at 12:00 PM ──
+        # ── Phase 2: Initial full scan at 10:30 AM ──
         if not _is_past_order_cutoff() and not (_is_squareoff_time() and not self._squared_off):
             if not is_market_open():
                 self._log("INFO", "Market closed — stopping auto-trader")
@@ -445,12 +445,13 @@ class AutoTrader:
                 self._log("INFO", "Background thread exited")
                 return
 
-            self._log("SCAN", "12:00 PM — executing initial full scan to fill all slots")
+            self._log("SCAN", "10:30 AM — executing initial full scan to fill all slots")
             self._execute_scan_cycle()
 
         # ── Phase 3: Monitor loop — check positions every 60s, scan on slot open ──
         prev_open_count = len([t for t in self._active_trades if t["status"] == "OPEN"])
         self._next_scan_at = None  # no scheduled scan — on-demand only
+        _monitor_tick = 0
 
         while self._running:
             # Square-off check
@@ -479,6 +480,21 @@ class AutoTrader:
 
             # ── Monitor positions: detect closures, update P&L ──
             self._update_position_pnl()
+            _monitor_tick += 1
+
+            # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
+            if _monitor_tick % 5 == 0:
+                try:
+                    if not is_authenticated():
+                        self._log("WARN", "Fyers disconnected — attempting reconnect...")
+                        from services.fyers_client import headless_login
+                        result = headless_login()
+                        if "error" in result:
+                            self._log("ALERT", f"Fyers reconnect FAILED: {result['error']} — positions at risk!")
+                        else:
+                            self._log("INFO", "Fyers reconnected successfully")
+                except Exception:
+                    pass
 
             current_open_count = len([t for t in self._active_trades if t["status"] == "OPEN"])
 
@@ -502,6 +518,20 @@ class AutoTrader:
 
         self._log("INFO", "Background thread exited")
 
+    def _check_drawdown_breaker(self) -> bool:
+        """Check if multi-day drawdown exceeds 15% of capital."""
+        try:
+            from services.trade_logger import get_all_trades
+            recent = get_all_trades(days=5)
+            trades = [t for t in recent if t.get("source") == "auto"]
+            if len(trades) >= 5:
+                pnl = sum(t.get("pnl", 0) for t in trades)
+                if pnl < -self._capital * 0.15:
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _check_daily_loss_limit(self) -> bool:
         """Returns True if daily loss limit breached — stop opening new positions."""
         if self._daily_loss_limit_hit:
@@ -517,6 +547,25 @@ class AutoTrader:
 
     def _execute_scan_cycle(self):
         """Run one scan across all selected strategies: find signals and place orders."""
+        # Re-detect regime on each scan cycle (strategies adapt to intraday shifts)
+        try:
+            from services.equity_regime import detect_equity_regime
+            new_regime = detect_equity_regime()
+            new_strategies = new_regime.get("strategies", [])
+            if new_strategies:
+                new_keys = [s["strategy"] for s in new_strategies]
+                new_tfs = {s["strategy"]: s["timeframe"] for s in new_strategies}
+                if set(new_keys) != set(self._strategy_keys):
+                    old_names = ", ".join(self._strategy_keys)
+                    new_names = ", ".join(new_keys)
+                    self._log("REGIME", f"Regime shifted → {new_regime.get('regime', '?')} | Strategies: {old_names} → {new_names}")
+                    self._strategy_keys = new_keys
+                    self._timeframes = new_tfs
+                # Always update timeframes even if keys haven't changed (VIX may have changed timeframe)
+                self._timeframes = new_tfs
+        except Exception as e:
+            pass  # Regime detection failed, keep current strategies
+
         # Daily loss check
         if self._check_daily_loss_limit():
             self._log("INFO", "Daily loss limit active — skipping scan, monitoring only")
@@ -556,6 +605,7 @@ class AutoTrader:
         all_signals = []
         total_scanned = 0
         total_time = 0
+        strategy_idx = 0
 
         for strategy_key in self._strategy_keys:
             timeframe = self._timeframes.get(strategy_key, "15m")
@@ -587,17 +637,27 @@ class AutoTrader:
             for sig in signals:
                 sig["_strategy"] = strategy_key
                 sig["_timeframe"] = timeframe
+                sig["_regime_position"] = strategy_idx
 
             all_signals.extend(signals)
             self._log("SCAN", f"  {strategy_key}({timeframe}): {len(signals)} signals ({scan_time}s)")
+            strategy_idx += 1
 
-        # Deduplicate by symbol — keep the best R:R signal per symbol
+        # Deduplicate by symbol — keep highest conviction signal per symbol
+        # Regime-aware: strategies listed first in regime map get a priority boost
         seen_symbols = {}
         for sig in all_signals:
             sym = sig.get("symbol", "")
-            rr_val = sig.get("reward", 0) / max(sig.get("risk", 1), 0.01)
-            if sym not in seen_symbols or rr_val > seen_symbols[sym][1]:
-                seen_symbols[sym] = (sig, rr_val)
+            conv = _calc_conviction(sig)
+            regime_pos = sig.get("_regime_position", 99)
+            if regime_pos == 0:
+                conv *= 1.5   # Primary strategy for this regime
+            elif regime_pos == 1:
+                conv *= 1.2   # Secondary
+            elif regime_pos == 2:
+                conv *= 1.05  # Tertiary
+            if sym not in seen_symbols or conv > seen_symbols[sym][1]:
+                seen_symbols[sym] = (sig, conv)
 
         unique_signals = [s[0] for s in sorted(seen_symbols.values(), key=lambda x: x[1], reverse=True)]
 
@@ -886,10 +946,26 @@ class AutoTrader:
         self._log("ALERT", f"Square-off complete. Total P&L: ₹{self._total_pnl:,.2f}")
         self._save_state()
 
+        # End-of-day pipeline (runs once per day, shared across all engines)
+        try:
+            from services.auto_tuner import run_eod_pipeline
+            eod = run_eod_pipeline("equity_live")
+            if eod.get("status") == "completed":
+                self._log("TRACKER", f"EOD pipeline completed — {eod.get('report', {}).get('total_trades', 0)} trades analyzed")
+        except Exception as e:
+            logger.warning(f"[AutoTrader] EOD pipeline failed: {e}")
+
     # ── Position Monitoring ───────────────────────────────────────────────
 
     def _update_position_pnl(self):
-        """Refresh P&L for active trades and check target exits for INTRADAY_SL mode."""
+        """Refresh P&L for active trades and check target exits for INTRADAY_SL mode.
+
+        NOTE: Trailing stop loss is NOT implemented here for live trading.
+        Fyers bracket orders (BO) manage SL on-exchange — modifying them would
+        require cancelling the BO leg and placing a new SL-M order, which adds
+        execution risk. Trailing SL is implemented in PaperTrader for virtual trades.
+        To add trailing for live: use INTRADAY_SL mode + modify_order() API.
+        """
         _, positions = self._get_open_positions_detail()
 
         pnl_map = {}

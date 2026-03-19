@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 from typing import Optional
 
-from services.scanner import run_scan, is_market_open
+from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.trade_logger import log_trade, log_trades_batch
 from services.fyers_client import get_quotes, is_authenticated
 from utils.time_utils import now_ist, is_past_time, is_before_time
@@ -254,11 +254,11 @@ class PaperTrader:
           4. At 3:15 PM — square off everything.
         """
         self._log("INFO", "Background thread started")
-        self._log("INFO", "Scan mode: ON-DEMAND — scan at 12:00 PM, then re-scan only when a slot opens")
+        self._log("INFO", "Scan mode: ON-DEMAND — scan at 10:30 AM, then re-scan only when a slot opens")
 
-        # ── Wait for 12:00 PM order window ──
+        # ── Wait for 10:30 AM order window ──
         while self._running and is_before_time(INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN):
-            self._log("INFO", "Waiting for 12:00 PM order window...")
+            self._log("INFO", "Waiting for 10:30 AM order window...")
             for _ in range(60):
                 if not self._running or not is_before_time(INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN):
                     break
@@ -266,7 +266,7 @@ class PaperTrader:
 
         # ── Initial full scan ──
         if not _is_past_order_cutoff() and is_market_open() and self._running:
-            self._log("SCAN", "12:00 PM — initial scan to fill all slots")
+            self._log("SCAN", "10:30 AM — initial scan to fill all slots")
             self._execute_scan_cycle()
         elif not is_market_open():
             self._log("INFO", "Market closed — stopping paper trader")
@@ -278,6 +278,7 @@ class PaperTrader:
         # ── Monitor loop — check positions every 60s, scan on slot open ──
         prev_open_count = len(self._active_trades)
         self._next_scan_at = None  # no scheduled scan — on-demand only
+        _monitor_tick = 0  # counter for periodic health checks
 
         while self._running:
             # Square-off check
@@ -304,6 +305,15 @@ class PaperTrader:
 
             # ── Monitor positions: detect SL/target hits, update P&L ──
             self._update_position_pnl()
+            _monitor_tick += 1
+
+            # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
+            if _monitor_tick % 5 == 0:
+                try:
+                    if not is_authenticated():
+                        self._log("WARN", "Fyers disconnected — using delayed yfinance data. Reconnect via UI.")
+                except Exception:
+                    pass
 
             current_open_count = len(self._active_trades)
 
@@ -338,7 +348,44 @@ class PaperTrader:
             return True
         return False
 
+    def _check_drawdown_breaker(self) -> bool:
+        """Check if multi-day drawdown exceeds 15% of capital. Returns True if breaker triggered."""
+        try:
+            from services.trade_logger import get_all_trades
+            recent = get_all_trades(days=5)
+            paper_trades = [t for t in recent if t.get("source") == "paper"]
+            if len(paper_trades) >= 5:
+                pnl = sum(t.get("pnl", 0) for t in paper_trades)
+                if pnl < -self._capital * 0.15:
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _execute_scan_cycle(self):
+        # Re-detect regime on each scan cycle (strategies adapt to intraday shifts)
+        try:
+            from services.equity_regime import detect_equity_regime
+            new_regime = detect_equity_regime()
+            new_strategies = new_regime.get("strategies", [])
+            if new_strategies:
+                new_keys = [s["strategy"] for s in new_strategies]
+                new_tfs = {s["strategy"]: s["timeframe"] for s in new_strategies}
+                if set(new_keys) != set(self._strategy_keys):
+                    old_names = ", ".join(self._strategy_keys)
+                    new_names = ", ".join(new_keys)
+                    self._log("REGIME", f"Regime shifted → {new_regime.get('regime', '?')} | Strategies: {old_names} → {new_names}")
+                    self._strategy_keys = new_keys
+                    self._timeframes = new_tfs
+                # Always update timeframes even if keys haven't changed (VIX may have changed timeframe)
+                self._timeframes = new_tfs
+        except Exception as e:
+            pass  # Regime detection failed, keep current strategies
+
+        # Multi-day drawdown breaker
+        if self._check_drawdown_breaker():
+            self._log("ALERT", "5-day drawdown > 15% — reducing to 1 order per scan (safety mode)")
+
         if self._check_daily_loss_limit():
             self._log("INFO", "Daily loss limit active — monitoring only")
             self._update_position_pnl()
@@ -371,6 +418,7 @@ class PaperTrader:
         all_signals = []
         total_scanned = 0
         total_time = 0
+        strategy_idx = 0  # Track regime priority position
 
         for strategy_key in self._strategy_keys:
             timeframe = self._timeframes.get(strategy_key, "15m")
@@ -401,17 +449,28 @@ class PaperTrader:
             for sig in signals:
                 sig["_strategy"] = strategy_key
                 sig["_timeframe"] = timeframe
+                sig["_regime_position"] = strategy_idx  # Position in regime priority list
 
             all_signals.extend(signals)
             self._log("SCAN", f"  {strategy_key}({timeframe}): {len(signals)} signals ({scan_time}s)")
+            strategy_idx += 1
 
-        # Deduplicate by symbol — keep best R:R
+        # Deduplicate by symbol — keep highest conviction signal per symbol
+        # Regime-aware: strategies listed first in regime map get a priority boost
         seen_symbols = {}
         for sig in all_signals:
             sym = sig.get("symbol", "")
-            rr_val = sig.get("reward", 0) / max(sig.get("risk", 1), 0.01)
-            if sym not in seen_symbols or rr_val > seen_symbols[sym][1]:
-                seen_symbols[sym] = (sig, rr_val)
+            conv = _calc_conviction(sig)
+            # Regime priority boost: #1 strategy gets 1.3x, #2 gets 1.15x, #3 gets 1.05x
+            regime_pos = sig.get("_regime_position", 99)
+            if regime_pos == 0:
+                conv *= 1.5   # Primary strategy for this regime — STRONGEST boost
+            elif regime_pos == 1:
+                conv *= 1.2   # Secondary
+            elif regime_pos == 2:
+                conv *= 1.05  # Tertiary
+            if sym not in seen_symbols or conv > seen_symbols[sym][1]:
+                seen_symbols[sym] = (sig, conv)
 
         unique_signals = [s[0] for s in sorted(seen_symbols.values(), key=lambda x: x[1], reverse=True)]
 
@@ -422,7 +481,7 @@ class PaperTrader:
             return
 
         # Stagger: max 2 orders per scan to avoid correlated losses
-        max_orders_per_scan = min(2, slots_available)
+        max_orders_per_scan = 1 if self._check_drawdown_breaker() else min(2, slots_available)
         orders_placed = 0
 
         for signal in unique_signals:
@@ -469,9 +528,14 @@ class PaperTrader:
         else:  # SELL: fill slightly lower
             entry_price = round(entry_price - slippage, 2)
 
-        # Estimate brokerage for this trade (₹20/order × 2 legs + STT + charges)
+        # Realistic Fyers brokerage + STT + other charges
         capital_req = qty * entry_price
-        est_brokerage = round(40 + capital_req * 0.0003, 2)  # ~₹40 + 0.03% of turnover
+        turnover = qty * entry_price
+        brokerage_per_leg = min(20, turnover * 0.0003)  # ₹20 or 0.03% (whichever lower)
+        brokerage = round(brokerage_per_leg * 2, 2)  # Entry + Exit = 2 legs
+        stt = round(turnover * 0.00025, 2)  # STT: 0.025% on sell side
+        exchange_charges = round(turnover * 0.0003, 2)  # NSE transaction + SEBI + stamp
+        est_brokerage = round(brokerage + stt + exchange_charges, 2)
 
         order_id = f"PAPER-{self._next_order_id:04d}"
         self._next_order_id += 1
@@ -496,6 +560,8 @@ class PaperTrader:
             "pnl": 0.0,
             "ltp": entry_price,
             "est_brokerage": est_brokerage,
+            "original_sl": stop_loss,
+            "max_favorable_price": entry_price,
         }
 
         self._active_trades.append(trade)
@@ -549,6 +615,22 @@ class PaperTrader:
         self._log("ALERT", f"Virtual square-off complete. Total P&L: ₹{self._total_pnl:,.2f}")
         self._save_state()
 
+        # End-of-day pipeline: daily report + auto-tune + QA (runs once per day)
+        try:
+            from services.auto_tuner import run_eod_pipeline
+            eod = run_eod_pipeline("equity_paper")
+            if eod.get("status") == "completed":
+                r = eod.get("report", {})
+                t = eod.get("tune_result", {})
+                actions = t.get("actions", [])
+                self._log("TRACKER", f"EOD report: {r.get('total_trades', 0)} trades, ₹{r.get('total_net_pnl', 0):,.0f} P&L")
+                if actions:
+                    self._log("TUNER", f"Auto-tuned {len(actions)} parameter(s): {', '.join(a.get('parameter','?') for a in actions)}")
+                else:
+                    self._log("TUNER", "No parameter changes needed")
+        except Exception as e:
+            logger.warning(f"[PaperTrader] EOD pipeline failed: {e}")
+
     # ── Position Monitoring ───────────────────────────────────────────────
 
     def _update_position_pnl(self):
@@ -564,14 +646,42 @@ class PaperTrader:
             symbol = trade["symbol"]
             ltp = ltp_map.get(symbol, trade.get("ltp", trade["entry_price"]))
             side = trade["side"]
+            entry = trade["entry_price"]
 
             if side == 1:
-                pnl = (ltp - trade["entry_price"]) * trade["quantity"]
+                pnl = (ltp - entry) * trade["quantity"]
             else:
-                pnl = (trade["entry_price"] - ltp) * trade["quantity"]
+                pnl = (entry - ltp) * trade["quantity"]
 
             trade["pnl"] = round(pnl, 2)
             trade["ltp"] = ltp
+
+            # ── Trailing stop loss — lock in profits on winning trades ──
+            # Store original SL on first monitoring pass (for trades loaded from state)
+            if "original_sl" not in trade:
+                trade["original_sl"] = trade["stop_loss"]
+
+            if side == 1:  # BUY
+                max_fav = max(trade.get("max_favorable_price", entry), ltp)
+                trade["max_favorable_price"] = max_fav
+                profit_pct = (max_fav - entry) / entry * 100 if entry > 0 else 0
+                if profit_pct >= 1.0:  # Only trail after 1% profit
+                    # Trail at 50% of max profit
+                    trail_sl = round(entry + (max_fav - entry) * 0.5, 2)
+                    if trail_sl > trade["stop_loss"]:
+                        old_sl = trade["stop_loss"]
+                        trade["stop_loss"] = trail_sl
+                        self._log("TRAIL", f"{symbol} — SL trailed ₹{old_sl} → ₹{trail_sl} (max ₹{max_fav}, +{profit_pct:.1f}%)")
+            else:  # SELL
+                max_fav = min(trade.get("max_favorable_price", entry), ltp)
+                trade["max_favorable_price"] = max_fav
+                profit_pct = (entry - max_fav) / entry * 100 if entry > 0 else 0
+                if profit_pct >= 1.0:  # Only trail after 1% profit
+                    trail_sl = round(entry - (entry - max_fav) * 0.5, 2)
+                    if trail_sl < trade["stop_loss"]:
+                        old_sl = trade["stop_loss"]
+                        trade["stop_loss"] = trail_sl
+                        self._log("TRAIL", f"{symbol} — SL trailed ₹{old_sl} → ₹{trail_sl} (max ₹{max_fav}, +{profit_pct:.1f}%)")
 
             # Check SL hit
             if side == 1 and ltp <= trade["stop_loss"]:

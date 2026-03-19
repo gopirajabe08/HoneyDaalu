@@ -98,6 +98,12 @@ class VWAPPullback(BaseStrategy):
         if last["Low"] > last["vwap"] * 1.005:
             return None
 
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
+
         # ── Entry & Targets ──
         entry = last["High"]  # break of trigger candle's high
         swing_sl = find_recent_swing_low(df.tail(10), lookback=10)
@@ -156,6 +162,12 @@ class VWAPPullback(BaseStrategy):
         # Last candle should be near VWAP (within 0.5%)
         if last["High"] < last["vwap"] * 0.995:
             return None
+
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
 
         # ── Entry & Targets ──
         entry = last["Low"]  # break of trigger candle's low

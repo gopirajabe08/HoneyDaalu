@@ -233,19 +233,20 @@ class FuturesPaperTrader:
     def _run_loop(self):
         self._log("INFO", "Background thread started")
 
-        # Wait for 12:00 PM order window
+        # Wait for 11:00 AM order window
         while self._running and _is_before_order_start():
-            self._log("INFO", "Waiting for 12:00 PM order window...")
+            self._log("INFO", "Waiting for 11:00 AM order window...")
             for _ in range(60):
                 if not self._running or not _is_before_order_start():
                     break
                 time.sleep(1)
 
         if not _is_past_order_cutoff() and is_market_open() and self._running:
-            self._log("SCAN", "12:00 PM — initial scan to fill slots")
+            self._log("SCAN", "11:00 AM — initial scan to fill slots")
             self._execute_scan_cycle()
 
         prev_open = len(self._active_trades)
+        _monitor_tick = 0  # counter for periodic health checks
 
         while self._running:
             if _is_squareoff_time() and not self._squared_off:
@@ -266,6 +267,16 @@ class FuturesPaperTrader:
                 break
 
             self._update_position_pnl()
+            _monitor_tick += 1
+
+            # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
+            if _monitor_tick % 5 == 0:
+                try:
+                    if not is_authenticated():
+                        self._log("WARN", "Fyers disconnected — using delayed data. Reconnect via UI.")
+                except Exception:
+                    pass
+
             current = len(self._active_trades)
 
             if current < prev_open and current < FUTURES_PAPER_MAX_POSITIONS:
@@ -291,8 +302,26 @@ class FuturesPaperTrader:
             return True
         return False
 
+    def _check_drawdown_breaker(self) -> bool:
+        """Check if multi-day drawdown exceeds 15% of capital. Returns True if breaker triggered."""
+        try:
+            from services.trade_logger import get_all_trades
+            recent = get_all_trades(days=5)
+            futures_trades = [t for t in recent if t.get("source") == "futures_paper"]
+            if len(futures_trades) >= 5:
+                pnl = sum(t.get("pnl", 0) for t in futures_trades)
+                if pnl < -self._capital * 0.15:
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _execute_scan_cycle(self):
         self._scan_count += 1
+
+        # Multi-day drawdown breaker
+        if self._check_drawdown_breaker():
+            self._log("ALERT", "5-day drawdown > 15% — reducing to 1 order per scan (safety mode)")
 
         if self._check_daily_loss_limit():
             return
@@ -343,7 +372,7 @@ class FuturesPaperTrader:
         self._log("SCAN", f"Scan #{self._scan_count} — {len(unique)} signals")
         self._save_state()
 
-        max_orders_per_scan = min(2, slots)
+        max_orders_per_scan = 1 if self._check_drawdown_breaker() else min(2, slots)
         orders = 0
         active_syms = {t["symbol"] for t in self._active_trades}
 
@@ -376,8 +405,13 @@ class FuturesPaperTrader:
         side = 1 if signal_type == "BUY" else -1
         entry = round(entry + slippage if side == 1 else entry - slippage, 2)
 
-        # Estimate brokerage (₹20/order × 2 + STT for futures)
-        est_brokerage = round(40 + entry * qty * 0.0002, 2)
+        # Realistic Fyers brokerage + STT + other charges (futures)
+        turnover = entry * qty
+        brokerage_per_leg = min(20, turnover * 0.0003)  # ₹20 or 0.03% (whichever lower)
+        brokerage = round(brokerage_per_leg * 2, 2)  # Entry + Exit = 2 legs
+        stt = round(turnover * 0.0002, 2)  # Futures: STT = 0.02% on sell side
+        exchange_charges = round(turnover * 0.0003, 2)  # NSE transaction + SEBI + stamp
+        est_brokerage = round(brokerage + stt + exchange_charges, 2)
 
         order_id = f"FPAPER-{self._next_order_id:04d}"
         self._next_order_id += 1
@@ -403,6 +437,8 @@ class FuturesPaperTrader:
             "pnl": 0.0,
             "ltp": entry,
             "est_brokerage": est_brokerage,
+            "original_sl": sl,
+            "max_favorable_price": entry,
         }
 
         self._active_trades.append(trade)
@@ -446,6 +482,15 @@ class FuturesPaperTrader:
         self._log("ALERT", f"Virtual square-off complete. P&L: ₹{self._total_pnl:,.2f}")
         self._save_state()
 
+        # End-of-day pipeline (runs once per day, shared across all engines)
+        try:
+            from services.auto_tuner import run_eod_pipeline
+            eod = run_eod_pipeline("futures_paper")
+            if eod.get("status") == "completed":
+                self._log("TRACKER", f"EOD pipeline completed — {eod.get('report', {}).get('total_trades', 0)} trades analyzed")
+        except Exception as e:
+            logger.warning(f"[FuturesPaper] EOD pipeline failed: {e}")
+
     # ── Position Monitoring ───────────────────────────────────────────────
 
     def _update_position_pnl(self):
@@ -460,9 +505,35 @@ class FuturesPaperTrader:
             symbol = trade["symbol"]
             ltp = ltp_map.get(symbol, trade.get("ltp", trade["entry_price"]))
             side = trade["side"]
-            pnl = round((ltp - trade["entry_price"]) * trade["quantity"] * (1 if side == 1 else -1), 2)
+            entry = trade["entry_price"]
+            pnl = round((ltp - entry) * trade["quantity"] * (1 if side == 1 else -1), 2)
             trade["pnl"] = pnl
             trade["ltp"] = ltp
+
+            # ── Trailing stop loss — lock in profits on winning trades ──
+            if "original_sl" not in trade:
+                trade["original_sl"] = trade["stop_loss"]
+
+            if side == 1:  # BUY
+                max_fav = max(trade.get("max_favorable_price", entry), ltp)
+                trade["max_favorable_price"] = max_fav
+                profit_pct = (max_fav - entry) / entry * 100 if entry > 0 else 0
+                if profit_pct >= 1.0:
+                    trail_sl = round(entry + (max_fav - entry) * 0.5, 2)
+                    if trail_sl > trade["stop_loss"]:
+                        old_sl = trade["stop_loss"]
+                        trade["stop_loss"] = trail_sl
+                        self._log("TRAIL", f"{symbol} — SL trailed ₹{old_sl} → ₹{trail_sl} (max ₹{max_fav}, +{profit_pct:.1f}%)")
+            else:  # SELL
+                max_fav = min(trade.get("max_favorable_price", entry), ltp)
+                trade["max_favorable_price"] = max_fav
+                profit_pct = (entry - max_fav) / entry * 100 if entry > 0 else 0
+                if profit_pct >= 1.0:
+                    trail_sl = round(entry - (entry - max_fav) * 0.5, 2)
+                    if trail_sl < trade["stop_loss"]:
+                        old_sl = trade["stop_loss"]
+                        trade["stop_loss"] = trail_sl
+                        self._log("TRAIL", f"{symbol} — SL trailed ₹{old_sl} → ₹{trail_sl} (max ₹{max_fav}, +{profit_pct:.1f}%)")
 
             if (side == 1 and ltp <= trade["stop_loss"]) or (side == -1 and ltp >= trade["stop_loss"]):
                 trade["exit_reason"] = "SL_HIT"

@@ -13,6 +13,7 @@ import AboutPage from './components/AboutPage'
 import DailyPnL from './components/DailyPnL'
 import OptionsPage from './components/OptionsPage'
 import FuturesPage from './components/FuturesPage'
+import ImprovementTracker from './components/ImprovementTracker'
 import { getFyersStatus } from './services/api'
 
 export default function App() {
@@ -82,6 +83,8 @@ export default function App() {
           {renderPage()}
         </main>
       </div>
+
+      <ImprovementTracker />
     </div>
   )
 }

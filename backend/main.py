@@ -28,6 +28,10 @@ from services.futures_paper_trader import futures_paper_trader
 from services.futures_swing_trader import futures_swing_trader
 from services.futures_swing_paper_trader import futures_swing_paper_trader
 from services.backtester import run_backtest_api
+from services.strategy_tracker import (
+    get_daily_report, get_recent_reports, get_strategy_registry,
+    get_changelog, generate_report_from_api,
+)
 from config import STRATEGY_TIMEFRAMES, SWING_STRATEGY_TIMEFRAMES
 
 import logging
@@ -1204,6 +1208,47 @@ def futures_auto_force_close(symbol: str):
 def futures_swing_force_close(symbol: str):
     """Force close a single futures swing position."""
     return futures_swing_trader.force_close_trade(symbol.upper())
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STRATEGY TRACKER ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/tracking/daily")
+def tracking_daily_report(date: str = Query(None, description="YYYY-MM-DD, defaults to today")):
+    """Get daily strategy performance report."""
+    return get_daily_report(date)
+
+
+@app.get("/api/tracking/recent")
+def tracking_recent_reports(days: int = Query(5, ge=1, le=30)):
+    """Get last N daily reports."""
+    return get_recent_reports(days)
+
+
+@app.get("/api/tracking/registry")
+def tracking_strategy_registry():
+    """Get master strategy parameter registry."""
+    return get_strategy_registry()
+
+
+@app.get("/api/tracking/changelog")
+def tracking_changelog():
+    """Get parameter change history."""
+    return get_changelog()
+
+
+@app.post("/api/tracking/generate")
+def tracking_generate_report():
+    """Generate today's daily report from trade data. Call after square-off."""
+    return generate_report_from_api()
+
+
+@app.post("/api/tracking/auto-tune")
+def tracking_auto_tune():
+    """Run auto-tuner to adjust parameters based on recent performance."""
+    from services.auto_tuner import run_auto_tune
+    return run_auto_tune()
 
 
 # ═══════════════════════════════════════════════════════════════════════════

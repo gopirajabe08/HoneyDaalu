@@ -79,6 +79,13 @@ export default function FuturesPage({ capital, setCapital }) {
     getFuturesRegime().then(setRegime).catch(() => {})
   }, [])
 
+  // Refresh regime every 60s while running
+  useEffect(() => {
+    if (!running) return
+    const id = setInterval(() => { getFuturesRegime().then(setRegime).catch(() => {}) }, 60000)
+    return () => clearInterval(id)
+  }, [running])
+
   // Poll status
   const pollStatus = useCallback(async () => {
     try {
@@ -160,7 +167,7 @@ export default function FuturesPage({ capital, setCapital }) {
           <BarChart3 size={22} className="text-amber-400" />
           <div>
             <h2 className="text-lg font-semibold text-white">Futures Trading</h2>
-            <p className="text-gray-500 text-xs">F&O stock futures with OI sentiment analysis + 4 screener strategies</p>
+            <p className="text-gray-500 text-xs">F&O stock futures with OI sentiment analysis + 8 strategies (4 futures-specific + Supertrend, ORB, RSI Divergence, Gap Analysis)</p>
           </div>
         </div>
 
@@ -188,23 +195,23 @@ export default function FuturesPage({ capital, setCapital }) {
         <span className="text-dark-500">|</span>
         {!isSwing ? (
           <>
-            <span>Start at <span className="text-amber-400 font-semibold">11:50 AM</span></span>
+            <span>Start at <span className="text-amber-400 font-semibold">10:45 AM</span></span>
             <span className="text-dark-500">|</span>
             <span>Capital: <span className="text-white">₹1L</span> (paper)</span>
             <span className="text-dark-500">|</span>
             <span>Mode: <span className="text-amber-400">Auto Regime</span> (NIFTY + VIX + OI)</span>
             <span className="text-dark-500">|</span>
-            <span>Engine scans at 12:00 PM, auto square-off 3:15 PM</span>
+            <span>Orders: 11:00 AM - 2:00 PM | Square-off 3:15 PM</span>
           </>
         ) : (
           <>
-            <span>Start at <span className="text-teal-400 font-semibold">11:50 AM</span></span>
+            <span>Start at <span className="text-teal-400 font-semibold">9:15 AM</span></span>
             <span className="text-dark-500">|</span>
             <span>Capital: <span className="text-white">₹1L</span> (paper)</span>
             <span className="text-dark-500">|</span>
-            <span>Mode: <span className="text-white">Manual</span> (all 4 strategies on 1h/1d)</span>
+            <span>Mode: <span className="text-white">Auto Regime</span> (all strategies on 1h/1d)</span>
             <span className="text-dark-500">|</span>
-            <span>Scans every 4h, positions carry overnight, rollover before expiry</span>
+            <span>Scan: every 4h | Positions carry overnight | Rollover before expiry</span>
           </>
         )}
       </div>
@@ -216,9 +223,9 @@ export default function FuturesPage({ capital, setCapital }) {
           <span className="text-dark-500">|</span>
           <span>Regime: <span className="text-amber-400">Auto</span> (NIFTY + VIX + ADX + OI → picks strategies)</span>
           <span className="text-dark-500">|</span>
-          <span>Scan: <span className="text-amber-400">12:00 PM</span> + on-demand</span>
+          <span>Scan: <span className="text-amber-400">11:00 AM</span> + on-demand</span>
           <span className="text-dark-500">|</span>
-          <span>Orders: <span className="text-amber-400">12:00 PM - 2:00 PM</span></span>
+          <span>Orders: <span className="text-amber-400">11:00 AM - 2:00 PM</span></span>
           <span className="text-dark-500">|</span>
           <span>Monitor: <span className="text-white">60s</span> + exchange SL-M</span>
           <span className="text-dark-500">|</span>
@@ -226,9 +233,13 @@ export default function FuturesPage({ capital, setCapital }) {
           <span className="text-dark-500">|</span>
           <span>Positions: <span className="text-white">4 live / 8 paper</span></span>
           <span className="text-dark-500">|</span>
-          <span>Risk: <span className="text-white">5%</span> | SL: <span className="text-white">min 1.2%</span></span>
+          <span>Risk: <span className="text-white">2%</span> | SL: <span className="text-white">min 1.2%</span></span>
           <span className="text-dark-500">|</span>
           <span>Daily loss: <span className="text-red-400">5% cap</span></span>
+          <span className="text-dark-500">|</span>
+          <span>Trailing SL (paper): <span className="text-white">+1% → trails 50%</span></span>
+          <span className="text-dark-500">|</span>
+          <span>Drawdown breaker: <span className="text-red-400">15%/5d</span></span>
           <span className="text-dark-500">|</span>
           <span>Margin ~10% | OI soft filter | Liquidity + brokerage filter</span>
         </div>
@@ -246,9 +257,13 @@ export default function FuturesPage({ capital, setCapital }) {
           <span className="text-dark-500">|</span>
           <span>Positions: <span className="text-white">2 live / 5 paper</span></span>
           <span className="text-dark-500">|</span>
-          <span>Risk: <span className="text-white">5%</span> | SL: <span className="text-white">min 1.2%</span></span>
+          <span>Risk: <span className="text-white">2%</span> | SL: <span className="text-white">min 1.2%</span></span>
           <span className="text-dark-500">|</span>
           <span>Daily loss: <span className="text-red-400">5% cap</span></span>
+          <span className="text-dark-500">|</span>
+          <span>Trailing SL (paper): <span className="text-white">+1% → trails 50%</span></span>
+          <span className="text-dark-500">|</span>
+          <span>Drawdown breaker: <span className="text-red-400">15%/5d</span></span>
           <span className="text-dark-500">|</span>
           <span>Margin ~20% | MARGIN product | OI + liquidity filter</span>
         </div>
@@ -320,10 +335,11 @@ export default function FuturesPage({ capital, setCapital }) {
                 Strategies will be <span className="text-amber-400 font-semibold">automatically selected</span> based on current market conditions:
               </p>
               <ul className="mt-2 space-y-1 text-[11px] text-gray-500">
-                <li>Trending market + High VIX → Volume Breakout</li>
-                <li>Trending market + Normal VIX → Volume Breakout + EMA Pullback</li>
-                <li>Pullback in trend → EMA Pullback + Candlestick Reversal</li>
-                <li>Sideways + Low VIX → Mean Reversion</li>
+                <li>Trending market + High VIX → Volume Breakout + Supertrend</li>
+                <li>Trending market + Normal VIX → Volume Breakout + EMA Pullback + ORB</li>
+                <li>Pullback in trend → EMA Pullback + Candlestick Reversal + RSI Divergence</li>
+                <li>Sideways + Low VIX → Mean Reversion + Gap Analysis</li>
+                <li>Gap / Event days → Gap Analysis + ORB + Volume Breakout</li>
               </ul>
               {regime?.reasoning && (
                 <p className="mt-3 text-[10px] text-amber-400/60 border-t border-dark-600 pt-2">
@@ -421,14 +437,14 @@ export default function FuturesPage({ capital, setCapital }) {
                   <>
                     <p className="text-amber-400 font-semibold mb-1">Futures Auto Regime</p>
                     <p>Detects NIFTY trend + VIX + ADX + aggregate OI sentiment. Picks strategies automatically.</p>
-                    <p className="mt-1">{isSwing ? 'Scan: every 4h | Exit: rollover 2d before expiry | SL-M re-placed daily' : 'Orders: 12 PM - 2 PM | Square-off: 3:15 PM'} | Risk: 5%/trade | Daily loss: 5% cap</p>
-                    <p className="mt-1">OI filter: soft (boosts priority) | Liquidity: min volume 50K | Brokerage-aware</p>
+                    <p className="mt-1">{isSwing ? 'Scan: every 4h | Exit: rollover 2d before expiry | SL-M re-placed daily' : 'Orders: 11 AM - 2 PM | Square-off: 3:15 PM'} | Risk: 2%/trade | Daily loss: 5% cap</p>
+                    <p className="mt-1">OI filter: hard (blocks counter-sentiment) | Liquidity: min volume 10K | Brokerage-aware</p>
                   </>
                 ) : (
                   <>
                     <p className="text-white font-semibold mb-1">Futures Manual Mode</p>
                     <p>You pick strategies and timeframes. OI sentiment + liquidity filters still active.</p>
-                    <p className="mt-1">{isSwing ? 'Scan: every 4h | MARGIN product | Exit: rollover 2d before expiry' : 'Orders: 12 PM - 2 PM | INTRADAY product | Square-off: 3:15 PM'}</p>
+                    <p className="mt-1">{isSwing ? 'Scan: every 4h | MARGIN product | Exit: rollover 2d before expiry' : 'Orders: 11 AM - 2 PM | INTRADAY product | Square-off: 3:15 PM'}</p>
                   </>
                 )}
               </div>

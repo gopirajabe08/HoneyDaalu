@@ -8,13 +8,13 @@ LONG Setup:
   - COMPLETED candle closes above 20-period high
   - Volume > 1.5x average (relaxed from 2x)
   - Breakout magnitude > 0.3 ATR (relaxed from 0.5)
-  - OI sentiment: boosts priority (soft filter, not hard block)
+  - OI sentiment: HARD filter — blocks trade if sentiment conflicts
 
 SHORT Setup:
   - COMPLETED candle closes below 20-period low
   - Volume > 1.5x average
   - Breakdown magnitude > 0.3 ATR
-  - OI sentiment: boosts priority
+  - OI sentiment: HARD filter — blocks trade if sentiment conflicts
 
 Execution:
   Entry : Signal bar close (no confirmation bar wait for intraday)
@@ -44,8 +44,8 @@ class FuturesVolumeBreakout(FuturesBaseStrategy):
     category = "Momentum"
     indicators = ["20-period High/Low", "Volume SMA(20)", "ATR(14)"]
     timeframes = ["15m", "1h", "1d"]
-    long_setup = "Completed candle breaks 20-period high + Volume > 1.5x SMA(20) + breakout > 0.3 ATR + OI soft filter"
-    short_setup = "Completed candle breaks 20-period low + Volume > 1.5x SMA(20) + breakdown > 0.3 ATR + OI soft filter"
+    long_setup = "Completed candle breaks 20-period high + Volume > 1.5x SMA(20) + breakout > 0.3 ATR + OI hard filter"
+    short_setup = "Completed candle breaks 20-period low + Volume > 1.5x SMA(20) + breakdown > 0.3 ATR + OI hard filter"
     exit_rules = "Target at 1:2 R:R ratio."
     stop_loss_rules = "ATR-based stop loss (1.5x ATR)."
 
@@ -81,13 +81,16 @@ class FuturesVolumeBreakout(FuturesBaseStrategy):
             return None
 
         sentiment = oi_data.get("sentiment", "") if oi_data else ""
-        # OI is soft filter — boosts score but doesn't block
         oi_aligned = False
 
         # ── LONG ──
         if signal_bar["Close"] > high_20 and signal_bar["Close"] > prev_bar["Close"]:
             breakout_mag = signal_bar["Close"] - high_20
             if breakout_mag < atr_val * 0.3:
+                return None
+
+            # P1-003: OI is HARD filter — block BUY when sentiment conflicts
+            if sentiment and sentiment in SHORT_OI:
                 return None
 
             oi_aligned = (not sentiment) or (sentiment in LONG_OI)
@@ -119,6 +122,10 @@ class FuturesVolumeBreakout(FuturesBaseStrategy):
         if signal_bar["Close"] < low_20 and signal_bar["Close"] < prev_bar["Close"]:
             breakdown_mag = low_20 - signal_bar["Close"]
             if breakdown_mag < atr_val * 0.3:
+                return None
+
+            # P1-003: OI is HARD filter — block SELL when sentiment conflicts
+            if sentiment and sentiment in LONG_OI:
                 return None
 
             oi_aligned = (not sentiment) or (sentiment in SHORT_OI)

@@ -87,6 +87,12 @@ class TripleMA(BaseStrategy):
         if not has_bullish_reversal(last, prev):
             return None
 
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
+
         entry = last["Close"]
         swing_sl = find_recent_swing_low(df, lookback=8)
         cfg = get_strategy_config(_KEY)
@@ -130,6 +136,12 @@ class TripleMA(BaseStrategy):
         # ── Confirm with bearish candlestick pattern ──
         if not has_bearish_reversal(last, prev):
             return None
+
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
 
         entry = last["Close"]
         swing_sl = find_recent_swing_high(df, lookback=8)

@@ -17,7 +17,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 
-from services.scanner import run_scan, is_market_open
+from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.trade_logger import log_trade
 from services.fyers_client import get_quotes, is_authenticated
 from config import SWING_PAPER_MAX_POSITIONS, SWING_SCAN_INTERVAL_SECONDS, SWING_DAILY_SCAN_TIMES
@@ -436,13 +436,13 @@ class SwingPaperTrader:
             all_signals.extend(signals)
             self._log("SCAN", f"  {strategy_key}({timeframe}): {len(signals)} signals ({scan_time}s)")
 
-        # Deduplicate by symbol — keep best R:R
+        # Deduplicate by symbol — keep highest conviction signal per symbol
         seen_symbols = {}
         for sig in all_signals:
             sym = sig.get("symbol", "")
-            rr_val = sig.get("reward", 0) / max(sig.get("risk", 1), 0.01)
-            if sym not in seen_symbols or rr_val > seen_symbols[sym][1]:
-                seen_symbols[sym] = (sig, rr_val)
+            conv = _calc_conviction(sig)
+            if sym not in seen_symbols or conv > seen_symbols[sym][1]:
+                seen_symbols[sym] = (sig, conv)
 
         unique_signals = [s[0] for s in sorted(seen_symbols.values(), key=lambda x: x[1], reverse=True)]
 
@@ -504,8 +504,13 @@ class SwingPaperTrader:
 
         capital_req = qty * entry_price
 
-        # Estimate brokerage for this trade (₹20/order × 2 legs + STT + charges)
-        est_brokerage = round(40 + capital_req * 0.0003, 2)  # ~₹40 + 0.03% of turnover
+        # Realistic Fyers brokerage + STT + other charges
+        turnover = qty * entry_price
+        brokerage_per_leg = min(20, turnover * 0.0003)  # ₹20 or 0.03% (whichever lower)
+        brokerage = round(brokerage_per_leg * 2, 2)  # Entry + Exit = 2 legs
+        stt = round(turnover * 0.00025, 2)  # STT: 0.025% on sell side
+        exchange_charges = round(turnover * 0.0003, 2)  # NSE transaction + SEBI + stamp
+        est_brokerage = round(brokerage + stt + exchange_charges, 2)
 
         order_id = f"SWING-P-{self._next_order_id:04d}"
         self._next_order_id += 1

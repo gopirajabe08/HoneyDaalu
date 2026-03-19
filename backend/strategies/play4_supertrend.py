@@ -55,7 +55,7 @@ class SupertrendPowerTrend(BaseStrategy):
     exit_rules = "T1 at recent swing high. T2 at 1:2 or 1:3 Risk-Reward."
     stop_loss_rules = "Strictly below the low of the signal candle."
 
-    def scan(self, df: pd.DataFrame, symbol: str) -> Optional[dict]:
+    def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
         if len(df) < 25:
             return None
 
@@ -103,6 +103,12 @@ class SupertrendPowerTrend(BaseStrategy):
         # ── Trigger candle: bullish reversal pattern ──
         if not has_bullish_reversal(last, prev):
             return None
+
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
 
         # ── Entry & Targets ──
         entry = last["High"]
@@ -163,6 +169,12 @@ class SupertrendPowerTrend(BaseStrategy):
         # ── Trigger candle: bearish reversal pattern ──
         if not has_bearish_reversal(last, prev):
             return None
+
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
 
         # ── Entry & Targets ──
         entry = last["Low"]  # break of signal candle's low

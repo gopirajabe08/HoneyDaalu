@@ -69,12 +69,51 @@ export const strategies = [
     color: '#ec4899',
     gradient: 'from-pink-500 to-rose-500',
   },
+  {
+    id: 'play7_orb',
+    name: 'Opening Range Breakout',
+    shortName: 'Play #7',
+    category: 'Intraday Momentum',
+    description: 'First 30-min range (9:15-9:45) → breakout above/below with volume confirmation. Morning momentum.',
+    indicators: ['Opening Range (15m)', 'Volume SMA20'],
+    timeframes: ['15m'],
+    swingTimeframes: [],
+    color: '#06b6d4',
+    gradient: 'from-cyan-500 to-sky-500',
+  },
+  {
+    id: 'play8_rsi_divergence',
+    name: 'RSI Divergence Reversal',
+    shortName: 'Play #8',
+    category: 'Reversal Detection',
+    description: 'Price makes new high but RSI makes lower high (bearish) or price makes new low but RSI makes higher low (bullish).',
+    indicators: ['RSI (14)', 'Swing High/Low Detection'],
+    timeframes: ['15m'],
+    swingTimeframes: ['1h', '1d'],
+    color: '#6366f1',
+    gradient: 'from-indigo-500 to-violet-500',
+  },
+  {
+    id: 'play9_gap_analysis',
+    name: 'Gap Analysis (Gap & Go / Fill)',
+    shortName: 'Play #9',
+    category: 'Intraday Gap Trading',
+    description: 'Morning gap > 1% — detects continuation (Gap & Go) or reversal (Gap Fill). Two modes.',
+    indicators: ['Previous Close', 'Opening Range', 'Volume SMA20'],
+    timeframes: ['15m'],
+    swingTimeframes: [],
+    color: '#14b8a6',
+    gradient: 'from-teal-500 to-emerald-500',
+  },
 ]
 
 export const categoryMap = {
   'Trend Following': { label: 'Trend Following (Momentum Capture)', color: '#f97316' },
   'Intraday Precision': { label: 'Intraday Precision (Session Trading)', color: '#22c55e' },
   'Volatility & Reversals': { label: 'Volatility & Reversals (Bollinger Dynamics)', color: '#a855f7' },
+  'Intraday Momentum': { label: 'Intraday Momentum (Opening Range)', color: '#06b6d4' },
+  'Reversal Detection': { label: 'Reversal Detection (Divergence Trading)', color: '#6366f1' },
+  'Intraday Gap Trading': { label: 'Intraday Gap Trading (Gap & Go / Fill)', color: '#14b8a6' },
 }
 
 export const optionsStrategies = [

@@ -12,6 +12,7 @@ import {
 } from '../services/api'
 import { formatINRCompact } from '../utils/formatters'
 import DailyStrategyStats from './DailyStrategyStats'
+import TodayImprovements from './TodayImprovements'
 
 const inr2 = (v) => `${Math.abs(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -175,6 +176,9 @@ export default function Dashboard({ fyersStatus }) {
     futures_candlestick_reversal: 'Fut Reversal',
     futures_mean_reversion: 'Fut Mean Rev',
     futures_ema_rsi_pullback: 'Fut EMA Pullback',
+    play7_orb: 'ORB Breakout',
+    play8_rsi_divergence: 'RSI Divergence',
+    play9_gap_analysis: 'Gap Analysis',
   }
 
   function rankStrategies(stats) {
@@ -198,6 +202,9 @@ export default function Dashboard({ fyersStatus }) {
 
   return (
     <div className="space-y-5">
+      {/* Today's Improvements Banner */}
+      <TodayImprovements />
+
       {/* Refresh bar */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">
@@ -622,6 +629,9 @@ function PositionsGroupedByStrategy({ tradedPositions, autoStatus, closedPositio
     play4_supertrend: 'Play #4 — Supertrend',
     play5_bb_squeeze: 'Play #5 — BB Squeeze',
     play6_bb_contra: 'Play #6 — BB Contra',
+    play7_orb: 'Play #7 — ORB Breakout',
+    play8_rsi_divergence: 'Play #8 — RSI Divergence',
+    play9_gap_analysis: 'Play #9 — Gap Analysis',
   }
 
   // Build symbol → strategy map from auto-trader trades
@@ -660,6 +670,9 @@ function PositionsGroupedByStrategy({ tradedPositions, autoStatus, closedPositio
     play4_supertrend: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
     play5_bb_squeeze: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
     play6_bb_contra: 'text-teal-400 bg-teal-500/10 border-teal-500/20',
+    play7_orb: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+    play8_rsi_divergence: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+    play9_gap_analysis: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     _unknown: 'text-gray-400 bg-gray-500/10 border-gray-500/20',
   }
 

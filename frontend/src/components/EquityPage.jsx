@@ -58,23 +58,23 @@ export default function EquityPage({ capital, setCapital }) {
         <span className="text-dark-500">|</span>
         {current?.component === 'intraday' ? (
           <>
-            <span>Start at <span className="text-orange-400 font-semibold">11:50 AM</span></span>
+            <span>Start at <span className="text-orange-400 font-semibold">10:15 AM</span></span>
             <span className="text-dark-500">|</span>
             <span>Capital: <span className="text-white">₹75K</span> (paper)</span>
             <span className="text-dark-500">|</span>
-            <span>Mode: <span className="text-amber-400">Auto Regime</span></span>
+            <span>Mode: <span className="text-amber-400">Auto Regime</span> (dynamic re-detection)</span>
             <span className="text-dark-500">|</span>
-            <span>Engine scans at 12:00 PM, auto square-off 3:15 PM</span>
+            <span>Orders: 10:30 AM - 2:00 PM | Square-off 3:15 PM</span>
           </>
         ) : (
           <>
-            <span>Start at <span className="text-emerald-400 font-semibold">11:50 AM</span></span>
+            <span>Start at <span className="text-emerald-400 font-semibold">9:15 AM</span></span>
             <span className="text-dark-500">|</span>
-            <span>Capital: <span className="text-white">₹50K</span> (paper)</span>
+            <span>Capital: <span className="text-white">₹75K</span> (paper)</span>
             <span className="text-dark-500">|</span>
-            <span>Mode: <span className="text-white">Manual</span> (Play 1, 2, 5, 6 on 1d)</span>
+            <span>Mode: <span className="text-white">Auto Regime</span> (Play 1, 2, 4, 5, 6 on 1d)</span>
             <span className="text-dark-500">|</span>
-            <span>Scans at 9:20 AM, positions carry overnight</span>
+            <span>Scan: 9:20 AM + retry 2h | Positions carry overnight</span>
           </>
         )}
       </div>
@@ -86,23 +86,27 @@ export default function EquityPage({ capital, setCapital }) {
           <span className="text-dark-500">|</span>
           <span>Regime: <span className="text-amber-400">Auto</span> (NIFTY + VIX + ADX picks strategies)</span>
           <span className="text-dark-500">|</span>
-          <span>Scan: <span className="text-orange-400">12:00 PM</span> + on-demand when slot opens</span>
+          <span>Scan: <span className="text-orange-400">10:30 AM</span> + on-demand when slot opens</span>
           <span className="text-dark-500">|</span>
-          <span>Orders: <span className="text-orange-400">12:00 PM - 2:00 PM</span></span>
+          <span>Orders: <span className="text-orange-400">10:30 AM - 2:00 PM</span></span>
           <span className="text-dark-500">|</span>
           <span>Max: <span className="text-white">2 orders/scan</span> (staggered)</span>
           <span className="text-dark-500">|</span>
-          <span>Monitor: <span className="text-white">every 60s</span></span>
+          <span>Monitor: <span className="text-white">every 20s</span></span>
           <span className="text-dark-500">|</span>
           <span>Square-off: <span className="text-red-400">3:15 PM</span></span>
           <span className="text-dark-500">|</span>
           <span>SL: <span className="text-white">min 1.2%</span></span>
           <span className="text-dark-500">|</span>
+          <span>Trailing SL: <span className="text-white">+1% → 50% trail</span></span>
+          <span className="text-dark-500">|</span>
           <span>VIX {'>'} 18: <span className="text-yellow-400">15m only</span></span>
           <span className="text-dark-500">|</span>
           <span>Daily loss: <span className="text-red-400">5% cap</span></span>
           <span className="text-dark-500">|</span>
-          <span>Positions: <span className="text-white">4 live / 10 paper</span></span>
+          <span>Drawdown: <span className="text-red-400">15%/5d breaker</span></span>
+          <span className="text-dark-500">|</span>
+          <span>Positions: <span className="text-white">6 live / 10 paper</span></span>
           <span className="text-dark-500">|</span>
           <span>Nifty 500 | ₹50-₹5,000</span>
         </div>
@@ -110,13 +114,15 @@ export default function EquityPage({ capital, setCapital }) {
         <div className="flex items-center gap-3 flex-wrap bg-dark-700/50 rounded-lg px-4 py-2 border border-emerald-500/10 text-[10px] text-gray-500">
           <span className="text-emerald-400 font-semibold">Swing</span>
           <span className="text-dark-500">|</span>
-          <span>Scan: <span className="text-emerald-400">9:20 AM</span> (retry every 30m until 2 PM)</span>
+          <span>Scan: <span className="text-emerald-400">9:20 AM</span> (retry every 2h until 2 PM)</span>
           <span className="text-dark-500">|</span>
           <span>Monitor: <span className="text-white">every 5 min</span></span>
           <span className="text-dark-500">|</span>
           <span>Direction: <span className="text-white">BUY only</span> (CNC)</span>
           <span className="text-dark-500">|</span>
           <span>SL: <span className="text-white">min 1.2%</span></span>
+          <span className="text-dark-500">|</span>
+          <span>Trailing SL: <span className="text-white">+1% → 50% trail</span></span>
           <span className="text-dark-500">|</span>
           <span>Positions: <span className="text-white">1 live / 5 paper</span></span>
           <span className="text-dark-500">|</span>

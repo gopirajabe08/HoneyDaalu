@@ -52,7 +52,7 @@ NSE_HOLIDAYS = {
 # ── Intraday Trading Time Windows (IST) ──────────────────────────────────────
 # Previously hard-coded in auto_trader.py and paper_trader.py
 
-INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN = 12, 0    # 12:00 PM — start placing orders
+INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN = 10, 30   # 10:30 AM — start placing orders
 INTRADAY_ORDER_CUTOFF_HOUR, INTRADAY_ORDER_CUTOFF_MIN = 14, 0  # 2:00 PM — stop placing new orders
 INTRADAY_SQUAREOFF_HOUR, INTRADAY_SQUAREOFF_MIN = 15, 15       # 3:15 PM — square off all positions
 INTRADAY_MARKET_CLOSE_HOUR, INTRADAY_MARKET_CLOSE_MIN = 15, 30 # 3:30 PM — market closes
@@ -63,7 +63,7 @@ INTRADAY_CAPITAL_PER_POSITION = 25000  # ~₹25K per slot (auto-calculates max p
 INTRADAY_MIN_POSITIONS = 1
 INTRADAY_MAX_POSITIONS_CAP = 6        # hard cap even for large capital
 INTRADAY_PAPER_MAX_POSITIONS = 10     # paper: more positions for testing
-INTRADAY_POSITION_CHECK_INTERVAL = 60  # seconds between LTP checks
+INTRADAY_POSITION_CHECK_INTERVAL = 20  # seconds between LTP checks (reduced from 60s for faster reaction)
 
 # Timeframe options per strategy (intraday only)
 STRATEGY_TIMEFRAMES = {
@@ -73,6 +73,9 @@ STRATEGY_TIMEFRAMES = {
     "play4_supertrend": ["5m", "15m"],
     "play5_bb_squeeze": ["15m"],
     "play6_bb_contra": ["5m", "15m"],
+    "play7_orb": ["15m"],                  # ORB needs 15m (first 2 candles = 30min range)
+    "play8_rsi_divergence": ["15m"],       # RSI divergence on 15m for intraday
+    "play9_gap_analysis": ["15m"],         # Gap analysis needs 15m (first 2-4 candles for gap detection)
 }
 
 # Swing trading timeframes (positions carry over days)
@@ -82,6 +85,7 @@ SWING_STRATEGY_TIMEFRAMES = {
     "play4_supertrend": ["1d"],
     "play5_bb_squeeze": ["1d"],
     "play6_bb_contra": ["1d"],
+    "play8_rsi_divergence": ["1h", "1d"],  # RSI divergence works well on daily for swing
 }
 
 # Swing trading settings
@@ -187,7 +191,7 @@ OPTIONS_STRATEGY_PARAMS = {
 # ── Futures Trading Config ────────────────────────────────────────────────
 
 # Intraday time windows (same as equity by default)
-FUTURES_ORDER_START_HOUR, FUTURES_ORDER_START_MIN = 12, 0    # 12:00 PM
+FUTURES_ORDER_START_HOUR, FUTURES_ORDER_START_MIN = 11, 0    # 11:00 AM
 FUTURES_ORDER_CUTOFF_HOUR, FUTURES_ORDER_CUTOFF_MIN = 14, 0  # 2:00 PM
 FUTURES_SQUAREOFF_HOUR, FUTURES_SQUAREOFF_MIN = 15, 15       # 3:15 PM
 
@@ -204,7 +208,7 @@ FUTURES_MARGIN_PCT_OVERNIGHT = 0.20  # 20% for swing (MARGIN)
 
 # Risk per trade (% of capital)
 # Conservative: 2-3% (institutional), Moderate: 5% (default), Aggressive: 10% (small capital)
-FUTURES_RISK_PER_TRADE_PCT = 0.05  # 5% default — adjustable for small capital accounts
+FUTURES_RISK_PER_TRADE_PCT = 0.02  # 2% conservative — reduced from 5% to limit per-trade exposure
 
 # Daily loss circuit breaker — stop engine if daily realized loss exceeds this % of capital
 FUTURES_DAILY_LOSS_LIMIT_PCT = 5.0

@@ -143,7 +143,9 @@
       "Bash(xargs du:*)",
       "Bash(git config:*)",
       "Bash(git ls-remote:*)",
-      "Read(//Users/vgopiraja/Documents/MY Applications/IntraTrading/**)"
+      "Read(//Users/vgopiraja/Documents/MY Applications/IntraTrading/**)",
+      "Bash(xargs kill:*)",
+      "Bash(python3 -c \":*)"
     ]
   }
 }

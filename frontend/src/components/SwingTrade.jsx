@@ -493,7 +493,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
                       <div className="bg-dark-800 border border-dark-500 rounded-lg p-3 shadow-lg text-[10px] text-gray-400 leading-relaxed">
                         <p className="text-emerald-400 font-semibold mb-1">Equity Swing Manual</p>
                         <p>CNC delivery orders. Positions carry overnight. BUY only (no short selling).</p>
-                        <p className="mt-1">Scan: 9:20 AM + retry every 30m | SL/Target orders re-placed daily | Max {isLive ? '1' : '5'} position{isLive ? '' : 's'}</p>
+                        <p className="mt-1">Scan: 9:20 AM + retry every 2h | SL/Target orders re-placed daily | Max {isLive ? '1' : '5'} position{isLive ? '' : 's'}</p>
                         <p className="mt-1">Price: ₹100-₹1,500 | Nifty filter: blocks BUY when Nifty {'<'} 50 SMA</p>
                       </div>
                     </div>

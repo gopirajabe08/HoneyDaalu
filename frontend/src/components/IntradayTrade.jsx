@@ -70,8 +70,13 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
     } catch {}
   }, [isLive])
 
-  // Fetch regime on mount
+  // Fetch regime on mount + refresh every 60s while running
   useEffect(() => { getEquityRegime().then(setRegime).catch(() => {}) }, [])
+  useEffect(() => {
+    if (!running) return
+    const id = setInterval(() => { getEquityRegime().then(setRegime).catch(() => {}) }, 60000)
+    return () => clearInterval(id)
+  }, [running])
 
   // Poll on mount and when mode switches
   useEffect(() => { pollStatus() }, [pollStatus])
@@ -417,6 +422,56 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
 
               {running ? (
                 <>
+                  {/* Live Regime Banner */}
+                  {regime && (
+                    <div className="bg-gradient-to-r from-dark-600 to-dark-700 rounded-xl px-3 py-2.5 mb-3 border border-dark-500/50">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider">Live Regime</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            regime.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
+                            regime.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {(regime.regime || '').replace(/_/g, ' ').toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {regime.components?.vix > 0 && (
+                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                              regime.components.vix > 20 ? 'bg-red-500/20 text-red-400' :
+                              regime.components.vix > 16 ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-emerald-500/20 text-emerald-400'
+                            }`}>
+                              VIX {regime.components.vix}
+                            </span>
+                          )}
+                          {regime.components?.nifty?.adx > 0 && (
+                            <span className="text-[9px] text-gray-400">ADX {regime.components.nifty.adx}</span>
+                          )}
+                          {regime.confidence && (
+                            <span className={`text-[9px] ${
+                              regime.confidence === 'high' ? 'text-emerald-400' :
+                              regime.confidence === 'medium' ? 'text-yellow-400' : 'text-red-400'
+                            }`}>
+                              ● {regime.confidence}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {regime.components?.intraday && (
+                        <div className="text-[9px] text-gray-400">
+                          Intraday: <span className={regime.components.intraday.change_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                            NIFTY {regime.components.intraday.change_pct >= 0 ? '+' : ''}{regime.components.intraday.change_pct}%
+                          </span>
+                          {regime.components?.nifty?.trend && (
+                            <span className="text-gray-500 ml-2">Daily: {regime.components.nifty.trend}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="bg-dark-600 rounded-xl px-3 py-2.5 mb-3">
                     <p className="text-[10px] text-gray-400 mb-1.5">Running {runningStrategies.length} strateg{runningStrategies.length === 1 ? 'y' : 'ies'}</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -433,7 +488,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
 
                   <div className="flex gap-2 mb-3 flex-wrap">
                     <Badge color={isLive ? 'green' : 'blue'} text={isLive ? 'Live Mode' : 'Virtual Mode'} />
-                    {orderCutoff && <Badge color="yellow" text="No new orders (past 2:15 PM)" />}
+                    {orderCutoff && <Badge color="yellow" text="No new orders (past 2:00 PM)" />}
                     {squaredOff && <Badge color="purple" text="Squared off" />}
                   </div>
 
@@ -572,14 +627,14 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                           <>
                             <p className="text-amber-400 font-semibold mb-1">Auto Regime Mode</p>
                             <p>System detects NIFTY trend + VIX + ADX and picks the best strategies automatically.</p>
-                            <p className="mt-1">Orders: 12 PM - 2 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2% | Daily loss limit 5%</p>
+                            <p className="mt-1">Orders: 10:30 AM - 2 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2% | Trailing SL (paper) | Daily loss limit 5% | Drawdown breaker 15%/5d</p>
                             {isLive && <p className="mt-1">VIX {'>'} 18: skips 5m, uses 15m only | Orders verified on Fyers before tracking</p>}
                           </>
                         ) : (
                           <>
                             <p className="text-white font-semibold mb-1">Manual Mode</p>
-                            <p>You pick strategies and timeframes. Engine scans at 12 PM, re-scans when slot opens.</p>
-                            <p className="mt-1">Orders: 12 PM - 2 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2%</p>
+                            <p>You pick strategies and timeframes. Engine scans at 10:30 AM, re-scans when slot opens.</p>
+                            <p className="mt-1">Orders: 10:30 AM - 2 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2%</p>
                           </>
                         )}
                       </div>
@@ -601,8 +656,8 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                 <AlertTriangle size={10} className="text-gray-600 flex-shrink-0 mt-0.5" />
                 <p className="text-[9px] text-gray-600 leading-relaxed">
                   {isLive
-                    ? 'Max 4 positions \u2022 2% risk \u2022 25 min scan \u2022 Orders 12:00-2:15 PM \u2022 Square-off 3:15 PM'
-                    : 'Virtual mode \u2022 Max 3 positions \u2022 2% risk \u2022 15 min scan \u2022 No real orders placed'}
+                    ? 'Max 6 positions \u2022 2% risk \u2022 Orders 10:30 AM-2:00 PM \u2022 Square-off 3:15 PM'
+                    : 'Virtual mode \u2022 Max 10 positions \u2022 2% risk \u2022 Trailing SL \u2022 Orders 10:30 AM-2:00 PM \u2022 No real orders placed'}
                 </p>
               </div>
             </div>

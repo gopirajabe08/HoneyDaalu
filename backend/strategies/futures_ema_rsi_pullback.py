@@ -9,14 +9,14 @@ LONG Setup (Trend Pullback):
   - Price within 5% of 50 EMA (relaxed from 3%)
   - RSI between 35-60 (relaxed from 40-55)
   - Volume > average (1.0x SMA20 — relaxed from 1.5x)
-  - OI sentiment: soft filter
+  - OI sentiment: HARD filter — blocks trade if sentiment conflicts
 
 SHORT Setup:
   - COMPLETED candle Close < 50 EMA (downtrend)
   - Price within 5% of 50 EMA
   - RSI between 40-65 (relaxed from 45-60)
   - Volume > average
-  - OI sentiment: soft filter
+  - OI sentiment: HARD filter — blocks trade if sentiment conflicts
 
 Execution:
   Entry : Signal bar close
@@ -47,8 +47,8 @@ class FuturesEmaRsiPullback(FuturesBaseStrategy):
     category = "Trend"
     indicators = ["50 EMA", "RSI(14)", "Volume SMA(20)"]
     timeframes = ["15m", "1h", "1d"]
-    long_setup = "Close > 50 EMA + within 5% of EMA + RSI 35-60 + Volume > avg + OI soft filter"
-    short_setup = "Close < 50 EMA + within 5% of EMA + RSI 40-65 + Volume > avg + OI soft filter"
+    long_setup = "Close > 50 EMA + within 5% of EMA + RSI 35-60 + Volume > avg + OI hard filter"
+    short_setup = "Close < 50 EMA + within 5% of EMA + RSI 40-65 + Volume > avg + OI hard filter"
     exit_rules = "Target at 1:2 R:R ratio."
     stop_loss_rules = "ATR-based stop loss (1.5x ATR)."
 
@@ -84,6 +84,10 @@ class FuturesEmaRsiPullback(FuturesBaseStrategy):
 
         # ── LONG: price above 50 EMA, RSI 35-60 ──
         if close > ema_50 and 35 <= rsi <= 60:
+            # P1-003: OI is HARD filter — block BUY when sentiment conflicts
+            if sentiment and sentiment in SHORT_OI:
+                return None
+
             oi_aligned = (not sentiment) or (sentiment in LONG_OI)
 
             entry = round(close, 2)
@@ -112,6 +116,10 @@ class FuturesEmaRsiPullback(FuturesBaseStrategy):
 
         # ── SHORT: price below 50 EMA, RSI 40-65 ──
         if close < ema_50 and 40 <= rsi <= 65:
+            # P1-003: OI is HARD filter — block SELL when sentiment conflicts
+            if sentiment and sentiment in LONG_OI:
+                return None
+
             oi_aligned = (not sentiment) or (sentiment in SHORT_OI)
 
             entry = round(close, 2)

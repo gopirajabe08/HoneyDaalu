@@ -330,8 +330,13 @@ class FuturesSwingPaperTrader:
         slippage = entry * 0.001
         entry = round(entry + slippage if side == 1 else entry - slippage, 2)
 
-        # Estimate brokerage (₹20/order × 2 + STT for futures)
-        est_brokerage = round(40 + entry * qty * 0.0002, 2)
+        # Realistic Fyers brokerage + STT + other charges (futures)
+        turnover = entry * qty
+        brokerage_per_leg = min(20, turnover * 0.0003)  # ₹20 or 0.03% (whichever lower)
+        brokerage = round(brokerage_per_leg * 2, 2)  # Entry + Exit = 2 legs
+        stt = round(turnover * 0.0002, 2)  # Futures: STT = 0.02% on sell side
+        exchange_charges = round(turnover * 0.0003, 2)  # NSE transaction + SEBI + stamp
+        est_brokerage = round(brokerage + stt + exchange_charges, 2)
 
         order_id = f"FSWPAPER-{self._next_order_id:04d}"
         self._next_order_id += 1

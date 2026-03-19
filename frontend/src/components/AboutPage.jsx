@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   TrendingUp,
   Shield,
@@ -27,14 +27,12 @@ import {
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: Info },
-  { id: 'how-it-works', label: 'How It Works', icon: Layers },
-  { id: 'get-started', label: 'Getting Started', icon: Play },
-  { id: 'trading-day', label: 'Trading Day', icon: CalendarDays },
-  { id: 'strategies', label: 'Strategies', icon: Target },
-  { id: 'options', label: 'Options Trading', icon: BarChart3 },
-  { id: 'futures', label: 'Futures Trading', icon: TrendingUp },
+  { id: 'auto-system', label: 'Auto System', icon: Repeat },
+  { id: 'strategies', label: 'Equity', icon: Target },
+  { id: 'options', label: 'Options', icon: BarChart3 },
+  { id: 'futures', label: 'Futures', icon: TrendingUp },
   { id: 'pages', label: 'App Pages', icon: BookOpen },
-  { id: 'rules', label: 'Rules & Notes', icon: Shield },
+  { id: 'e2e-flow', label: 'E2E Flow', icon: Layers },
 ]
 
 /* ─── Tab: Overview ─── */
@@ -50,7 +48,7 @@ function OverviewTab() {
             <h1 className="text-2xl font-bold text-white mb-2">IntraTrading</h1>
             <p className="text-gray-400 leading-relaxed">
               An automated stock trading system for the <span className="text-white font-medium">Indian market (NSE)</span>.
-              It scans <span className="text-white font-medium">Nifty 500 stocks</span> using 6 proven technical strategies,
+              It scans <span className="text-white font-medium">Nifty 500 stocks</span> using 9 proven technical strategies,
               finds high-probability trade setups, and automatically places orders through your
               <span className="text-white font-medium"> Fyers broker account</span> — with stop-loss and target built in.
               Supports <span className="text-orange-400 font-medium">equity intraday</span>,
@@ -66,12 +64,12 @@ function OverviewTab() {
         <div className="bg-dark-700 rounded-xl border border-dark-500 p-5">
           <Search size={20} className="text-blue-400 mb-3" />
           <h3 className="text-sm font-semibold text-white mb-1">Scan</h3>
-          <p className="text-xs text-gray-400 leading-relaxed">Scans all Nifty 500 stocks using 6 technical strategies to find buy/sell signals with clear entry, stop-loss, and target.</p>
+          <p className="text-xs text-gray-400 leading-relaxed">Scans all Nifty 500 stocks using 9 technical strategies to find buy/sell signals with clear entry, stop-loss, and target.</p>
         </div>
         <div className="bg-dark-700 rounded-xl border border-dark-500 p-5">
           <ShoppingCart size={20} className="text-green-400 mb-3" />
           <h3 className="text-sm font-semibold text-white mb-1">Trade</h3>
-          <p className="text-xs text-gray-400 leading-relaxed">Automatically places orders on Fyers with built-in SL & target. Risks only 2% of your capital per trade. No manual intervention needed.</p>
+          <p className="text-xs text-gray-400 leading-relaxed">Automatically places orders on Fyers with built-in SL & target. Risks only 2% of your capital per trade. Trailing SL locks in profits after 1% gain. Multi-day drawdown breaker (15% over 5 days) reduces exposure. No manual intervention needed.</p>
         </div>
         <div className="bg-dark-700 rounded-xl border border-dark-500 p-5">
           <LineChart size={20} className="text-purple-400 mb-3" />
@@ -116,12 +114,15 @@ function HowItWorksTab() {
             <Zap size={14} /> Intraday Mode
           </h3>
           <ul className="space-y-2 text-xs text-gray-400">
-            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>On-demand scan: initial scan at 12:00 PM, re-scans when a slot opens</li>
-            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Places entry + SL orders on Fyers, monitors target every 60s</li>
-            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Max 4 positions (live) / 10 positions (paper)</li>
-            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Orders: 12:00 PM - 2:00 PM. Square-off at 3:15 PM</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Auto regime mode with dynamic re-detection every scan cycle</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>On-demand scan: initial scan at 10:30 AM, re-scans when a slot opens</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Play4 Supertrend prioritized. Volume confirmation on all signals</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Conviction-based signal ranking. VIX elevated zone (16-20) reduces positions</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Places entry + SL orders on Fyers, monitors target every 20s</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Max 6 positions (live) / 10 positions (paper)</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Orders: 10:30 AM - 2:00 PM. Square-off at 3:15 PM</li>
             <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Uses 5m / 15m candle timeframes</li>
-            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>All 6 strategies available. Price filter: Rs 50 - Rs 5,000</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>All 9 strategies available. Price filter: Rs 50 - Rs 5,000</li>
           </ul>
         </div>
         <div className="bg-dark-700 rounded-xl p-5 border border-emerald-500/20">
@@ -129,7 +130,7 @@ function HowItWorksTab() {
             <Repeat size={14} /> Swing Mode
           </h3>
           <ul className="space-y-2 text-xs text-gray-400">
-            <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">&#9679;</span>Morning scan at 9:20 AM. Retries every 30 min until 2 PM if slot open</li>
+            <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">&#9679;</span>Morning scan at 9:20 AM. Retries every 2 hours until 2 PM if slot open</li>
             <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">&#9679;</span>BUY only — CNC (delivery) does not support short selling</li>
             <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">&#9679;</span>Max 1 position (live) / 5 positions (paper)</li>
             <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">&#9679;</span>Orders re-placed daily (CNC orders expire each day)</li>
@@ -163,7 +164,7 @@ function GetStartedTab() {
     },
     {
       step: '4', title: 'Go Live', icon: Play,
-      desc: 'Once confident with paper results, switch to Live mode using the toggle on the Intraday or Swing page. The system will scan at 12 PM (intraday) or 9:20 AM (swing), place real orders, manage SL/target, and square off — all automatically.',
+      desc: 'Once confident with paper results, switch to Live mode using the toggle on the Intraday or Swing page. The system will scan at 10:30 AM (intraday) or 9:20 AM (swing), place real orders, manage SL/target, and square off — all automatically.',
       color: 'from-orange-500/20 to-orange-500/5 border-orange-500/30',
     },
     {
@@ -201,10 +202,10 @@ function GetStartedTab() {
 /* ─── Tab: Trading Day ─── */
 function TradingDayTab() {
   const timeline = [
-    { time: '9:15 AM', title: 'Market Opens', desc: 'Start intraday engine (Live or Paper). Swing engine scans at 9:20 AM for overnight signals. Intraday waits until 12:00 PM before placing orders.', color: 'bg-green-500', textColor: 'text-green-400', highlight: true },
-    { time: '9:20 AM', title: 'Swing Morning Scan', desc: "Swing trader scans all 4 strategies on daily candles. If no signal found and slot open, retries every 30 min until 2 PM. BUY signals only.", color: 'bg-emerald-500', textColor: 'text-emerald-400' },
-    { time: '12:00 PM', title: 'Intraday Orders Begin', desc: 'Initial full scan runs to fill all position slots. On-demand mode: re-scans immediately when a slot opens (position hits SL or target).', color: 'bg-orange-500', textColor: 'text-orange-400', highlight: true },
-    { time: '12:00 - 2:00 PM', title: 'Active Trading', desc: 'Monitors positions every 60s. When a trade closes (SL/target), scans again to fill the slot. Max 4 live / 10 paper positions.', color: 'bg-orange-500', textColor: 'text-orange-400' },
+    { time: '9:15 AM', title: 'Market Opens', desc: 'Start intraday engine (Live or Paper). Swing engine scans at 9:20 AM for overnight signals. Intraday waits until 10:30 AM before placing orders.', color: 'bg-green-500', textColor: 'text-green-400', highlight: true },
+    { time: '9:20 AM', title: 'Swing Morning Scan', desc: "Swing trader scans all 4 strategies on daily candles. If no signal found and slot open, retries every 2 hours until 2 PM. BUY signals only.", color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+    { time: '10:30 AM', title: 'Equity Intraday Orders Begin', desc: 'Initial full scan runs to fill all position slots. Auto regime with dynamic re-detection. Play4 Supertrend prioritized. Volume confirmation + conviction-based ranking.', color: 'bg-orange-500', textColor: 'text-orange-400', highlight: true },
+    { time: '10:30 AM - 2:00 PM', title: 'Active Trading', desc: 'Monitors positions every 20s. When a trade closes (SL/target), scans again to fill the slot. Max 6 live / 10 paper positions. VIX elevated zone (16-20) reduces positions.', color: 'bg-orange-500', textColor: 'text-orange-400' },
     { time: '2:00 PM', title: 'Order Cutoff', desc: 'No new intraday or swing orders after this time. Existing positions keep running with their SL/target.', color: 'bg-yellow-500', textColor: 'text-yellow-400' },
     { time: '2:00 - 3:15 PM', title: 'Position Monitoring', desc: 'Intraday engine monitors open positions. Trades can still hit target or SL. No new scans or orders.', color: 'bg-blue-500', textColor: 'text-blue-400' },
     { time: '3:15 PM', title: 'Intraday Square-Off', desc: 'All remaining intraday positions closed at market price. Swing positions carry overnight (CNC delivery).', color: 'bg-red-500', textColor: 'text-red-400', highlight: true },
@@ -309,11 +310,44 @@ function StrategiesTab() {
       swing: { timeframes: ['1d'], best: '1d', note: 'Daily mean reversion from lower band in uptrends offers high-probability swing entries. BUY only in swing.' },
       color: 'border-pink-500/20', badge: 'text-pink-400 bg-pink-500/15',
     },
+    {
+      num: '#7', name: 'Opening Range Breakout (ORB)', type: 'Momentum',
+      indicators: 'Opening Range (9:15-9:45 AM), Volume SMA20',
+      how: 'Price breaks above/below 30-min high/low with volume > 1.3x and strong body (>50% of range). Captures morning momentum on trending and gap days.',
+      exit: '1:2 risk-reward target.',
+      sl: 'Opposite side of opening range (min 1.2% ATR floor).',
+      rr: '1:2',
+      intraday: { timeframes: ['15m'], best: '15m', note: '15m captures the breakout cleanly. Best on trending days and gap days — strong directional moves after the opening range sets.' },
+      swing: null,
+      color: 'border-amber-500/20', badge: 'text-amber-400 bg-amber-500/15',
+    },
+    {
+      num: '#8', name: 'RSI Divergence Reversal', type: 'Reversal',
+      indicators: 'RSI (14), Swing High/Low detection',
+      how: 'Price makes new high but RSI makes lower high = bearish divergence. Price makes new low but RSI makes higher low = bullish divergence. Detects trend exhaustion before price reverses.',
+      exit: '1:2 risk-reward target.',
+      sl: 'Beyond last swing extreme (min 1.2% ATR floor).',
+      rr: '1:2',
+      intraday: { timeframes: ['15m'], best: '15m', note: '15m gives clean divergence signals. Best for catching reversals, pullbacks, oversold bounces, and trend exhaustion points.' },
+      swing: { timeframes: ['1h', '1d'], best: '1d', note: 'Daily RSI divergence catches multi-day reversals and oversold bounces. Higher timeframes = stronger divergence signals.' },
+      color: 'border-rose-500/20', badge: 'text-rose-400 bg-rose-500/15',
+    },
+    {
+      num: '#9', name: 'Gap Analysis (Gap & Go / Gap Fill)', type: 'Momentum / Reversal',
+      indicators: 'Previous Close, Opening Range, Volume SMA20',
+      how: 'Gap > 1% from previous close. Two modes: Gap & Go (continuation if price holds above gap) or Gap Fill (reversal if price starts filling the gap). Volume > 1.3x confirms.',
+      exit: '1:2 R:R (Gap & Go) or previous close (Gap Fill).',
+      sl: 'Opposite side of gap range.',
+      rr: '1:2',
+      intraday: { timeframes: ['15m'], best: '15m', note: '15m captures gap reactions after first 30 min. Best on morning gaps from overnight news, earnings, or event days.' },
+      swing: null,
+      color: 'border-teal-500/20', badge: 'text-teal-400 bg-teal-500/15',
+    },
   ]
 
   return (
     <>
-      <h2 className="text-lg font-semibold text-white mb-1">6 Trading Strategies</h2>
+      <h2 className="text-lg font-semibold text-white mb-1">9 Trading Strategies</h2>
       <p className="text-xs text-gray-500 mb-6">From a proven Technical Indicator Playbook — each uses different indicators and market conditions</p>
 
       <div className="space-y-4">
@@ -616,11 +650,11 @@ function FuturesTab() {
           </div>
           <div className="bg-dark-600/50 rounded-lg p-4 border border-blue-500/10">
             <div className="text-[10px] font-bold text-blue-400 uppercase mb-2">Layer 2: Strategy Screeners</div>
-            <p className="text-xs text-gray-400 leading-relaxed">4 technical strategies scan all F&O stocks. Each strategy fires ONLY when OI sentiment aligns (e.g., Volume Breakout BUY requires Long Buildup or Short Covering). Uses completed candles to avoid lookahead bias.</p>
+            <p className="text-xs text-gray-400 leading-relaxed">8 strategies scan all F&O stocks (4 futures-specific + Supertrend, ORB, RSI Divergence, Gap Analysis from equity). Each strategy fires ONLY when OI sentiment aligns (e.g., Volume Breakout BUY requires Long Buildup or Short Covering). Uses completed candles to avoid lookahead bias.</p>
           </div>
           <div className="bg-dark-600/50 rounded-lg p-4 border border-green-500/10">
             <div className="text-[10px] font-bold text-green-400 uppercase mb-2">Layer 3: Margin Sizing</div>
-            <p className="text-xs text-gray-400 leading-relaxed">Position size = min(margin lots, risk lots). Intraday margin: ~10%. Risk cap: 5% per trade. Lot-based sizing ensures quantity is always a valid multiple. Brokerage-aware: skips trades where charges eat {'>'}50% of reward.</p>
+            <p className="text-xs text-gray-400 leading-relaxed">Position size = min(margin lots, risk lots). Intraday margin: ~10%. Risk cap: 2% per trade. Lot-based sizing ensures quantity is always a valid multiple. Brokerage-aware: skips trades where charges eat {'>'}50% of reward.</p>
           </div>
         </div>
       </div>
@@ -661,7 +695,7 @@ function FuturesTab() {
       </div>
 
       {/* 4 Strategies */}
-      <h3 className="text-sm font-semibold text-white mb-3">4 Futures Strategies</h3>
+      <h3 className="text-sm font-semibold text-white mb-3">8 Futures Strategies (4 futures-specific + Supertrend, ORB, RSI Divergence, Gap Analysis)</h3>
       <div className="space-y-4 mb-6">
         {strategies.map((s, i) => (
           <div key={i} className={`bg-dark-700 rounded-xl border ${s.color} p-5`}>
@@ -734,7 +768,7 @@ function FuturesTab() {
         <h3 className="text-sm font-semibold text-white mb-3">Risk Management</h3>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs text-gray-400">
           <div className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">&#9679;</span><span>Exchange-level SL-M order on every position (not just polling)</span></div>
-          <div className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">&#9679;</span><span>5% risk per trade (configurable). Strict lot-size enforcement</span></div>
+          <div className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">&#9679;</span><span>2% risk per trade (configurable). Strict lot-size enforcement</span></div>
           <div className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">&#9679;</span><span>Daily loss limit: 5% of capital — engine stops opening new positions</span></div>
           <div className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">&#9679;</span><span>Per-position max loss: 3% of capital — force close if breached</span></div>
           <div className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">&#9679;</span><span>Liquidity filter: skips contracts with OI {'<'} 5,000 or volume {'<'} 50,000</span></div>
@@ -770,8 +804,8 @@ function FuturesTab() {
 function AppPagesTab() {
   const pages = [
     { name: 'Dashboard', desc: 'Home screen showing all 4 engines (Intraday Live, Intraday Paper, Swing Live, Swing Paper) with live status. Overall P&L, win rate, open positions, strategy performance split by Intraday and Swing, stock-wise P&L bars, and order summary.', color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-    { name: 'Intraday Trading', desc: 'Auto regime mode: system detects NIFTY trend + VIX + ADX and picks from all 6 strategies automatically. Max 2 orders per scan (staggered). VIX > 18: skips 5m, uses 15m only. SL min 1.2%. Daily 5% loss limit. Order fill verification on Fyers. Fyers P&L shown as source of truth for live mode.', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-    { name: 'Swing Trading', desc: 'Live/Paper toggle. BUY-only (CNC delivery, no short selling). Morning scan at 9:20 AM, retries every 30 min if slot open. Max 1 position (live) / 5 (paper). Price filter: Rs 100 - Rs 1,500. Daily Strategy Performance shows per-day breakdown.', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+    { name: 'Intraday Trading', desc: 'Auto regime mode with dynamic re-detection. Play4 Supertrend prioritized. Volume confirmation on all signals. Conviction-based signal ranking. VIX elevated zone (16-20) reduces positions. Orders 10:30 AM - 2 PM. Max 2 orders per scan (staggered). SL min 1.2%. Daily 5% loss limit. Order fill verification on Fyers. Fyers P&L shown as source of truth for live mode.', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+    { name: 'Swing Trading', desc: 'Live/Paper toggle. BUY-only (CNC delivery, no short selling). Morning scan at 9:20 AM, retries every 2 hours if slot open. Max 1 position (live) / 5 (paper). Price filter: Rs 100 - Rs 1,500. Daily Strategy Performance shows per-day breakdown.', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
     { name: 'Backtest', desc: 'Test any strategy on a specific past date to see what trades would have triggered, their entry/exit prices, and overall performance. Great for validating strategies before deploying.', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
     { name: 'Positions & Orders', desc: 'Real-time view of your open positions and complete order book from Fyers. Filter orders by status — Filled, Pending, Rejected, or Cancelled.', color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' },
     { name: 'Trade Log', desc: 'Complete history of all trades (auto, paper, swing, swing paper) with strategy tags, entry/exit prices, P&L, broker charges, and net profit. Filter by source, strategy, or date range. Totals row shows filtered P&L, charges, net P&L, and win rate.', color: 'text-pink-400', bg: 'bg-pink-500/10 border-pink-500/20' },
@@ -779,8 +813,8 @@ function AppPagesTab() {
     { name: 'Algo Specialists', desc: '6 AI analysis agents (Strategist, Engineer, Data Scientist, Risk Manager, QA Expert, Performance Analyst). Single "Generate" button runs all at once. Shows findings, deployable recommendations, and manual insights.', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
     { name: 'Options Intraday (Live/Paper)', desc: 'NIFTY/BANKNIFTY spread trading. Auto regime every 15 min (VIX + PCR + daily trend + intraday direction). 6 strategies auto-selected. Intraday direction prevents wrong-side spreads. Scan every 15 min. 30 min loss cooldown after losing trade. Daily 5% loss limit. Orders 10 AM - 2 PM, square-off 3 PM.', color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
     { name: 'Options Swing (Live/Paper)', desc: 'Monthly expiry options spreads that carry over days. Same 6 strategies with auto regime detection. Exit on profit target, stop loss, or 2 days before expiry. Max 2 positions. Scans every 4 hours during market hours.', color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20' },
-    { name: 'Futures Intraday (Live/Paper)', desc: 'NSE F&O stock futures with 3-layer system: OI sentiment analysis + 4 strategy screeners + margin-based lot sizing. Auto regime detection selects strategies based on NIFTY trend, VIX, and aggregate OI. Exchange-level SL-M on every position. Daily 5% loss limit. Orders 12 PM - 2 PM, square-off 3:15 PM. Max 4 positions (live) / 8 (paper).', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
-    { name: 'Futures Swing (Live/Paper)', desc: 'MARGIN product futures that carry over days. Same 4 strategies with OI filter. Exchange SL-M re-placed daily (DAY validity). Contract rollover near expiry: close current month, re-enter next month. Max 2 positions (live) / 5 (paper). Scans every 4 hours. Per-position 3% max loss cap.', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+    { name: 'Futures Intraday (Live/Paper)', desc: 'NSE F&O stock futures with 3-layer system: OI sentiment hard filter + 8 strategy screeners (4 futures-specific + Supertrend, ORB, RSI Divergence, Gap Analysis) + margin-based lot sizing. Auto regime detection selects strategies based on NIFTY trend, VIX, and aggregate OI. Exchange-level SL-M on every position. 2% risk/trade. Daily 5% loss limit. Orders 11 AM - 2 PM, square-off 3:15 PM. Max 4 positions (live) / 8 (paper).', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+    { name: 'Futures Swing (Live/Paper)', desc: 'MARGIN product futures that carry over days. Same 8 strategies (4 futures-specific + Supertrend, ORB, RSI Divergence, Gap Analysis) with OI filter. Exchange SL-M re-placed daily (DAY validity). Contract rollover near expiry: close current month, re-enter next month. Max 2 positions (live) / 5 (paper). Scans every 4 hours. Per-position 3% max loss cap.', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
   ]
 
   return (
@@ -803,6 +837,433 @@ function AppPagesTab() {
   )
 }
 
+/* ─── Tab: Autonomous Trading System ─── */
+function AutoSystemTab() {
+  const timelineSteps = [
+    { time: '9:15 AM', title: 'YOU — Press Start', desc: 'Open browser → localhost:3000. Start all 6 engines (Equity Intraday, Equity Swing, Options Intraday, Options Swing, Futures Intraday, Futures Swing). Close browser. Done for the day. 9 equity strategies + 8 futures strategies + 6 options strategies auto-selected by regime.', role: 'manual', icon: '👆' },
+    { time: '9:20 AM', title: 'Swing Morning Scan', desc: 'Equity + Futures swing engines scan all strategies on daily candles. BUY-only for equity (CNC). If no signal, retry in 2 hours.', role: 'auto', icon: '🔍' },
+    { time: '9:50 AM', title: 'Options Regime Detection', desc: 'Analyzes NIFTY/BANKNIFTY trend, VIX, PCR. Picks from 6 options strategies (spreads, condors, straddles). Iron condor blocked when VIX > 16.', role: 'auto', icon: '📊' },
+    { time: '10:00 AM', title: 'Options Orders Begin', desc: 'Scans for option spread opportunities. Places virtual orders with slippage simulation + brokerage estimation. Max 3 positions per underlying.', role: 'auto', icon: '📈' },
+    { time: '10:30 AM', title: 'Equity Intraday Begins', desc: 'Regime detected: NIFTY trend + VIX + ADX + intraday direction → picks from 9 strategies. Play4 Supertrend prioritized (best performer). Play7 ORB for morning breakouts, Play8 RSI Divergence for reversals, Play9 Gap for gap days. Volume confirmation filters noise. Conviction score ranks signals. Max 2 orders per scan.', role: 'auto', icon: '🚀' },
+    { time: '11:00 AM', title: 'Futures Intraday Begins', desc: 'Futures regime + OI sentiment analysis. OI hard filter blocks counter-sentiment trades. 2% risk per trade. Margin-based lot sizing.', role: 'auto', icon: '📉' },
+    { time: '10:30–2:00', title: 'Active Trading Loop', desc: 'Every 20 seconds: check LTP for all positions → SL hit? Close. Target hit? Close. Trailing SL activates after 1% profit — locks in 50% of max gain. When slot opens → re-detect regime (may have shifted mid-day) → scan → rank by conviction → place best signal.', role: 'auto', icon: '🔄' },
+    { time: '2:00 PM', title: 'Order Cutoff', desc: 'No new intraday orders. Existing positions monitored every 20s until square-off. Swing positions continue.', role: 'auto', icon: '🚫' },
+    { time: '3:00 PM', title: 'Options Square-off', desc: 'All intraday option spreads closed. Swing option positions carry overnight.', role: 'auto', icon: '⏹️' },
+    { time: '3:15 PM', title: 'Equity + Futures Square-off', desc: 'All intraday positions force-closed. Swing positions carry overnight. Trade data logged.', role: 'auto', icon: '⏹️' },
+    { time: '3:15 PM', title: 'AUTO — Daily Report Generated', desc: 'Counts all trades by strategy + source. Calculates win rate, expectancy, P&L per strategy. Compares with last 3-5 days. Generates insights + recommendations. Saved to tracking/daily/.', role: 'auto', icon: '📋' },
+    { time: '3:15 PM', title: 'AUTO — Quant Strategist (Auto-Tuner)', desc: 'Analyzes rolling 3-5 day performance. Adjusts strategy conviction boosts (best→1.4x, worst→0.5x). SL hit rate > 50% for 2+ days → widens ATR by 0.25. Too few trades → loosens volume filter. Win rate < 35% → tightens volume filter. All within guardrails (can never exceed bounds).', role: 'auto', icon: '🧠' },
+    { time: '3:15 PM', title: 'AUTO — QA Testing (34 checks)', desc: 'All strategy modules import? Parameters within bounds? Regime detection works? Volume filters intact? Trailing SL fields valid? If ANY check fails → ALL changes rolled back automatically. System safe for tomorrow.', role: 'auto', icon: '✅' },
+    { time: '3:16 PM', title: 'System Ready for Tomorrow', desc: 'Optimized parameters saved. Swing positions monitored overnight. Next morning: press Start → system uses yesterday\'s optimized config.', role: 'auto', icon: '🌙' },
+  ]
+
+  const autoTuneParams = [
+    { param: 'Strategy Conviction Boosts', what: 'Which strategy gets picked first from scan results', how: 'Ranks by rolling expectancy (₹/trade). Best=1.4x, worst=0.5x. Recalculates daily.', bounds: '0.3x – 2.0x', frequency: 'Daily' },
+    { param: 'ATR Stop Loss Multiplier', what: 'How wide the stop loss is (distance from entry)', how: 'SL hit rate > 50% for 2+ days → widen by 0.25. SL rate < 15% → tighten by 0.25.', bounds: '1.5x – 4.0x (max ±0.25/day)', frequency: 'When pattern detected (3+ days)' },
+    { param: 'Volume Filter Threshold', what: 'Minimum volume required to accept a signal', how: '< 3 trades/day for 3 days → loosen by 0.1. Win rate < 35% → tighten by 0.1.', bounds: '1.0x – 2.0x (max ±0.1/day)', frequency: 'When pattern detected (3+ days)' },
+    { param: 'Direction Bias', what: 'Whether BUY or SELL signals are preferred', how: 'If one direction loses > ₹3K over 3 days while other profits → logged as observation. Regime detection handles dynamically.', bounds: 'Observation only', frequency: 'When detected' },
+    { param: 'Trailing Stop Loss', what: 'Locks in profits as trade moves favorably', how: 'Activates after 1% profit. Trails at 50% of max profit. SL only tightens, never loosens.', bounds: 'Min = original SL, Max = current price', frequency: 'Every 20s position check' },
+  ]
+
+  const safetyGuardrails = [
+    'Every parameter has absolute min/max bounds — can NEVER exceed',
+    'Max ONE step change per parameter per day — no dramatic shifts',
+    'Needs 3+ days of consistent signal before acting (no single-day reactions)',
+    'Every change logged in changelog.json with full data backing',
+    '34-point QA test runs AFTER every change',
+    'If QA fails → ALL changes auto-rolled back to pre-tune values',
+    'Strategy boosts recalculate daily — bad day auto-corrects next day',
+    'All changes visible in Tracker sidebar (right panel)',
+    'Trailing stop loss: locks in 50% of peak profit after 1% gain threshold',
+    'Multi-day drawdown breaker: 15% loss over 5 days → reduces to 1 order/scan',
+    'Fyers auto-reconnect: live traders detect disconnect and attempt headless re-login',
+  ]
+
+  return (
+    <>
+      <div className="bg-gradient-to-br from-purple-500/10 via-dark-700 to-blue-500/10 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h2 className="text-xl font-bold text-white mb-2">Autonomous Trading System</h2>
+        <p className="text-sm text-gray-400">
+          Fully automated: you press Start at 9:15 AM, the system trades, optimizes, tests, and prepares for tomorrow.
+          No manual intervention needed for strategy selection, risk management, or parameter tuning.
+        </p>
+      </div>
+
+      {/* Daily Timeline */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Daily Flow — Timeline</h3>
+        <div className="space-y-0">
+          {timelineSteps.map((step, i) => (
+            <div key={i} className="flex gap-4">
+              {/* Timeline line */}
+              <div className="flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${
+                  step.role === 'manual' ? 'bg-orange-500/20 border-2 border-orange-500' : 'bg-dark-600 border border-dark-400'
+                }`}>
+                  {step.icon}
+                </div>
+                {i < timelineSteps.length - 1 && (
+                  <div className={`w-0.5 h-full min-h-[20px] ${step.role === 'manual' ? 'bg-orange-500/30' : 'bg-dark-500'}`} />
+                )}
+              </div>
+              {/* Content */}
+              <div className="pb-4 flex-1">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs text-gray-500 font-mono w-20">{step.time}</span>
+                  <span className={`text-sm font-semibold ${step.role === 'manual' ? 'text-orange-400' : 'text-white'}`}>
+                    {step.title}
+                  </span>
+                  {step.role === 'manual' && (
+                    <span className="text-[9px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded font-bold">YOU</span>
+                  )}
+                  {step.role === 'auto' && (
+                    <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-bold">AUTO</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Equity Regime Types */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-1">Equity Market Regimes</h3>
+        <p className="text-xs text-gray-500 mb-4">12 regime types detected from NIFTY trend + VIX + ADX + BB squeeze + RSI + calendar events</p>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-dark-500">
+                {['Regime', 'Condition', 'Strategies Selected'].map(h => (
+                  <th key={h} className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="text-xs">
+              {[
+                ['Bullish Trend', 'NIFTY above EMAs, ADX strong', 'Play 9 (Gap), Play 7 (ORB), Play 4 (Supertrend), Play 1 (EMA), Play 3 (VWAP)'],
+                ['Bearish Trend', 'NIFTY below EMAs, ADX strong', 'Play 9 (Gap), Play 7 (ORB), Play 4 (Supertrend), Play 1 (EMA)'],
+                ['Pullback in Uptrend', 'Bullish trend but retracing', 'Play 4 (Supertrend), Play 8 (RSI Divergence), Play 3 (VWAP), Play 6 (BB Contra)'],
+                ['Bounce in Downtrend', 'Bearish trend but bouncing', 'Play 4 (Supertrend), Play 8 (RSI Divergence), Play 3 (VWAP), Play 6 (BB Contra)'],
+                ['Sideways', 'No clear trend, range-bound', 'Play 5 (BB Squeeze), Play 8 (RSI Divergence), Play 6 (BB Contra)'],
+                ['Reversal', 'Trend direction changing', 'Play 8 (RSI Divergence), Play 6 (BB Contra)'],
+                ['Neutral', 'Mixed signals, no conviction', 'Play 9 (Gap), Play 7 (ORB), Play 4 (Supertrend), Play 8 (RSI Divergence), Play 6 (BB Contra)'],
+                ['Squeeze', 'BB width compressed < 60% avg', 'Play 5 (BB Squeeze), Play 7 (ORB), Play 4 (Supertrend)'],
+                ['Trend Exhaustion', 'Bullish but RSI > 70 (overextended)', 'Play 8 (RSI Divergence), Play 6 (BB Contra)'],
+                ['Oversold Bounce', 'Bearish but RSI < 30 (oversold)', 'Play 8 (RSI Divergence), Play 3 (VWAP), Play 6 (BB Contra)'],
+                ['Expiry Day', 'F&O weekly/monthly expiry', 'Play 4 (Supertrend), Play 6 (BB Contra) — conservative'],
+                ['Pre-Holiday', 'Day before market holiday', 'Play 6 (BB Contra), Play 5 (BB Squeeze) — low risk only'],
+              ].map((row, i) => (
+                <tr key={i} className="border-b border-dark-600/30">
+                  <td className="px-3 py-2 text-white font-medium">{row[0]}</td>
+                  <td className="px-3 py-2 text-gray-400">{row[1]}</td>
+                  <td className="px-3 py-2 text-orange-400">{row[2]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* What Auto-Tuner Adjusts */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-1">Auto-Tuner — What Gets Optimized</h3>
+        <p className="text-xs text-gray-500 mb-4">Runs daily after square-off. Acts as a Senior Quantitative Trading Strategist.</p>
+        <div className="space-y-3">
+          {autoTuneParams.map((item, i) => (
+            <div key={i} className="bg-dark-600/50 rounded-xl p-4 border border-dark-500/50">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-semibold text-purple-400">{item.param}</span>
+                <span className="text-[9px] text-gray-500 bg-dark-700 px-2 py-0.5 rounded">{item.frequency}</span>
+              </div>
+              <p className="text-xs text-gray-400 mb-1"><span className="text-gray-500">What:</span> {item.what}</p>
+              <p className="text-xs text-gray-400 mb-1"><span className="text-gray-500">How:</span> {item.how}</p>
+              <p className="text-xs text-gray-400"><span className="text-gray-500">Bounds:</span> <span className="text-emerald-400">{item.bounds}</span></p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Day-over-Day Improvement Cycle */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Day-over-Day Improvement Cycle</h3>
+        <div className="grid grid-cols-5 gap-2 text-center">
+          {['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5'].map((day, i) => (
+            <div key={i} className="space-y-2">
+              <div className={`rounded-xl p-3 border ${i === 0 ? 'bg-dark-600 border-dark-400' : 'bg-dark-600/50 border-dark-500/30'}`}>
+                <p className="text-xs font-bold text-white">{day}</p>
+                <p className="text-[9px] text-gray-400 mt-1">
+                  {i === 0 && 'Baseline. No changes yet.'}
+                  {i === 1 && 'Boosts updated. Best strategy prioritized.'}
+                  {i === 2 && 'SL rate checked. May widen ATR.'}
+                  {i === 3 && 'Volume filter checked. Trade count balanced.'}
+                  {i === 4 && 'Full optimization cycle. System self-calibrated.'}
+                </p>
+              </div>
+              {i < 4 && <div className="text-gray-500">→</div>}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 bg-dark-600/50 rounded-lg p-3 border border-emerald-500/20">
+          <p className="text-xs text-emerald-400 font-semibold mb-1">What improves automatically each day:</p>
+          <div className="grid grid-cols-2 gap-1 text-[10px] text-gray-400">
+            <span>• Strategy that won → higher priority tomorrow</span>
+            <span>• Strategy that lost → deprioritized tomorrow</span>
+            <span>• SLs too tight → gradually widened</span>
+            <span>• SLs too wide → gradually tightened</span>
+            <span>• Too few signals → volume filter loosened</span>
+            <span>• Too many bad signals → volume filter tightened</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Safety Guardrails */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-3">Safety Guardrails</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {safetyGuardrails.map((rule, i) => (
+            <div key={i} className="flex items-start gap-2 bg-dark-600/50 rounded-lg px-3 py-2 border border-dark-500/30">
+              <Shield size={12} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+              <span className="text-xs text-gray-400">{rule}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* QA Testing */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6">
+        <h3 className="text-lg font-semibold text-white mb-3">Post-Fix QA Testing — 34 Automated Checks</h3>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-dark-600/50 rounded-lg p-3 border border-dark-500/30">
+            <p className="text-xs font-semibold text-blue-400 mb-2">Module Imports (15)</p>
+            <p className="text-[10px] text-gray-400">All 10 strategy files + 5 service files must import without errors after any parameter change.</p>
+          </div>
+          <div className="bg-dark-600/50 rounded-lg p-3 border border-dark-500/30">
+            <p className="text-xs font-semibold text-purple-400 mb-2">Parameter Bounds (9)</p>
+            <p className="text-[10px] text-gray-400">ATR mult (2), volume threshold (1), strategy boosts (6) — all must be within guardrail bounds.</p>
+          </div>
+          <div className="bg-dark-600/50 rounded-lg p-3 border border-dark-500/30">
+            <p className="text-xs font-semibold text-emerald-400 mb-2">Functional Tests (7)</p>
+            <p className="text-[10px] text-gray-400">Regime detection works, volume filters present in all 9 strategy files, conviction scoring intact.</p>
+          </div>
+        </div>
+        <div className="mt-3 bg-red-500/10 rounded-lg p-3 border border-red-500/20">
+          <p className="text-xs text-red-400 font-semibold">If ANY check fails → ALL changes auto-rolled back</p>
+          <p className="text-[10px] text-gray-400 mt-1">System reverts to pre-tune parameters. Tomorrow trades with yesterday's known-good config. Failure logged for investigation.</p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+
+/* ─── Tab: E2E Flow & Architecture ─── */
+function E2EFlowTab() {
+  const [registry, setRegistry] = useState(null)
+  const [changelog, setChangelog] = useState([])
+
+  useEffect(() => {
+    fetch('http://localhost:8001/api/tracking/registry').then(r => r.json()).then(setRegistry).catch(() => {})
+    fetch('http://localhost:8001/api/tracking/changelog').then(r => r.json()).then(d => setChangelog(d.changes || [])).catch(() => {})
+  }, [])
+
+  // Extract live values from registry
+  const risk = registry?.global_config?.risk || {}
+  const liveParams = {
+    'Position Check': `Every ${risk.intraday_position_check_interval_sec || 20}s (equity), ${risk.options_position_check_interval_sec || 15}s (options)`,
+    'Futures Risk': `${((risk.futures_risk_per_trade_pct || 0.02) * 100).toFixed(0)}% per trade, ${risk.futures_daily_loss_limit_pct || 5}% daily loss limit`,
+    'ATR Stop Loss': `${registry?.candlestick_definitions?.atr_sl_default_mult || 2.5}x ATR, ${((registry?.candlestick_definitions?.atr_sl_default_min_pct || 0.012) * 100).toFixed(1)}% min floor`,
+    'Iron Condor': registry?.options?.strategies?.iron_condor?.vix_gate || 'Blocked when VIX > 16',
+    'Data Source': 'Fyers real-time (yfinance fallback)',
+  }
+
+  // Count recent auto-tune changes
+  const recentAutoTunes = changelog.filter(c => c.type === 'AUTO_TUNE').length
+  const lastUpdate = registry?._meta?.last_updated || 'unknown'
+
+  return (
+    <>
+      {/* Live params notice */}
+      {registry && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2 mb-4 flex items-center justify-between">
+          <span className="text-xs text-emerald-400">Parameters fetched live from backend registry (v{registry._meta?.version || '?'})</span>
+          <span className="text-[10px] text-gray-500">Last updated: {lastUpdate} | {recentAutoTunes} auto-tunes logged</span>
+        </div>
+      )}
+
+      {/* Architecture Overview */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-4">System Architecture</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-dark-600/50 rounded-xl p-4 border border-blue-500/20">
+            <p className="text-sm font-bold text-blue-400 mb-2">Frontend</p>
+            <p className="text-xs text-gray-400">React + Vite + Tailwind</p>
+            <p className="text-xs text-gray-500 mt-1">Port 3000 | Dashboard, Trading Pages, Tracker Sidebar</p>
+          </div>
+          <div className="bg-dark-600/50 rounded-xl p-4 border border-orange-500/20">
+            <p className="text-sm font-bold text-orange-400 mb-2">Backend</p>
+            <p className="text-xs text-gray-400">FastAPI + Python</p>
+            <p className="text-xs text-gray-500 mt-1">Port 8001 | 12 Engines, Scanner, Regime Detection, Auto-Tuner</p>
+          </div>
+          <div className="bg-dark-600/50 rounded-xl p-4 border border-emerald-500/20">
+            <p className="text-sm font-bold text-emerald-400 mb-2">Broker</p>
+            <p className="text-xs text-gray-400">Fyers API v3</p>
+            <p className="text-xs text-gray-500 mt-1">Real-time data, Order execution, Positions, Funds</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Data Flow */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Data Flow — Scan to Trade</h3>
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+            <p className="font-semibold text-emerald-400">Fyers OHLCV</p>
+            <p className="text-[9px] text-gray-500">Real-time candles (yfinance fallback)</p>
+          </div>
+          <span className="text-dark-400 text-lg">→</span>
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg px-3 py-2">
+            <p className="font-semibold text-purple-400">Regime Detector</p>
+            <p className="text-[9px] text-gray-500">NIFTY + VIX + ADX + Intraday direction</p>
+          </div>
+          <span className="text-dark-400 text-lg">→</span>
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
+            <p className="font-semibold text-blue-400">Strategy Scanner</p>
+            <p className="text-[9px] text-gray-500">9 equity + 8 futures strategies</p>
+          </div>
+          <span className="text-dark-400 text-lg">→</span>
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
+            <p className="font-semibold text-yellow-400">Volume Filter</p>
+            <p className="text-[9px] text-gray-500">Reject low-volume noise</p>
+          </div>
+          <span className="text-dark-400 text-lg">→</span>
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
+            <p className="font-semibold text-orange-400">Conviction Ranking</p>
+            <p className="text-[9px] text-gray-500">Score by vol + price + strategy boost</p>
+          </div>
+          <span className="text-dark-400 text-lg">→</span>
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <p className="font-semibold text-red-400">Order Placement</p>
+            <p className="text-[9px] text-gray-500">Fyers API (live) or Virtual (paper)</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 12 Engines Grid */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-4">12 Trading Engines</h3>
+        <div className="grid grid-cols-4 gap-3">
+          <div className="text-center text-xs text-gray-500 font-semibold pb-2"></div>
+          <div className="text-center text-xs text-orange-400 font-semibold pb-2">Equity</div>
+          <div className="text-center text-xs text-violet-400 font-semibold pb-2">Options</div>
+          <div className="text-center text-xs text-amber-400 font-semibold pb-2">Futures</div>
+
+          {['Intraday Live', 'Intraday Paper', 'Swing Live', 'Swing Paper'].map((row, ri) => (
+            <React.Fragment key={ri}>
+              <div className="text-xs text-gray-400 flex items-center">{row}</div>
+              {['equity', 'options', 'futures'].map((col, ci) => {
+                const configs = {
+                  'Intraday Live-equity': { time: '10:30 AM', max: 6 },
+                  'Intraday Paper-equity': { time: '10:30 AM', max: 10 },
+                  'Swing Live-equity': { time: '9:20 AM', max: 1 },
+                  'Swing Paper-equity': { time: '9:20 AM', max: 5 },
+                  'Intraday Live-options': { time: '10:00 AM', max: 4 },
+                  'Intraday Paper-options': { time: '10:00 AM', max: 3 },
+                  'Swing Live-options': { time: 'Every 4h', max: 2 },
+                  'Swing Paper-options': { time: 'Every 4h', max: 2 },
+                  'Intraday Live-futures': { time: '11:00 AM', max: 4 },
+                  'Intraday Paper-futures': { time: '11:00 AM', max: 8 },
+                  'Swing Live-futures': { time: 'Every 4h', max: 2 },
+                  'Swing Paper-futures': { time: 'Every 4h', max: 5 },
+                }
+                const c = configs[`${row}-${col}`] || {}
+                return (
+                  <div key={ci} className="bg-dark-600/50 rounded-lg p-2 text-center border border-dark-500/30">
+                    <p className="text-[10px] text-white">{c.time}</p>
+                    <p className="text-[9px] text-gray-500">Max {c.max} pos</p>
+                  </div>
+                )
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {/* Key Rules — live values from registry */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-white">Key Rules & Parameters</h3>
+          <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">LIVE from registry</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {[
+            { label: 'Market Hours', value: '9:15 AM - 3:30 PM IST (Mon-Fri)' },
+            { label: 'Equity Orders', value: registry?.global_config?.timing?.intraday_order_start ? `${registry.global_config.timing.intraday_order_start} - ${registry.global_config.timing.intraday_order_cutoff}` : '10:30 AM - 2:00 PM' },
+            { label: 'Futures Orders', value: '11:00 AM - 2:00 PM' },
+            { label: 'Options Orders', value: registry?.global_config?.timing?.options_order_start ? `${registry.global_config.timing.options_order_start} - ${registry.global_config.timing.options_order_cutoff}` : '10:00 AM - 2:00 PM' },
+            { label: 'Equity Square-off', value: registry?.global_config?.timing?.intraday_squareoff || '3:15 PM' },
+            { label: 'Options Square-off', value: registry?.global_config?.timing?.options_squareoff || '3:00 PM' },
+            { label: 'Position Check', value: liveParams['Position Check'] },
+            { label: 'Futures Risk', value: liveParams['Futures Risk'], live: true },
+            { label: 'ATR Stop Loss', value: liveParams['ATR Stop Loss'], live: true },
+            { label: 'Volume Filter', value: '> 1.3x SMA20 required' },
+            { label: 'Signal Ranking', value: registry?.signal_ranking?.method || 'Conviction score' },
+            { label: 'Scan Universe', value: 'Nifty 500 (equity), F&O stocks (futures)' },
+            { label: 'Price Filter', value: registry?.global_config?.price_filters ? `₹${registry.global_config.price_filters.intraday_min}-₹${registry.global_config.price_filters.intraday_max.toLocaleString()} (intraday)` : '₹50-₹5,000' },
+            { label: 'Swing Retry', value: '9:20 AM + every 2 hours' },
+            { label: 'Max Orders/Scan', value: '2 (staggered filling)' },
+            { label: 'OI Filter (Futures)', value: 'Hard — blocks counter-sentiment trades' },
+            { label: 'Iron Condor', value: liveParams['Iron Condor'], live: true },
+            { label: 'Data Source', value: liveParams['Data Source'] },
+            { label: 'Trailing SL', value: 'Activates at +1%, trails 50% of max profit' },
+            { label: 'Drawdown Breaker', value: '15% loss over 5 days → 1 order/scan max' },
+            { label: 'Fyers Health', value: 'Auto-reconnect every 5 min (live traders)' },
+          ].map((item, i) => (
+            <div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2 border ${
+              item.live ? 'bg-purple-500/5 border-purple-500/20' : 'bg-dark-600/50 border-dark-500/30'
+            }`}>
+              <span className="text-gray-400">{item.label}</span>
+              <span className="text-white font-medium flex items-center gap-1">
+                {item.value}
+                {item.live && <span className="text-[8px] text-purple-400">●</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[9px] text-gray-600 mt-2"><span className="text-purple-400">●</span> = auto-tunable parameters (adjusted daily by system)</p>
+      </div>
+
+      {/* Getting Started */}
+      <div className="bg-dark-700 rounded-2xl border border-dark-500 p-6">
+        <h3 className="text-lg font-semibold text-white mb-3">Quick Start</h3>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400 text-xs font-bold flex-shrink-0">1</div>
+            <p className="text-xs text-gray-400">Start backend: cd backend && source venv/bin/activate && python main.py</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs font-bold flex-shrink-0">2</div>
+            <p className="text-xs text-gray-400">Start frontend: cd frontend && npm run dev</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xs font-bold flex-shrink-0">3</div>
+            <p className="text-xs text-gray-400">Open http://localhost:3000 → Login to Fyers (auto headless login)</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 text-xs font-bold flex-shrink-0">4</div>
+            <p className="text-xs text-gray-400">9:15 AM — Press Start on all 6 engines (9 equity + 8 futures + 6 options strategies). Close browser. Done.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-pink-500/20 border border-pink-500/30 flex items-center justify-center text-pink-400 text-xs font-bold flex-shrink-0">5</div>
+            <p className="text-xs text-gray-400">3:30 PM — Check Tracker sidebar for daily report + improvements</p>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+
 /* ─── Tab: Rules & Notes ─── */
 function RulesTab() {
   const rules = [
@@ -812,9 +1273,9 @@ function RulesTab() {
     { label: 'Intraday Positions', value: '4 (live) / 10 (paper)', icon: Target },
     { label: 'Swing Positions', value: '1 (live) / 5 (paper)', icon: Repeat },
     { label: 'Intraday Scan', value: 'On-demand — re-scans when slot opens', icon: Search },
-    { label: 'Intraday Orders', value: '12:00 PM - 2:00 PM', icon: Clock },
+    { label: 'Intraday Orders', value: '10:30 AM - 2:00 PM (equity) / 11:00 AM - 2:00 PM (futures)', icon: Clock },
     { label: 'Auto Square-Off', value: '3:15 PM (intraday only)', icon: Square },
-    { label: 'Swing Scan', value: '9:20 AM + retry every 30 min', icon: Search },
+    { label: 'Swing Scan', value: '9:20 AM + retry every 2 hours', icon: Search },
     { label: 'Swing Direction', value: 'BUY only (no CNC short selling)', icon: TrendingUp },
     { label: 'Swing Nifty Filter', value: 'Blocks BUY only when Nifty < 50 SMA', icon: Shield },
     { label: 'Intraday Price Range', value: 'Rs 50 - Rs 5,000', icon: IndianRupee },
@@ -822,7 +1283,7 @@ function RulesTab() {
     { label: 'Intraday Product', value: 'INTRADAY (MIS)', icon: Zap },
     { label: 'Swing Product', value: 'CNC (delivery, carries overnight)', icon: Repeat },
     { label: 'Futures Universe', value: '~180 NSE F&O stocks with lot sizes', icon: BarChart3 },
-    { label: 'Futures Risk/Trade', value: '5% of capital (margin-based lots)', icon: Shield },
+    { label: 'Futures Risk/Trade', value: '2% of capital (margin-based lots)', icon: Shield },
     { label: 'Futures Daily Loss', value: '5% of capital — engine stops', icon: AlertTriangle },
     { label: 'Futures Intraday Margin', value: '~10% of contract value', icon: IndianRupee },
     { label: 'Futures Swing Margin', value: '~20% of contract value', icon: IndianRupee },
@@ -887,12 +1348,12 @@ export default function AboutPage() {
       case 'overview': return <OverviewTab />
       case 'how-it-works': return <HowItWorksTab />
       case 'get-started': return <GetStartedTab />
-      case 'trading-day': return <TradingDayTab />
       case 'strategies': return <StrategiesTab />
       case 'options': return <OptionsTab />
       case 'futures': return <FuturesTab />
       case 'pages': return <AppPagesTab />
-      case 'rules': return <RulesTab />
+      case 'auto-system': return <AutoSystemTab />
+      case 'e2e-flow': return <E2EFlowTab />
       default: return <OverviewTab />
     }
   }

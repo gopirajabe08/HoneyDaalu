@@ -110,6 +110,66 @@ def get_market_status() -> dict:
     return {**base, "is_open": False, "message": "Market closed \u2022 Opens 9:15 AM IST"}
 
 
+def _calc_conviction(signal: dict) -> float:
+    """Score signal quality: higher = more conviction."""
+    score = 1.0
+
+    # Volume strength (if available in signal)
+    vol_ratio = signal.get("volume_ratio", 1.0)
+    if vol_ratio >= 2.0:
+        score *= 1.5  # Strong volume
+    elif vol_ratio >= 1.5:
+        score *= 1.2  # Decent volume
+
+    # R:R ratio bonus
+    risk = max(signal.get("risk", 1), 0.01)
+    reward = signal.get("reward", 0)
+    rr = reward / risk
+    if rr >= 2.5:
+        score *= 1.3
+    elif rr >= 2.0:
+        score *= 1.1
+
+    # Price range preference (₹200-₹2000 stocks move better intraday)
+    entry = signal.get("entry_price", 0)
+    if 200 <= entry <= 2000:
+        score *= 1.2  # Sweet spot for intraday momentum
+    elif entry < 100:
+        score *= 0.6  # Too cheap, won't move enough
+    elif entry > 3000:
+        score *= 0.8  # Expensive, needs more capital
+
+    # Strategy preference (based on 30-day performance data)
+    strategy = signal.get("_strategy", "")
+    strategy_boost = {
+        "play4_supertrend": 1.3,     # Best performer: +₹4,133 over 30 days
+        "play7_orb": 1.25,           # ORB: high probability morning breakout (new — start high)
+        "play9_gap_analysis": 1.2,   # Gap Analysis: morning gap exploitation (new — start high)
+        "play3_vwap_pullback": 1.2,  # 75% win rate, fewer signals
+        "play8_rsi_divergence": 1.15, # RSI Divergence: proven reversal signal (new — start moderate)
+        "play6_bb_contra": 1.1,      # 100% win rate (small sample)
+        "play5_bb_squeeze": 1.0,     # Neutral
+        "play1_ema_crossover": 0.9,  # Mediocre
+        "play2_triple_ma": 0.7,      # Worst performer: -₹5,531
+    }
+    score *= strategy_boost.get(strategy, 1.0)
+
+    # Pivot alignment bonus — entry near pivot level = higher conviction
+    pivots = signal.get("pivot_points", {})
+    if pivots and entry > 0:
+        pivot = pivots.get("pivot", 0)
+        s1 = pivots.get("s1", 0)
+        r1 = pivots.get("r1", 0)
+        if pivot > 0:
+            # Check if entry is within 0.5% of any key level
+            for level in [pivot, s1, r1]:
+                if level > 0 and abs(entry - level) / level < 0.005:
+                    score *= 1.1  # Near pivot level = higher conviction
+                    break
+
+    return round(score, 3)
+
+
 def calculate_quantity(capital: float, entry_price: float, risk_per_share: float) -> int:
     """
     Calculate position size based on capital.
@@ -172,6 +232,33 @@ def scan_single_stock(symbol: str, strategy_key: str, timeframe: str, capital: f
     signal = strategy.scan(df, symbol)
     if signal is None:
         return None
+
+    # Circuit limit check — skip stocks at circuit (can't trade)
+    if signal and df is not None and len(df) >= 2:
+        last = df.iloc[-1]
+        prev = df.iloc[-2]
+        last_close = float(last["Close"])
+        prev_close = float(prev["Close"])
+        if prev_close > 0:
+            change_pct = abs(last_close - prev_close) / prev_close * 100
+            # If price moved > 19% in one candle, likely at circuit
+            if change_pct > 19:
+                return None
+        # Also check if high == low == close (frozen at circuit)
+        if float(last["High"]) == float(last["Low"]) == float(last["Close"]):
+            return None
+
+    # Enrich signal with volume ratio for conviction scoring
+    if len(df) >= 20:
+        vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+        current_vol = df["Volume"].iloc[-1]
+        signal["volume_ratio"] = round(current_vol / vol_sma, 2) if vol_sma > 0 else 1.0
+
+    # Add pivot point levels for enhanced SL/target
+    from strategies.base import calc_pivot_points
+    pivots = calc_pivot_points(df)
+    if pivots and signal:
+        signal["pivot_points"] = pivots
 
     # Calculate quantity based on capital
     risk = signal.get("risk", 0)
@@ -283,8 +370,8 @@ def run_scan(strategy_key: str, timeframe: str, capital: float = 100000, max_wor
         elif nifty_trend == "BEARISH":
             signals = [s for s in signals if s.get("signal_type") != "BUY"]
 
-    # Sort by risk-reward (best first)
-    signals.sort(key=lambda s: s.get("reward", 0) / max(s.get("risk", 1), 0.01), reverse=True)
+    # Sort by conviction score (best first)
+    signals.sort(key=lambda s: _calc_conviction(s), reverse=True)
 
     elapsed = round(time.time() - start_time, 2)
 

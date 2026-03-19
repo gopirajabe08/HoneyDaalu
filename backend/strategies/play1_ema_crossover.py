@@ -144,6 +144,12 @@ class EMA_Crossover(BaseStrategy):
                 if rejection:
                     return None
 
+            # Volume confirmation — reject low-conviction signals
+            if len(df) >= 20:
+                vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+                if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                    return None  # Low volume — skip
+
             entry = last["Close"]
             cfg = get_strategy_config(_KEY)
 
@@ -185,6 +191,12 @@ class EMA_Crossover(BaseStrategy):
                 rejection = self._swing_filters(df, last, "SELL")
                 if rejection:
                     return None
+
+            # Volume confirmation — reject low-conviction signals
+            if len(df) >= 20:
+                vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+                if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                    return None  # Low volume — skip
 
             entry = last["Close"]
             cfg = get_strategy_config(_KEY)

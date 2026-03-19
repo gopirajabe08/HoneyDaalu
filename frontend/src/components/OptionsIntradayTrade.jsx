@@ -378,7 +378,7 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
 
                   <div className="flex gap-2 mb-3 flex-wrap">
                     <Badge color={isLive ? 'orange' : 'blue'} text={isLive ? 'Live Mode' : 'Virtual Mode'} />
-                    {orderCutoff && <Badge color="yellow" text="No new orders (past 2:15 PM)" />}
+                    {orderCutoff && <Badge color="yellow" text="No new orders (past 2:00 PM)" />}
                     {squaredOff && <Badge color="purple" text="Squared off" />}
                   </div>
 
@@ -478,7 +478,7 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
                 <AlertTriangle size={10} className="text-gray-600 flex-shrink-0 mt-0.5" />
                 <p className="text-[9px] text-gray-600 leading-relaxed">
                   {isLive
-                    ? 'Options intraday \u2022 Auto regime-based strategy \u2022 Orders 12:00-2:15 PM \u2022 Square-off 3:15 PM'
+                    ? 'Options intraday \u2022 Auto regime-based strategy \u2022 Orders 10:00 AM-2:15 PM \u2022 Square-off 3:00 PM'
                     : 'Virtual mode \u2022 Auto regime-based strategy \u2022 No real orders placed'}
                 </p>
               </div>

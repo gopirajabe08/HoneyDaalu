@@ -66,6 +66,12 @@ def scan_options(underlying: str, capital: float, mode: str = "intraday") -> dic
     credit_strategies = ["bull_put_spread", "bear_call_spread", "iron_condor"]
     all_candidates = list(dict.fromkeys(candidate_ids + credit_strategies))
 
+    # P1-002: Block iron condor when VIX > 16 (too much movement risk)
+    vix = regime.get("components", {}).get("vix", 0)
+    if vix > 16 and "iron_condor" in all_candidates:
+        all_candidates.remove("iron_condor")
+        logger.info(f"[OptionsScanner] Iron condor blocked — VIX={vix:.1f} > 16")
+
     # Fetch option chain
     expiry_pref = "monthly" if mode == "swing" else OPTIONS_EXPIRY_PREFERENCE
     chain_data = get_option_chain(underlying, expiry_pref)

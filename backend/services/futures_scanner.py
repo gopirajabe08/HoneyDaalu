@@ -192,6 +192,11 @@ def run_futures_scan(strategy_key: str, timeframe: str, capital: float,
         s.get("reward", 0) / max(s.get("risk", 1), 0.01),
     ), reverse=True)
 
+    # SEBI F&O ban check: Not filtered here — handled at order placement level.
+    # If a stock is in SEBI's F&O ban period, Fyers will reject the order.
+    # The auto_trader and fyers_client already handle order rejections gracefully.
+    # Paper trading signals are unaffected (no real orders placed).
+
     return {
         "strategy": strategy_key,
         "timeframe": timeframe,

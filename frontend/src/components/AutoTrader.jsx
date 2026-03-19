@@ -349,7 +349,7 @@ export default function AutoTrader({ capital }) {
         <div className="mt-3 flex items-start gap-2 px-1">
           <AlertTriangle size={10} className="text-gray-600 flex-shrink-0 mt-0.5" />
           <p className="text-[9px] text-gray-600 leading-relaxed">
-            Max 3 positions &bull; 2% risk &bull; 15 min scan &bull; Orders stop at 2:00 PM &bull; Square-off at 3:15 PM
+            Max 6 positions &bull; 2% risk &bull; Orders 10:30 AM - 2:00 PM &bull; Square-off at 3:15 PM
           </p>
         </div>
       </div>

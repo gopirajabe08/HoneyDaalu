@@ -591,7 +591,20 @@ def _place_order_with_tick_retry(fyers, data: dict, max_retries: int = 2) -> dic
                 return response
 
             msg = response.get("message", "")
+            code = response.get("code", 0)
             last_response = response
+
+            # Categorise common rejection reasons for better diagnostics
+            msg_lower = msg.lower()
+            if "insufficient" in msg_lower or "margin" in msg_lower:
+                logger.warning(f"[Fyers] Order rejected — insufficient margin: {msg}")
+            elif "circuit" in msg_lower or "frozen" in msg_lower:
+                logger.warning(f"[Fyers] Order rejected — stock at circuit/frozen: {msg}")
+            elif "banned" in msg_lower or "ban period" in msg_lower:
+                logger.warning(f"[Fyers] Order rejected — SEBI F&O ban: {msg}")
+            elif "tick size" not in msg_lower:
+                # Log non-tick-size rejections (tick-size is retried below)
+                logger.warning(f"[Fyers] Order rejected: {msg} (code: {code})")
 
             # Parse tick size from error: "StopPrice not a multiple of tick size 0.1000"
             if "tick size" in msg.lower() and attempt < max_retries:

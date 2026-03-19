@@ -7,11 +7,11 @@ Analyzes:
   3. NIFTY intraday range (gap/reversal detection)
 
 Maps regime → recommended equity strategies:
-  - Strong trend + Low VIX    → Play 1 (EMA), 2 (Triple MA), 3 (VWAP), 4 (Supertrend)
-  - Strong trend + High VIX   → Play 1 (EMA), 2 (Triple MA) on 15m only
-  - Pullback in trend          → Play 3 (VWAP), 6 (BB Contra)
-  - Sideways + Low VIX         → Play 5 (BB Squeeze), 6 (BB Contra)
-  - Sideways + High VIX        → Play 5 (BB Squeeze) only
+  - Strong trend + Low VIX    → Play 4 (Supertrend), 1 (EMA), 3 (VWAP)
+  - Strong trend + High VIX   → Play 4 (Supertrend), 1 (EMA)
+  - Pullback in trend          → Play 4 (Supertrend), 3 (VWAP), 6 (BB Contra)
+  - Sideways + Low VIX         → Play 4 (Supertrend), 5 (BB Squeeze), 6 (BB Contra)
+  - Sideways + High VIX        → Play 6 (BB Contra) only
   - Reversal / Whipsaw         → Play 6 (BB Contra) only
 """
 
@@ -79,24 +79,56 @@ def _get_nifty_analysis() -> dict:
         today_close = float(daily["Close"].iloc[-1])
         intraday_range_pct = (today_high - today_low) / today_open * 100
 
+        # RSI for exhaustion/oversold detection
+        rsi_val = 50
+        try:
+            from strategies.base import calc_rsi
+            rsi = calc_rsi(daily, 14)
+            rsi_val = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50
+        except Exception:
+            pass
+
+        # Bollinger Band width for squeeze detection
+        bb_squeeze = False
+        try:
+            bb_mid = close.rolling(20).mean()
+            bb_std = close.rolling(20).std()
+            bb_upper = bb_mid + 2 * bb_std
+            bb_lower = bb_mid - 2 * bb_std
+            bb_width = ((bb_upper - bb_lower) / bb_mid * 100).iloc[-1]
+            bb_width_avg = ((bb_upper - bb_lower) / bb_mid * 100).rolling(50).mean().iloc[-1]
+            if not pd.isna(bb_width) and not pd.isna(bb_width_avg):
+                bb_squeeze = bb_width < bb_width_avg * 0.6  # Width < 60% of average = squeeze
+        except Exception:
+            pass
+
         # Reversal detection: big range + close opposite to open direction
-        opened_down = today_open > today_close * 1.005  # opened significantly higher than close
-        closed_up = today_close > today_open  # but closed green
+        opened_down = today_open > today_close * 1.005
+        closed_up = today_close > today_open
         is_reversal = intraday_range_pct > 1.5 and ((opened_down and closed_up) or (not opened_down and not closed_up and intraday_range_pct > 2.0))
 
+        # Apply regime overrides based on additional signals
         if is_reversal:
             trend = "reversal"
+        elif bb_squeeze and trend == "sideways":
+            trend = "squeeze"  # BB compressed — breakout imminent
+        elif trend == "bullish" and rsi_val > 70 and abs(dist_ema20) > 3:
+            trend = "trend_exhaustion"  # Bullish but overextended
+        elif trend == "bearish" and rsi_val < 30 and abs(dist_ema20) > 3:
+            trend = "oversold_bounce"  # Bearish but oversold — bounce likely
 
         return {
             "trend": trend,
             "strength": strength,
             "adx": round(adx_val, 1),
+            "rsi": round(rsi_val, 1),
             "price": round(price, 2),
             "ema20": round(ema20, 2),
             "sma50": round(sma50, 2),
             "dist_ema20_pct": round(dist_ema20, 2),
             "intraday_range_pct": round(intraday_range_pct, 2),
             "is_reversal": is_reversal,
+            "bb_squeeze": bb_squeeze,
         }
     except Exception as e:
         logger.warning(f"[EquityRegime] Nifty analysis error: {e}")
@@ -145,38 +177,75 @@ def _get_vix() -> float:
 # ── Regime → Strategy + Timeframe Mapping ─────────────────────────────────
 
 REGIME_STRATEGY_MAP = {
-    # Strong trending — use trend-following strategies
-    ("bullish", "low_vol"):     [("play1_ema_crossover", "15m"), ("play2_triple_ma", "15m"), ("play3_vwap_pullback", "5m"), ("play4_supertrend", "5m")],
-    ("bullish", "normal"):      [("play1_ema_crossover", "15m"), ("play2_triple_ma", "15m"), ("play3_vwap_pullback", "5m"), ("play4_supertrend", "15m")],
-    ("bullish", "high_vol"):    [("play1_ema_crossover", "15m"), ("play2_triple_ma", "15m")],
+    # Strong trending — Gap + ORB for morning, Supertrend for trend, EMA for confirmation, VWAP for pullback
+    ("bullish", "low_vol"):     [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "5m"), ("play1_ema_crossover", "15m"), ("play3_vwap_pullback", "5m")],
+    ("bullish", "normal"):      [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play1_ema_crossover", "15m"), ("play3_vwap_pullback", "5m")],
+    ("bullish", "elevated"):    [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play1_ema_crossover", "15m")],
+    ("bullish", "high_vol"):    [("play4_supertrend", "15m"), ("play1_ema_crossover", "15m")],
 
-    ("bearish", "low_vol"):     [("play1_ema_crossover", "15m"), ("play2_triple_ma", "15m"), ("play3_vwap_pullback", "5m"), ("play4_supertrend", "5m")],
-    ("bearish", "normal"):      [("play1_ema_crossover", "15m"), ("play2_triple_ma", "15m"), ("play3_vwap_pullback", "5m"), ("play4_supertrend", "15m")],
-    ("bearish", "high_vol"):    [("play1_ema_crossover", "15m"), ("play2_triple_ma", "15m")],
+    ("bearish", "low_vol"):     [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "5m"), ("play1_ema_crossover", "15m"), ("play3_vwap_pullback", "5m")],
+    ("bearish", "normal"):      [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play1_ema_crossover", "15m"), ("play3_vwap_pullback", "5m")],
+    ("bearish", "elevated"):    [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play1_ema_crossover", "15m")],
+    ("bearish", "high_vol"):    [("play4_supertrend", "15m"), ("play1_ema_crossover", "15m")],
 
-    # Pullback — VWAP catches bounce + BB Contra fades overextension
-    ("pullback_in_uptrend", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("pullback_in_uptrend", "normal"):    [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("pullback_in_uptrend", "high_vol"):  [("play6_bb_contra", "15m")],
+    # Pullback — Supertrend continuation + RSI Divergence for reversal entry + VWAP bounce + BB Contra fade
+    ("pullback_in_uptrend", "low_vol"):   [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
+    ("pullback_in_uptrend", "normal"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
+    ("pullback_in_uptrend", "elevated"):  [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("pullback_in_uptrend", "high_vol"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    ("bounce_in_downtrend", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("bounce_in_downtrend", "normal"):    [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("bounce_in_downtrend", "high_vol"):  [("play6_bb_contra", "15m")],
+    ("bounce_in_downtrend", "low_vol"):   [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
+    ("bounce_in_downtrend", "normal"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
+    ("bounce_in_downtrend", "elevated"):  [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("bounce_in_downtrend", "high_vol"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    # Sideways — BB strategies thrive
-    ("sideways", "low_vol"):    [("play5_bb_squeeze", "15m"), ("play6_bb_contra", "15m")],
-    ("sideways", "normal"):     [("play5_bb_squeeze", "15m"), ("play6_bb_contra", "15m")],
-    ("sideways", "high_vol"):   [("play5_bb_squeeze", "15m")],
+    # Sideways — BB Squeeze for breakout, BB Contra for range, RSI Divergence for reversals
+    ("sideways", "low_vol"):    [("play4_supertrend", "15m"), ("play5_bb_squeeze", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("sideways", "normal"):     [("play5_bb_squeeze", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("sideways", "elevated"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("sideways", "high_vol"):   [("play6_bb_contra", "15m")],
 
-    # Reversal / Whipsaw — only mean reversion
-    ("reversal", "low_vol"):    [("play6_bb_contra", "15m")],
-    ("reversal", "normal"):     [("play6_bb_contra", "15m")],
+    # Reversal — RSI Divergence is the BEST reversal signal + BB Contra
+    ("reversal", "low_vol"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("reversal", "normal"):     [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("reversal", "elevated"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("reversal", "high_vol"):   [("play6_bb_contra", "15m")],
 
-    # Neutral fallback
-    ("neutral", "low_vol"):     [("play1_ema_crossover", "15m"), ("play5_bb_squeeze", "15m"), ("play6_bb_contra", "15m")],
-    ("neutral", "normal"):      [("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m")],
-    ("neutral", "high_vol"):    [("play6_bb_contra", "15m")],
+    # Neutral — Gap + ORB for direction, Supertrend for trend, RSI for reversals
+    ("neutral", "low_vol"):     [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("neutral", "normal"):      [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("neutral", "elevated"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("neutral", "high_vol"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+
+    # Squeeze — BB Squeeze is designed for this + ORB for breakout direction
+    ("squeeze", "low_vol"):     [("play5_bb_squeeze", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m")],
+    ("squeeze", "normal"):      [("play5_bb_squeeze", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m")],
+    ("squeeze", "elevated"):    [("play5_bb_squeeze", "15m"), ("play7_orb", "15m")],
+    ("squeeze", "high_vol"):    [("play5_bb_squeeze", "15m")],
+
+    # Trend Exhaustion — overbought, expect pullback. RSI Divergence + BB Contra for reversal
+    ("trend_exhaustion", "low_vol"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
+    ("trend_exhaustion", "normal"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("trend_exhaustion", "elevated"): [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("trend_exhaustion", "high_vol"): [("play6_bb_contra", "15m")],
+
+    # Oversold Bounce — expect bounce. RSI Divergence for reversal + VWAP for bounce entry
+    ("oversold_bounce", "low_vol"):   [("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
+    ("oversold_bounce", "normal"):    [("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
+    ("oversold_bounce", "elevated"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("oversold_bounce", "high_vol"):  [("play6_bb_contra", "15m")],
+
+    # Expiry Day — reduced activity, wider SLs, only high-conviction strategies
+    ("expiry_day", "low_vol"):    [("play4_supertrend", "15m"), ("play6_bb_contra", "15m")],
+    ("expiry_day", "normal"):     [("play4_supertrend", "15m"), ("play6_bb_contra", "15m")],
+    ("expiry_day", "elevated"):   [("play6_bb_contra", "15m")],
+    ("expiry_day", "high_vol"):   [("play6_bb_contra", "15m")],
+
+    # Pre-Holiday — low volume, mean reversion only
+    ("pre_holiday", "low_vol"):   [("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("pre_holiday", "normal"):    [("play6_bb_contra", "15m")],
+    ("pre_holiday", "elevated"):  [("play6_bb_contra", "15m")],
+    ("pre_holiday", "high_vol"):  [("play6_bb_contra", "15m")],
 }
 
 
@@ -228,9 +297,36 @@ def detect_equity_regime() -> dict:
     intraday_dir = intraday.get("direction", "neutral")
     intraday_change = intraday.get("change_pct", 0)
 
+    # Check for special days: expiry, pre-holiday
+    is_expiry_day = False
+    is_pre_holiday = False
+    try:
+        from datetime import date as dt_date
+        today = now_ist().date()
+        weekday = today.weekday()  # 0=Mon, 4=Fri
+
+        # Expiry day: Thursday (weekly expiry for NIFTY/BANKNIFTY)
+        if weekday == 3:  # Thursday
+            is_expiry_day = True
+
+        # Pre-holiday: check if tomorrow is a holiday
+        from config import NSE_HOLIDAYS
+        tomorrow = today + timedelta(days=1)
+        # Skip weekend check
+        if weekday == 4:  # Friday → Monday might be holiday
+            check_date = today + timedelta(days=3)
+        else:
+            check_date = tomorrow
+        if check_date.strftime("%Y-%m-%d") in NSE_HOLIDAYS:
+            is_pre_holiday = True
+    except Exception:
+        pass
+
     # VIX classification
     if vix > 20:
         vol_level = "high_vol"
+    elif vix > 16:
+        vol_level = "elevated"
     elif vix < 14:
         vol_level = "low_vol"
     else:
@@ -238,21 +334,31 @@ def detect_equity_regime() -> dict:
 
     # Determine effective trend — intraday direction can override daily
     if daily_trend in ("bearish",) and intraday_dir == "intraday_bullish":
-        # Daily says bearish but today is green — CONFLICT
-        # Don't trust bearish SELL signals — use neutral/reversal strategies
-        effective_trend = "bounce_in_downtrend"
+        # Only override if intraday move is strong enough (> 0.5%)
+        if abs(intraday_change) > 0.5:
+            effective_trend = "bounce_in_downtrend"
+        else:
+            effective_trend = daily_trend  # Weak intraday, trust daily
     elif daily_trend in ("bullish",) and intraday_dir == "intraday_bearish":
-        # Daily says bullish but today is red — CONFLICT
-        effective_trend = "pullback_in_uptrend"
+        if abs(intraday_change) > 0.5:
+            effective_trend = "pullback_in_uptrend"
+        else:
+            effective_trend = daily_trend  # Weak intraday, trust daily
     elif nifty.get("is_reversal", False):
         effective_trend = "reversal"
     else:
         # Daily and intraday agree, or intraday is neutral
         effective_trend = daily_trend
 
+    # Special day overrides (highest priority)
+    if is_expiry_day:
+        effective_trend = "expiry_day"
+    elif is_pre_holiday:
+        effective_trend = "pre_holiday"
+
     # Get strategies from map
     key = (effective_trend, vol_level)
-    strat_list = REGIME_STRATEGY_MAP.get(key, [("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m")])
+    strat_list = REGIME_STRATEGY_MAP.get(key, [("play4_supertrend", "15m"), ("play6_bb_contra", "15m")])
 
     strategies = [{"strategy": s, "timeframe": tf} for s, tf in strat_list]
     strategy_ids = [s for s, _ in strat_list]
@@ -268,6 +374,9 @@ def detect_equity_regime() -> dict:
         "play4_supertrend": "Supertrend",
         "play5_bb_squeeze": "BB Squeeze",
         "play6_bb_contra": "BB Contra",
+        "play7_orb": "ORB Breakout",
+        "play8_rsi_divergence": "RSI Divergence",
+        "play9_gap_analysis": "Gap Analysis",
     }
 
     reasoning_parts = [
@@ -277,6 +386,15 @@ def detect_equity_regime() -> dict:
         f"VIX: {vix:.1f} ({vol_level.replace('_', ' ')})",
         f"Selected: {', '.join(STRAT_NAMES.get(s, s) for s in strategy_ids)}",
     ]
+
+    # Confidence scoring
+    confidence = "high"
+    if vol_level == "elevated":
+        confidence = "medium"
+    elif vol_level == "high_vol":
+        confidence = "low"
+    if effective_trend != daily_trend:
+        confidence = "medium" if confidence == "high" else "low"
 
     return {
         "regime": regime_label,
@@ -289,4 +407,5 @@ def detect_equity_regime() -> dict:
             "intraday": intraday,
         },
         "reasoning": " | ".join(reasoning_parts),
+        "confidence": confidence,
     }

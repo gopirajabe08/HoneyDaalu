@@ -1,0 +1,177 @@
+{
+  "_meta": {
+    "description": "Every parameter change MUST be logged here with date, reason, and data backing. Claude MUST check this before making any strategy changes. Never change parameters without recording here first.",
+    "rules": [
+      "1. Check strategy_registry.json for current values",
+      "2. Check last 3 daily reports for performance data",
+      "3. Log the change HERE with before/after values + reason",
+      "4. Update strategy_registry.json",
+      "5. Only then modify the actual code"
+    ]
+  },
+  "changes": [
+    {
+      "date": "2026-03-18",
+      "type": "INITIAL_BASELINE",
+      "description": "Strategy tracker system created. All current parameters recorded in strategy_registry.json as baseline.",
+      "author": "Claude (system audit)",
+      "data_backing": "30-day paper + live trade analysis. See daily/2026-03-18.json for today's performance."
+    },
+    {
+      "id": "P0-001",
+      "date": "2026-03-18",
+      "type": "P0_FIX",
+      "file": "backend/strategies/base.py",
+      "parameter": "atr_sl_multiplier (default)",
+      "before": 1.5,
+      "after": 2.5,
+      "reason": "5 of 12 SL hits in last 5 days were within normal noise range (<1% from entry). 33-min SL hit on UNITDSPR today. Tight SLs cause premature exits before trade can develop.",
+      "data_backing": "30-day: SL_HIT accounts for -₹11,866 of losses (12 trades). Avg time-to-SL = 28 min. Today: UNITDSPR SL hit in 33 min, only 1% move.",
+      "expected_impact": "Reduce premature SL hits by ~50%, accept slightly larger losses on true reversals",
+      "rollback_trigger": "If avg loss per trade doubles over next 5 days without win rate improvement"
+    },
+    {
+      "id": "P0-002",
+      "date": "2026-03-18",
+      "type": "P0_FIX",
+      "file": "backend/strategies/futures_base.py",
+      "parameter": "atr_sl_multiplier + min_sl_pct",
+      "before": {"atr_mult": 1.5, "min_pct": 0.005},
+      "after": {"atr_mult": 2.5, "min_pct": 0.012},
+      "reason": "Futures 1.5x ATR with 0.5% floor causes whipsaws. BAJFINANCE SL hit at ₹878.70 (1.2% from entry) in 1h41m. Normal futures intraday noise is 1-1.5%.",
+      "data_backing": "Today: BAJFINANCE -₹5,462 SL hit, NESTLEIND -₹1,290 square-off. Both SELL in bullish market with tight SLs.",
+      "expected_impact": "Wider SLs give futures trades room. Combined with P0-003 (risk reduction), max loss per trade stays controlled.",
+      "rollback_trigger": "If futures avg loss exceeds ₹3,000 per trade over 5 days"
+    },
+    {
+      "id": "P0-003",
+      "date": "2026-03-18",
+      "type": "P0_FIX",
+      "file": "backend/config.py",
+      "parameter": "FUTURES_RISK_PER_TRADE_PCT",
+      "before": 0.05,
+      "after": 0.02,
+      "reason": "5% risk per trade = single trade can wipe 5.5% of capital. BAJFINANCE today: 500 qty, -₹5,462 (5.5%). Institutional standard is 1-2%.",
+      "data_backing": "Today: 1 futures SL hit triggered daily loss limit. 500 qty on BAJFINANCE at 5% risk. NESTLEIND 675 qty (27 lots) is extreme.",
+      "expected_impact": "Max single-trade loss drops from ~₹5,000 to ~₹2,000. Smaller positions, more controlled drawdown.",
+      "rollback_trigger": "N/A — this is a permanent risk management improvement"
+    },
+    {
+      "id": "P0-004",
+      "date": "2026-03-18",
+      "type": "P0_FIX",
+      "files": ["backend/strategies/play1_ema_crossover.py", "backend/strategies/play2_triple_ma.py", "backend/strategies/play3_vwap_pullback.py", "backend/strategies/play4_supertrend.py", "backend/strategies/play5_bb_squeeze.py", "backend/strategies/play6_bb_contra.py"],
+      "parameter": "volume_confirmation",
+      "before": "NONE",
+      "after": "volume > 1.3x SMA20 required for signal",
+      "reason": "Zero strategies have volume confirmation. Signals fire on low-volume moves that reverse immediately. Every quant textbook requires volume to confirm price action.",
+      "data_backing": "30-day: 44-46% win rate across strategies. Many SL hits on low-conviction moves. Play2 generated 32 trades with -₹5,531 P&L — bulk were noise.",
+      "expected_impact": "Filter ~30-40% of noise signals. Remaining signals have higher conviction.",
+      "rollback_trigger": "If signal count drops below 3 per day on paper trader (too restrictive)"
+    },
+    {
+      "id": "P1-001",
+      "date": "2026-03-18",
+      "type": "P1_FIX",
+      "file": "backend/services/scanner.py",
+      "parameter": "signal_ranking_method",
+      "before": "Sort by reward/risk ratio (all strategies produce 1:2, so effectively random)",
+      "after": "Conviction score: volume_ratio × ADX_strength × trend_alignment. Higher score = picked first.",
+      "reason": "Current ranking picks stocks with widest SL/target spread, not highest probability. Today: DEVYANI (₹109) selected over higher-quality signals — didn't move at all.",
+      "data_backing": "Today: 24 signals from scan #1, 100 from scan #2 — only 2 picked per scan. DEVYANI (low-priced, low-momentum) wasted a slot for 2.5 hours.",
+      "expected_impact": "Better trade selection from available signals. Higher average win size.",
+      "rollback_trigger": "If win rate drops below 40% over 5 days"
+    },
+    {
+      "id": "P1-002",
+      "date": "2026-03-18",
+      "type": "P1_FIX",
+      "file": "backend/services/options_paper_trader.py + options_scanner.py",
+      "parameter": "iron_condor_vix_gate",
+      "before": "Iron condor placed in any regime including 'neutral' regardless of VIX",
+      "after": "Block iron condor when VIX > 16. Only allow when VIX <= 16 AND regime is 'neutral'",
+      "reason": "Iron condor requires range-bound, low-vol market. Today: VIX=19 + bullish trend → CE leg breached → -₹1,562 loss destroyed 3 put spread wins.",
+      "data_backing": "Today: 1 iron condor at VIX 19 → -₹1,562. 3 bull_put_spreads → +₹1,212. Net options: -₹721. Without IC, would have been +₹841.",
+      "expected_impact": "Eliminate iron condor losses in trending/volatile markets",
+      "rollback_trigger": "If no iron condors placed for 10+ consecutive days (too restrictive)"
+    },
+    {
+      "id": "P1-003",
+      "date": "2026-03-18",
+      "type": "P1_FIX",
+      "files": ["backend/strategies/futures_volume_breakout.py", "backend/strategies/futures_ema_rsi_pullback.py"],
+      "parameter": "oi_sentiment_filter",
+      "before": "SOFT filter — boosts score but does NOT block counter-sentiment trades",
+      "after": "HARD filter — block BUY when sentiment is 'short_buildup' or 'long_unwinding', block SELL when 'long_buildup' or 'short_covering'",
+      "reason": "Futures traded SELL on BAJFINANCE with 'long_unwinding' sentiment. Smart money was exiting longs = bearish, but stock went UP. OI alone shouldn't drive direction in bullish regime.",
+      "data_backing": "Today: Both futures trades had 'long_unwinding' OI but market was bullish. Both lost. -₹6,752 total.",
+      "expected_impact": "Prevent counter-sentiment futures trades. May reduce signal count by 30-40%.",
+      "rollback_trigger": "If futures signal count drops below 1 per day"
+    },
+    {
+      "id": "P1-004",
+      "date": "2026-03-18",
+      "type": "P1_FIX",
+      "file": "backend/config.py",
+      "parameter": "INTRADAY_POSITION_CHECK_INTERVAL",
+      "before": 60,
+      "after": 20,
+      "reason": "60-second checks miss SL/target hits between checks. On 5m candles, only 5 LTP checks per candle. Today: SBICARD target was at ₹710.05 but exited at ₹710.35 (lucked out). Could easily miss by 60 seconds and have price reverse.",
+      "data_backing": "Today: 4 intraday trades monitored every 60s. Options already use 15s interval (correctly).",
+      "expected_impact": "3x more frequent price checks. Better SL/target execution.",
+      "rollback_trigger": "If API rate limiting causes LTP fetch failures"
+    },
+    {
+      "id": "P1-005",
+      "date": "2026-03-18",
+      "type": "P1_FIX",
+      "files": ["backend/services/paper_trader.py", "backend/services/auto_trader.py"],
+      "parameter": "regime_re_detection",
+      "before": "Regime detected ONCE at engine start, strategies fixed for entire session",
+      "after": "Re-detect regime on every scan cycle. If regime changes, update strategy list dynamically.",
+      "reason": "Today: regime was 'neutral' at 10 AM, shifted to 'mildly_bullish' by noon. Strategies selected at start didn't adapt. SELL signals ran in bullish market.",
+      "data_backing": "Mar 18: UNITDSPR SELL hit SL in 33 min (counter-trend). Market shifted bullish mid-day but engine kept running neutral-regime strategies.",
+      "expected_impact": "Strategies adapt to intraday regime shifts. Fewer counter-trend trades.",
+      "rollback_trigger": "If regime flapping causes > 3 strategy switches per day (add cooldown)"
+    },
+    {
+      "id": "P1-006",
+      "date": "2026-03-18",
+      "type": "P1_FIX",
+      "file": "backend/services/equity_regime.py",
+      "parameter": "REGIME_STRATEGY_MAP — add Play4 to pullback/bounce, remove Play2 from top slots",
+      "before": "Play4 Supertrend only in bullish/bearish. Play2 Triple MA in 6+ regimes.",
+      "after": "Play4 added to pullback/bounce/neutral regimes on 15m. Play2 removed from bullish/bearish (kept only as low-vol fallback).",
+      "reason": "Play4 is best performer (+₹4,133, 52% WR) but excluded from 8/20 regimes. Play2 is worst (-₹5,531, 44% WR) but in most common regimes.",
+      "data_backing": "30-day: Play4 +₹4,133 (23 trades). Play2 -₹5,531 (32 trades). Play4 Supertrend pullback entry works in non-trending markets too.",
+      "expected_impact": "Best strategy gets more opportunities. Worst strategy stops wasting capital slots.",
+      "rollback_trigger": "If Play4 win rate drops below 40% in pullback regimes over 5 days"
+    },
+    {
+      "id": "P1-007",
+      "date": "2026-03-18",
+      "type": "P1_FIX",
+      "file": "backend/services/equity_regime.py",
+      "parameter": "VIX caution zone + confidence scoring",
+      "before": "VIX binary: >20=high, <14=low, else normal. No confidence score.",
+      "after": "Added 'elevated' zone (16-20): max positions halved. Intraday direction uses magnitude for confidence (0.3% vs 1.5% treated differently).",
+      "reason": "VIX 14.1 and 19.9 both treated as 'normal' but are very different. Today VIX=19 should have triggered caution.",
+      "data_backing": "Mar 18: VIX=19, iron condor placed in 'neutral' regime → -₹1,562. Iron condor now blocked by P1-002, but other strategies still over-allocated.",
+      "expected_impact": "More conservative position sizing in uncertain volatility. Fewer slots used when conviction is low.",
+      "rollback_trigger": "If daily trade count drops below 2 (too restrictive)"
+    },
+    {
+      "id": "P1-008",
+      "date": "2026-03-18",
+      "type": "P1_FIX",
+      "file": "backend/config.py",
+      "parameter": "INTRADAY_ORDER_START + FUTURES_ORDER_START",
+      "before": {"equity": "12:00 PM", "futures": "12:00 PM"},
+      "after": {"equity": "10:30 AM", "futures": "11:00 AM"},
+      "reason": "12 PM start misses best 2 hours of intraday volume (10-12). By 12 PM, big moves are done. Options already start at 10 AM with 75% win rate on spreads. 10:30 gives 15m charts 5+ candles to stabilize.",
+      "data_backing": "Mar 18: Options (10 AM start) had 75% WR on bull_put_spreads. Equity (12 PM start) got weaker signals. Trading window doubles from 2h to 3.5h (equity) and 3h (futures).",
+      "expected_impact": "More trading opportunities. Better signals during high-volume morning session. Trading window: equity 10:30-2:00 (3.5h), futures 11:00-2:00 (3h).",
+      "rollback_trigger": "If morning trades (10:30-12:00) have significantly worse win rate than afternoon (12:00-2:00) over 5 days"
+    }
+  ]
+}

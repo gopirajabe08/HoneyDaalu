@@ -411,7 +411,7 @@ export default function PaperTrade({ capital, setCapital }) {
               <div className="mt-3 flex items-start gap-2 px-1">
                 <AlertTriangle size={10} className="text-gray-600 flex-shrink-0 mt-0.5" />
                 <p className="text-[9px] text-gray-600 leading-relaxed">
-                  Virtual mode &bull; Max 3 positions &bull; 2% risk &bull; 15 min scan &bull; No real orders placed
+                  Virtual mode &bull; Max 10 positions &bull; 2% risk &bull; Orders 10:30 AM - 2:00 PM &bull; No real orders placed
                 </p>
               </div>
             </div>

@@ -159,32 +159,32 @@ def _get_oi_sentiment_summary(oi_data: dict | None = None) -> dict:
 REGIME_STRATEGY_MAP = {
     # (trend_type, vol_level) → [strategies]
     # Strong trending markets → momentum + trend continuation
-    ("bullish", "high_vol"): ["futures_volume_breakout"],
-    ("bullish", "normal"):   ["futures_volume_breakout", "futures_ema_rsi_pullback"],
-    ("bullish", "low_vol"):  ["futures_ema_rsi_pullback"],
+    ("bullish", "high_vol"): ["futures_volume_breakout", "play4_supertrend", "play7_orb", "play9_gap_analysis"],
+    ("bullish", "normal"):   ["futures_volume_breakout", "futures_ema_rsi_pullback", "play4_supertrend", "play7_orb", "play9_gap_analysis"],
+    ("bullish", "low_vol"):  ["futures_ema_rsi_pullback", "play4_supertrend", "play7_orb", "play9_gap_analysis"],
 
-    ("bearish", "high_vol"): ["futures_volume_breakout"],
-    ("bearish", "normal"):   ["futures_volume_breakout", "futures_ema_rsi_pullback"],
-    ("bearish", "low_vol"):  ["futures_ema_rsi_pullback"],
+    ("bearish", "high_vol"): ["futures_volume_breakout", "play4_supertrend", "play7_orb", "play9_gap_analysis"],
+    ("bearish", "normal"):   ["futures_volume_breakout", "futures_ema_rsi_pullback", "play4_supertrend", "play7_orb", "play9_gap_analysis"],
+    ("bearish", "low_vol"):  ["futures_ema_rsi_pullback", "play4_supertrend", "play7_orb", "play9_gap_analysis"],
 
     # Pullback in trend → pullback + reversal strategies
-    ("pullback_in_uptrend", "high_vol"):  ["futures_ema_rsi_pullback", "futures_candlestick_reversal"],
-    ("pullback_in_uptrend", "normal"):    ["futures_ema_rsi_pullback", "futures_candlestick_reversal"],
-    ("pullback_in_uptrend", "low_vol"):   ["futures_ema_rsi_pullback", "futures_mean_reversion"],
+    ("pullback_in_uptrend", "high_vol"):  ["futures_ema_rsi_pullback", "futures_candlestick_reversal", "play8_rsi_divergence", "play4_supertrend"],
+    ("pullback_in_uptrend", "normal"):    ["futures_ema_rsi_pullback", "futures_candlestick_reversal", "play8_rsi_divergence", "play4_supertrend"],
+    ("pullback_in_uptrend", "low_vol"):   ["futures_ema_rsi_pullback", "futures_mean_reversion", "play8_rsi_divergence", "play4_supertrend"],
 
-    ("bounce_in_downtrend", "high_vol"):  ["futures_ema_rsi_pullback", "futures_candlestick_reversal"],
-    ("bounce_in_downtrend", "normal"):    ["futures_ema_rsi_pullback", "futures_candlestick_reversal"],
-    ("bounce_in_downtrend", "low_vol"):   ["futures_ema_rsi_pullback", "futures_mean_reversion"],
+    ("bounce_in_downtrend", "high_vol"):  ["futures_ema_rsi_pullback", "futures_candlestick_reversal", "play8_rsi_divergence", "play4_supertrend"],
+    ("bounce_in_downtrend", "normal"):    ["futures_ema_rsi_pullback", "futures_candlestick_reversal", "play8_rsi_divergence", "play4_supertrend"],
+    ("bounce_in_downtrend", "low_vol"):   ["futures_ema_rsi_pullback", "futures_mean_reversion", "play8_rsi_divergence", "play4_supertrend"],
 
     # Sideways / range-bound → mean reversion + breakout (for breakout from range)
-    ("sideways", "high_vol"):  ["futures_volume_breakout", "futures_candlestick_reversal"],
-    ("sideways", "normal"):    ["futures_mean_reversion", "futures_candlestick_reversal"],
-    ("sideways", "low_vol"):   ["futures_mean_reversion"],
+    ("sideways", "high_vol"):  ["futures_volume_breakout", "futures_candlestick_reversal", "play8_rsi_divergence"],
+    ("sideways", "normal"):    ["futures_mean_reversion", "futures_candlestick_reversal", "play8_rsi_divergence"],
+    ("sideways", "low_vol"):   ["futures_mean_reversion", "play8_rsi_divergence"],
 
     # Neutral fallback
-    ("neutral", "high_vol"):  ["futures_volume_breakout", "futures_candlestick_reversal"],
-    ("neutral", "normal"):    ["futures_ema_rsi_pullback", "futures_mean_reversion"],
-    ("neutral", "low_vol"):   ["futures_mean_reversion"],
+    ("neutral", "high_vol"):  ["futures_volume_breakout", "futures_candlestick_reversal", "play7_orb", "play4_supertrend", "play8_rsi_divergence"],
+    ("neutral", "normal"):    ["futures_ema_rsi_pullback", "futures_mean_reversion", "play7_orb", "play4_supertrend", "play8_rsi_divergence"],
+    ("neutral", "low_vol"):   ["futures_mean_reversion", "play7_orb", "play4_supertrend", "play8_rsi_divergence"],
 }
 
 # Default timeframes per strategy for auto mode
@@ -193,6 +193,10 @@ AUTO_TIMEFRAMES = {
     "futures_candlestick_reversal": "15m",
     "futures_mean_reversion": "1h",
     "futures_ema_rsi_pullback": "15m",
+    "play4_supertrend": "15m",
+    "play7_orb": "15m",
+    "play8_rsi_divergence": "15m",
+    "play9_gap_analysis": "15m",
 }
 
 AUTO_SWING_TIMEFRAMES = {
@@ -200,6 +204,8 @@ AUTO_SWING_TIMEFRAMES = {
     "futures_candlestick_reversal": "1h",
     "futures_mean_reversion": "1d",
     "futures_ema_rsi_pullback": "1h",
+    "play4_supertrend": "1h",
+    "play8_rsi_divergence": "1h",
 }
 
 

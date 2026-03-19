@@ -104,6 +104,12 @@ class BBContra(BaseStrategy):
         if not has_reversal:
             return None
 
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
+
         if is_hammer(last) or is_doji(last) or is_bullish_engulfing(last, prev):
             reversal = last
         else:
@@ -172,6 +178,12 @@ class BBContra(BaseStrategy):
         )
         if not has_reversal:
             return None
+
+        # Volume confirmation — reject low-conviction signals
+        if len(df) >= 20:
+            vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
+            if df["Volume"].iloc[-1] < vol_sma * 1.3:
+                return None  # Low volume — skip
 
         if is_shooting_star(last) or is_doji(last) or is_bearish_engulfing(last, prev):
             reversal = last

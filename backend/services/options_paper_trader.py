@@ -507,6 +507,8 @@ class OptionsPaperTrader:
         self._log("ALERT", f"Virtual square-off complete. Total P&L: {self._total_pnl:,.2f}")
         self._save_state()
 
+        # Note: EOD pipeline runs from equity/futures square-off at 3:15 PM (after all trades closed)
+
     # ── Position Monitoring ───────────────────────────────────────────────
 
     def _update_position_pnl(self):
