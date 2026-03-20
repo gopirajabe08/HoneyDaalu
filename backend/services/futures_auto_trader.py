@@ -420,6 +420,24 @@ class FuturesAutoTrader:
             all_signals.extend(signals)
             self._log("SCAN", f"  {strategy_key}({timeframe}): {len(signals)} signals (filtered: {result.get('filtered_liquidity', 0)} illiquid)")
 
+        # Direction filter: align with NIFTY regime
+        try:
+            from services.equity_regime import detect_equity_regime
+            regime = detect_equity_regime()
+            regime_name = regime.get("regime", "")
+            if "bearish" in regime_name:
+                before = len(all_signals)
+                all_signals = [s for s in all_signals if s.get("signal_type") == "SELL"]
+                if len(all_signals) < before:
+                    self._log("FILTER", f"Bearish regime — filtered {before - len(all_signals)} BUY signals")
+            elif "bullish" in regime_name:
+                before = len(all_signals)
+                all_signals = [s for s in all_signals if s.get("signal_type") == "BUY"]
+                if len(all_signals) < before:
+                    self._log("FILTER", f"Bullish regime — filtered {before - len(all_signals)} SELL signals")
+        except Exception:
+            pass
+
         # Deduplicate
         seen = {}
         for sig in all_signals:

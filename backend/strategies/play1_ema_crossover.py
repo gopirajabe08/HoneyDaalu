@@ -144,11 +144,14 @@ class EMA_Crossover(BaseStrategy):
                 if rejection:
                     return None
 
-            # Volume confirmation — reject low-conviction signals
+            # Volume confirmation — relaxed for low-volume sessions
             if len(df) >= 20:
                 vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-                if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                    return None  # Low volume — skip
+                threshold = 0.8 if len(df) < 60 else 1.1
+                # If market-wide volume is extremely low (<50% avg), don't filter
+                if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                    if df["Volume"].iloc[-1] < vol_sma * threshold:
+                        return None
 
             entry = last["Close"]
             cfg = get_strategy_config(_KEY)
@@ -192,11 +195,14 @@ class EMA_Crossover(BaseStrategy):
                 if rejection:
                     return None
 
-            # Volume confirmation — reject low-conviction signals
+            # Volume confirmation — relaxed for low-volume sessions
             if len(df) >= 20:
                 vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-                if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                    return None  # Low volume — skip
+                threshold = 0.8 if len(df) < 60 else 1.1
+                # If market-wide volume is extremely low (<50% avg), don't filter
+                if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                    if df["Volume"].iloc[-1] < vol_sma * threshold:
+                        return None
 
             entry = last["Close"]
             cfg = get_strategy_config(_KEY)

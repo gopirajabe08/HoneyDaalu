@@ -7,6 +7,7 @@ import { strategies } from '../data/mockData'
 import {
   startSwingTrading, stopSwingTrading, getSwingStatus,
   startSwingPaperTrading, stopSwingPaperTrading, getSwingPaperStatus,
+  startSwingTradingRegime, startSwingPaperTradingRegime,
   getPositions,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
@@ -39,6 +40,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
   const [status, setStatus] = useState(null)
   const [countdown, setCountdown] = useState(null)
   const [selected, setSelected] = useState({})
+  const [autoMode, setAutoMode] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [fyersPositions, setFyersPositions] = useState([])
   const scanInterval = getAutoScanInterval(selected)
@@ -135,13 +137,20 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
   }
 
   async function handleStart() {
-    if (selectedCount === 0) return
     setLoading(true)
     setError('')
     try {
-      const stratList = Object.entries(selected).map(([strategy, timeframe]) => ({ strategy, timeframe }))
-      const startFn = isLive ? startSwingTrading : startSwingPaperTrading
-      const data = await startFn(stratList, capital, scanInterval)
+      let data
+      if (autoMode) {
+        // Auto regime — backend picks all swing strategies automatically
+        const autoFn = isLive ? startSwingTradingRegime : startSwingPaperTradingRegime
+        data = await autoFn(capital)
+      } else {
+        if (selectedCount === 0) { setLoading(false); return }
+        const stratList = Object.entries(selected).map(([strategy, timeframe]) => ({ strategy, timeframe }))
+        const startFn = isLive ? startSwingTrading : startSwingPaperTrading
+        data = await startFn(stratList, capital, scanInterval)
+      }
       if (data.error) {
         setError(data.error)
       } else {

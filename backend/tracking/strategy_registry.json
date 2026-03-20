@@ -1,8 +1,8 @@
 {
   "_meta": {
     "description": "Master registry of ALL strategy parameters. Claude and the daily tracker reference this file before making ANY changes. Every parameter change MUST be logged in changelog.json with date + reason + data backing.",
-    "last_updated": "2026-03-18",
-    "version": "2.0.0 \u2014 auto-tuned Mar 18"
+    "last_updated": "2026-03-19",
+    "version": "2.0.0 \u2014 auto-tuned Mar 19"
   },
   "equity_intraday": {
     "play1_ema_crossover": {
@@ -21,7 +21,7 @@
         "sma50_slope_lookback": 5,
         "min_sma50_distance_pct": 0.015,
         "nifty_regime_threshold_pct": 0.01,
-        "volume_confirmation": "volume > 1.3x SMA20 required"
+        "volume_confirmation": "volume > 1.1x SMA20 required"
       },
       "risk_management": {
         "sl_method": "min(swing_low, ATR-based)",
@@ -56,7 +56,7 @@
         "slope_check": "EMA20 and SMA50 must slope in direction (3-bar lookback)",
         "pullback_tolerance_pct": 0.005,
         "candle_pattern": "hammer, doji, engulfing, or bullish close required",
-        "volume_confirmation": "volume > 1.3x SMA20 required"
+        "volume_confirmation": "volume > 1.1x SMA20 required"
       },
       "risk_management": {
         "sl_method": "min(swing_low/high, ATR-based)",
@@ -90,7 +90,7 @@
         "vwap_touch_tolerance_pct": 0.002,
         "near_vwap_tolerance_pct": 0.005,
         "entry_type": "trigger candle HIGH (aggressive)",
-        "volume_confirmation": "volume > 1.3x SMA20 required"
+        "volume_confirmation": "volume > 1.1x SMA20 required"
       },
       "risk_management": {
         "sl_method": "min(swing_low, VWAP-0.2%, ATR-based)",
@@ -123,7 +123,7 @@
         "power_zone_candles": 3,
         "candle_pattern": "bullish/bearish reversal required",
         "entry_type": "trigger candle HIGH/LOW (aggressive)",
-        "volume_confirmation": "volume > 1.3x SMA20 required"
+        "volume_confirmation": "volume > 1.1x SMA20 required"
       },
       "risk_management": {
         "sl_method": "ATR-based only",
@@ -153,7 +153,7 @@
         "longer_bw_period": 20,
         "breakout_body_mult": 1.5,
         "entry_type": "current candle HIGH (aggressive)",
-        "volume_confirmation": "volume > 1.3x SMA20 required"
+        "volume_confirmation": "volume > 1.1x SMA20 required"
       },
       "risk_management": {
         "sl_method": "min(BB middle band, ATR-based)",
@@ -176,7 +176,7 @@
         "band_touch_tolerance_pct": 0.002,
         "reversal_candle": "hammer, doji, or engulfing required",
         "entry_type": "reversal candle HIGH/LOW",
-        "volume_confirmation": "volume > 1.3x SMA20 required"
+        "volume_confirmation": "volume > 1.1x SMA20 required"
       },
       "risk_management": {
         "sl_method": "min(reversal candle low, ATR-based)",
@@ -330,12 +330,15 @@
       "rr_ratio_bonus": "1.3x for R:R >= 2.5, 1.1x for >= 2.0",
       "price_range": "1.2x for \u20b9200-\u20b92000, 0.6x for < \u20b9100, 0.8x for > \u20b93000",
       "strategy_boost": {
-        "play4_supertrend": 1.3,
-        "play3_vwap_pullback": 1.2,
-        "play6_bb_contra": 1.1,
-        "play1_ema_crossover": 0.9,
+        "play4_supertrend": 1.4,
+        "play7_orb": 1.0,
+        "play9_gap_analysis": 1.0,
+        "play3_vwap_pullback": 1.0,
+        "play8_rsi_divergence": 1.0,
+        "play6_bb_contra": 1.0,
         "play5_bb_squeeze": 1.0,
-        "play2_triple_ma": 0.7
+        "play1_ema_crossover": 0.5,
+        "play2_triple_ma": 1.0
       }
     },
     "applied_in": [

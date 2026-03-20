@@ -90,19 +90,23 @@ class VWAPPullback(BaseStrategy):
         if not touched_vwap:
             return None
 
-        # ── Trigger: Bullish reversal candle near VWAP ──
-        if not has_bullish_reversal(last, prev):
+        # ── Trigger: Bullish reversal candle near VWAP (relaxed: green candle also qualifies) ──
+        is_green = last["Close"] > last["Open"]
+        if not is_green and not has_bullish_reversal(last, prev):
             return None
 
         # Last candle should be near VWAP (within 0.5%)
         if last["Low"] > last["vwap"] * 1.005:
             return None
 
-        # Volume confirmation — reject low-conviction signals
+        # Volume confirmation — relaxed for low-volume sessions
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None  # Low volume — skip
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         # ── Entry & Targets ──
         entry = last["High"]  # break of trigger candle's high
@@ -155,19 +159,23 @@ class VWAPPullback(BaseStrategy):
         if not touched_vwap:
             return None
 
-        # ── Trigger: Bearish reversal candle near VWAP ──
-        if not has_bearish_reversal(last, prev):
+        # ── Trigger: Bearish reversal candle near VWAP (relaxed: red candle also qualifies) ──
+        is_red = last["Close"] < last["Open"]
+        if not is_red and not has_bearish_reversal(last, prev):
             return None
 
         # Last candle should be near VWAP (within 0.5%)
         if last["High"] < last["vwap"] * 0.995:
             return None
 
-        # Volume confirmation — reject low-conviction signals
+        # Volume confirmation — relaxed for low-volume sessions
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None  # Low volume — skip
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         # ── Entry & Targets ──
         entry = last["Low"]  # break of trigger candle's low

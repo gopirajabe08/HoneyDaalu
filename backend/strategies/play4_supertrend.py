@@ -100,15 +100,20 @@ class SupertrendPowerTrend(BaseStrategy):
         if not touched_power_zone:
             return None
 
-        # ── Trigger candle: bullish reversal pattern ──
-        if not has_bullish_reversal(last, prev):
+        # ── Trigger candle: bullish close OR reversal pattern ──
+        # Relaxed: any green candle (close > open) qualifies, not just hammer/engulfing
+        is_green = last["Close"] > last["Open"]
+        if not is_green and not has_bullish_reversal(last, prev):
             return None
 
-        # Volume confirmation — reject low-conviction signals
+        # Volume confirmation — relaxed: skip filter if volume data is very low (Friday afternoon etc.)
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None  # Low volume — skip
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         # ── Entry & Targets ──
         entry = last["High"]
@@ -166,15 +171,18 @@ class SupertrendPowerTrend(BaseStrategy):
         if not touched_power_zone:
             return None
 
-        # ── Trigger candle: bearish reversal pattern ──
-        if not has_bearish_reversal(last, prev):
+        # ── Trigger candle: bearish close OR reversal pattern ──
+        is_red = last["Close"] < last["Open"]
+        if not is_red and not has_bearish_reversal(last, prev):
             return None
 
-        # Volume confirmation — reject low-conviction signals
+        # Volume confirmation — relaxed for low-volume sessions
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None  # Low volume — skip
+            threshold = 0.8 if len(df) < 60 else 1.1
+            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         # ── Entry & Targets ──
         entry = last["Low"]  # break of signal candle's low

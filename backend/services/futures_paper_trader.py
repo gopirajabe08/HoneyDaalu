@@ -285,6 +285,13 @@ class FuturesPaperTrader:
                     self._execute_scan_cycle()
                     current = len(self._active_trades)
 
+            # Periodic re-scan: if 0 positions, re-scan every ~15 min
+            elif current == 0 and not _is_past_order_cutoff() and is_market_open():
+                if _monitor_tick > 0 and _monitor_tick % 15 == 0:  # ~15 min at 60s intervals
+                    self._log("SCAN", "No positions — periodic re-scan")
+                    self._execute_scan_cycle()
+                    current = len(self._active_trades)
+
             prev_open = current
 
         self._log("INFO", "Background thread exited")
@@ -359,6 +366,25 @@ class FuturesPaperTrader:
                 sig["_timeframe"] = tf
             all_signals.extend(signals)
             self._log("SCAN", f"  {key}({tf}): {len(signals)} signals")
+
+        # Direction filter: align with NIFTY intraday direction
+        # Bearish regime → only SELL. Bullish → only BUY. Neutral → both.
+        try:
+            from services.equity_regime import detect_equity_regime
+            regime = detect_equity_regime()
+            regime_name = regime.get("regime", "")
+            if "bearish" in regime_name:
+                before = len(all_signals)
+                all_signals = [s for s in all_signals if s.get("signal_type") == "SELL"]
+                if len(all_signals) < before:
+                    self._log("FILTER", f"Bearish regime — filtered {before - len(all_signals)} BUY signals, kept {len(all_signals)} SELL")
+            elif "bullish" in regime_name:
+                before = len(all_signals)
+                all_signals = [s for s in all_signals if s.get("signal_type") == "BUY"]
+                if len(all_signals) < before:
+                    self._log("FILTER", f"Bullish regime — filtered {before - len(all_signals)} SELL signals, kept {len(all_signals)} BUY")
+        except Exception:
+            pass
 
         # Deduplicate
         seen = {}

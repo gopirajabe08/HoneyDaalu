@@ -65,6 +65,119 @@ def auto_connect_fyers():
         name = profile.get("data", {}).get("name", "Unknown")
         logger.info(f"Fyers auto-connected (TOTP login): {name}")
 
+    # Start market monitor daemon
+    from services.market_monitor import start_monitor
+    start_monitor()
+
+    # Auto-start engines based on available capital and market conditions
+    import threading
+    def _auto_start_engines():
+        """Auto-start paper + live engines based on capital and conditions."""
+        import time
+        time.sleep(5)  # Wait for server to fully initialize
+
+        try:
+            from services.equity_regime import detect_equity_regime
+            from config import SWING_STRATEGY_TIMEFRAMES
+
+            # Always start ALL paper engines (for data collection)
+            paper_configs = [
+                ("Equity Intraday Paper", lambda: paper_trader.start(
+                    strategies=detect_equity_regime().get("strategies", []),
+                    capital=75000)),
+                ("Equity Swing Paper", lambda: swing_paper_trader.start(
+                    strategies=[{"strategy": s, "timeframe": tfs[0]} for s, tfs in SWING_STRATEGY_TIMEFRAMES.items()],
+                    capital=75000)),
+                ("Options Intraday Paper", lambda: options_paper_trader.start(
+                    capital=25000, underlyings=["NIFTY", "BANKNIFTY"])),
+                ("Options Swing Paper", lambda: options_swing_paper_trader.start(
+                    capital=25000, underlyings=["NIFTY", "BANKNIFTY"])),
+                ("Futures Intraday Paper", lambda: futures_paper_trader.start(
+                    strategies=[], capital=100000)),
+                ("Futures Swing Paper", lambda: futures_swing_paper_trader.start(
+                    strategies=[], capital=100000)),
+            ]
+
+            for name, start_fn in paper_configs:
+                try:
+                    result = start_fn()
+                    if result and not result.get("error"):
+                        logger.info(f"[AutoStart] {name}: started")
+                    else:
+                        logger.info(f"[AutoStart] {name}: already running or restored from state")
+                except Exception as e:
+                    logger.warning(f"[AutoStart] {name}: {e}")
+
+            # Live engines: only start if Fyers connected + capital available
+            if not fyers_client.is_authenticated():
+                logger.warning("[AutoStart] Fyers not connected — skipping live engines")
+                return
+
+            try:
+                funds = fyers_client.get_funds()
+                fund_list = funds.get("fund_limit", [])
+                available = 0
+                for f in fund_list:
+                    if f.get("id") == 10:
+                        available = f.get("equityAmount", 0)
+
+                if available <= 0:
+                    logger.warning("[AutoStart] No funds available — skipping live engines")
+                    return
+
+                logger.info(f"[AutoStart] Available capital: ₹{available:,.0f}")
+
+                # Detect market conditions for allocation
+                regime = detect_equity_regime()
+                vix = regime.get("components", {}).get("vix", 15)
+                regime_name = regime.get("regime", "neutral")
+
+                # Dynamic allocation based on capital + conditions
+                if available < 100000:
+                    # < 1L: Options only
+                    opt_capital = available
+                    eq_capital = 0
+                elif available < 250000:
+                    # 1L-2.5L: Options 40% + Equity 35% + reserve
+                    if vix > 20:
+                        opt_capital = int(available * 0.50)
+                        eq_capital = int(available * 0.30)
+                    else:
+                        opt_capital = int(available * 0.35)
+                        eq_capital = int(available * 0.45)
+                else:
+                    # 2.5L+: wider allocation
+                    opt_capital = int(available * 0.40)
+                    eq_capital = int(available * 0.40)
+
+                # Start live engines
+                if opt_capital >= 20000:
+                    try:
+                        r = options_auto_trader.start(capital=opt_capital, underlyings=["NIFTY", "BANKNIFTY"])
+                        if not r.get("error"):
+                            logger.info(f"[AutoStart] Options Live: ₹{opt_capital:,} allocated")
+                    except Exception as e:
+                        logger.warning(f"[AutoStart] Options Live failed: {e}")
+
+                if eq_capital >= 20000:
+                    try:
+                        strategies = regime.get("strategies", [])
+                        r = auto_trader.start(strategies=strategies, capital=eq_capital)
+                        if not r.get("error"):
+                            logger.info(f"[AutoStart] Equity Live: ₹{eq_capital:,} allocated | {len(strategies)} strategies")
+                    except Exception as e:
+                        logger.warning(f"[AutoStart] Equity Live failed: {e}")
+
+                logger.info(f"[AutoStart] Complete — VIX:{vix} Regime:{regime_name}")
+
+            except Exception as e:
+                logger.warning(f"[AutoStart] Live allocation failed: {e}")
+
+        except Exception as e:
+            logger.error(f"[AutoStart] Failed: {e}")
+
+    threading.Thread(target=_auto_start_engines, daemon=True, name="AutoStartEngines").start()
+
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
@@ -476,6 +589,19 @@ def swing_start(req: SwingStartRequest):
     )
 
 
+@app.post("/api/swing/start-auto")
+def swing_start_regime(req: EquityAutoStartRequest):
+    """Start equity swing live with auto strategy selection from regime."""
+    from config import SWING_STRATEGY_TIMEFRAMES
+    strategies = [{"strategy": s, "timeframe": tfs[0]} for s, tfs in SWING_STRATEGY_TIMEFRAMES.items()]
+    if not strategies:
+        return {"error": "No swing strategies configured"}
+    result = swing_trader.start(strategies=strategies, capital=req.capital)
+    result["auto_regime"] = True
+    result["strategies_count"] = len(strategies)
+    return result
+
+
 @app.post("/api/swing/stop")
 def swing_stop():
     return swing_trader.stop()
@@ -504,6 +630,19 @@ def swing_paper_start(req: SwingStartRequest):
         capital=req.capital,
         scan_interval_minutes=req.scan_interval_minutes,
     )
+
+
+@app.post("/api/swing-paper/start-auto")
+def swing_paper_start_regime(req: EquityAutoStartRequest):
+    """Start equity swing paper with auto strategy selection."""
+    from config import SWING_STRATEGY_TIMEFRAMES
+    strategies = [{"strategy": s, "timeframe": tfs[0]} for s, tfs in SWING_STRATEGY_TIMEFRAMES.items()]
+    if not strategies:
+        return {"error": "No swing strategies configured"}
+    result = swing_paper_trader.start(strategies=strategies, capital=req.capital)
+    result["auto_regime"] = True
+    result["strategies_count"] = len(strategies)
+    return result
 
 
 @app.post("/api/swing-paper/stop")
@@ -679,7 +818,8 @@ def daily_pnl(
         d = daily[date]
         pnl = t.get("pnl", 0)
         d["total_pnl"] += pnl
-        d["brokerage"] += _estimate_trade_brokerage(t)
+        # Use actual charges if available (paper traders calc realistic brokerage), else estimate
+        d["brokerage"] += t.get("charges", _estimate_trade_brokerage(t))
         d["trades"] += 1
         if pnl > 0:
             d["wins"] += 1
@@ -689,7 +829,8 @@ def daily_pnl(
             d["gross_loss"] += pnl
         if t.get("strategy"):
             d["strategies"].add(t["strategy"])
-        if t.get("source") == "paper":
+        src = t.get("source", "")
+        if "paper" in src:
             d["paper_trades"] += 1
         else:
             d["auto_trades"] += 1
@@ -1249,6 +1390,13 @@ def tracking_auto_tune():
     """Run auto-tuner to adjust parameters based on recent performance."""
     from services.auto_tuner import run_auto_tune
     return run_auto_tune()
+
+
+@app.get("/api/monitor/log")
+def monitor_log(lines: int = Query(50, ge=1, le=200)):
+    """Get recent market monitor log entries."""
+    from services.market_monitor import get_monitor_log
+    return {"log": get_monitor_log(lines)}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

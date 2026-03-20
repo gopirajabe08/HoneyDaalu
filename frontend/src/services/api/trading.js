@@ -91,6 +91,22 @@ export async function startSwingPaperTrading(strategies, capital, scanIntervalMi
   })
 }
 
+export async function startSwingTradingRegime(capital) {
+  return apiFetch(`${API_BASE}/swing/start-auto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ capital }),
+  })
+}
+
+export async function startSwingPaperTradingRegime(capital) {
+  return apiFetch(`${API_BASE}/swing-paper/start-auto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ capital }),
+  })
+}
+
 export async function stopSwingPaperTrading() {
   return apiFetch(`${API_BASE}/swing-paper/stop`, { method: 'POST' })
 }

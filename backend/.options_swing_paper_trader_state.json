@@ -1,0 +1,341 @@
+{
+  "running": true,
+  "capital": 25000.0,
+  "underlyings": [
+    "NIFTY",
+    "BANKNIFTY"
+  ],
+  "scan_interval": 14400,
+  "active_positions": [],
+  "trade_history": [
+    {
+      "underlying": "BANKNIFTY",
+      "strategy": "bear_call_spread",
+      "strategy_id": "bear_call_spread",
+      "legs": [
+        {
+          "symbol": "NSE:BANKNIFTY26MAR54000CE",
+          "strike": 54000,
+          "option_type": "CE",
+          "side": -1,
+          "price": 921.33,
+          "qty": 15
+        },
+        {
+          "symbol": "NSE:BANKNIFTY26MAR54200CE",
+          "strike": 54200,
+          "option_type": "CE",
+          "side": 1,
+          "price": 817.37,
+          "qty": 15
+        }
+      ],
+      "net_premium": 105.7,
+      "max_risk": 1414.5,
+      "max_reward": 1585.5,
+      "lot_size": 15,
+      "quantity": 1,
+      "expiry": "26MAR",
+      "order_id": "OPT-SWING-P-0001",
+      "entry_time": "2026-03-19T09:16:03.466042+05:30",
+      "placed_at": "2026-03-19T09:16:03.466055+05:30",
+      "status": "CLOSED",
+      "pnl": -278.6,
+      "current_net_premium": 105.7,
+      "regime": "neutral",
+      "strategy_type": "credit",
+      "product_type": "MARGIN",
+      "est_brokerage": 80,
+      "current_prices": {
+        "NSE:BANKNIFTY26MAR54200CE": 982.45
+      },
+      "days_held": 1,
+      "exit_reason": "PROFIT_TARGET",
+      "gross_pnl": -198.6,
+      "charges": 80,
+      "closed_at": "2026-03-20T10:47:18.167966+05:30"
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "strategy": "bull_put_spread",
+      "strategy_id": "bull_put_spread",
+      "legs": [
+        {
+          "symbol": "NSE:BANKNIFTY26MAR53800PE",
+          "strike": 53800,
+          "option_type": "PE",
+          "side": -1,
+          "price": 768.78,
+          "qty": 15
+        },
+        {
+          "symbol": "NSE:BANKNIFTY26MAR53600PE",
+          "strike": 53600,
+          "option_type": "PE",
+          "side": 1,
+          "price": 723.37,
+          "qty": 15
+        }
+      ],
+      "net_premium": 46.9,
+      "max_risk": 2296.5,
+      "max_reward": 703.5,
+      "lot_size": 15,
+      "quantity": 1,
+      "expiry": "26MAR",
+      "order_id": "OPT-SWING-P-0002",
+      "entry_time": "2026-03-19T09:16:03.468456+05:30",
+      "placed_at": "2026-03-19T09:16:03.468466+05:30",
+      "status": "CLOSED",
+      "pnl": -80.0,
+      "current_net_premium": 46.9,
+      "regime": "neutral",
+      "strategy_type": "credit",
+      "product_type": "MARGIN",
+      "est_brokerage": 80,
+      "current_prices": {
+        "NSE:BANKNIFTY26MAR53800PE": 933.85
+      },
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "gross_pnl": 0.0,
+      "charges": 80,
+      "closed_at": "2026-03-20T12:16:52.275905+05:30"
+    }
+  ],
+  "total_pnl": -358.6,
+  "daily_realized_pnl": -358.6,
+  "daily_loss_limit_hit": false,
+  "last_loss_reset_date": "2026-03-20",
+  "scan_count": 6,
+  "order_count": 2,
+  "started_at": "2026-03-19T09:15:55.538020+05:30",
+  "next_order_id": 3,
+  "logs": [
+    {
+      "timestamp": "09:15:55",
+      "level": "START",
+      "message": "Options swing paper trader STARTED \u2014 NIFTY, BANKNIFTY | Capital=25,000"
+    },
+    {
+      "timestamp": "09:15:55",
+      "level": "INFO",
+      "message": "SWING PAPER MODE \u2014 Max 2 positions | Monthly expiry | No real orders | Positions carry over days | Exit 2 days before expiry"
+    },
+    {
+      "timestamp": "09:15:55",
+      "level": "INFO",
+      "message": "Background thread started"
+    },
+    {
+      "timestamp": "09:15:55",
+      "level": "SCAN",
+      "message": "Options swing scan #1 \u2014 NIFTY, BANKNIFTY..."
+    },
+    {
+      "timestamp": "09:15:59",
+      "level": "WARN",
+      "message": "Scan error for NIFTY: Could not get spot price for NIFTY"
+    },
+    {
+      "timestamp": "09:16:03",
+      "level": "SCAN",
+      "message": "  BANKNIFTY: 2 signals | regime=neutral (3.8s)"
+    },
+    {
+      "timestamp": "09:16:03",
+      "level": "SCAN",
+      "message": "Options swing scan #1 complete \u2014 2 signals"
+    },
+    {
+      "timestamp": "09:16:03",
+      "level": "ORDER",
+      "message": "Virtual SWING bear_call_spread on BANKNIFTY: SELL NSE:BANKNIFTY26MAR54000CE | BUY NSE:BANKNIFTY26MAR54200CE"
+    },
+    {
+      "timestamp": "09:16:03",
+      "level": "ORDER",
+      "message": "  Premium=105.70 | Risk=1414.50 | Reward=1585.50 | Lots=1 | Expiry=26MAR | Est charges=\u20b980"
+    },
+    {
+      "timestamp": "09:16:03",
+      "level": "ORDER",
+      "message": "Virtual SWING bull_put_spread on BANKNIFTY: SELL NSE:BANKNIFTY26MAR53800PE | BUY NSE:BANKNIFTY26MAR53600PE"
+    },
+    {
+      "timestamp": "09:16:03",
+      "level": "ORDER",
+      "message": "  Premium=46.90 | Risk=2296.50 | Reward=703.50 | Lots=1 | Expiry=26MAR | Est charges=\u20b980"
+    },
+    {
+      "timestamp": "12:30:07",
+      "level": "RESTORE",
+      "message": "Restored swing options state \u2014 NIFTY, BANKNIFTY | Active: 2 | History: 0 | P&L: 0.00"
+    },
+    {
+      "timestamp": "12:30:07",
+      "level": "RESTORE",
+      "message": "Options swing paper trader was running \u2014 auto-resuming..."
+    },
+    {
+      "timestamp": "12:30:07",
+      "level": "INFO",
+      "message": "Background thread started"
+    },
+    {
+      "timestamp": "12:30:07",
+      "level": "SCAN",
+      "message": "Options swing scan #2 \u2014 NIFTY, BANKNIFTY..."
+    },
+    {
+      "timestamp": "12:30:07",
+      "level": "INFO",
+      "message": "Max swing positions reached (2/2) \u2014 monitoring only"
+    },
+    {
+      "timestamp": "09:17:35",
+      "level": "RESTORE",
+      "message": "Restored swing options state \u2014 NIFTY, BANKNIFTY | Active: 2 | History: 0 | P&L: 0.00"
+    },
+    {
+      "timestamp": "09:17:35",
+      "level": "RESTORE",
+      "message": "Options swing paper trader was running \u2014 auto-resuming..."
+    },
+    {
+      "timestamp": "09:17:35",
+      "level": "INFO",
+      "message": "Background thread started"
+    },
+    {
+      "timestamp": "09:17:35",
+      "level": "SCAN",
+      "message": "Options swing scan #3 \u2014 NIFTY, BANKNIFTY..."
+    },
+    {
+      "timestamp": "09:17:35",
+      "level": "INFO",
+      "message": "New trading day (2026-03-20) \u2014 daily loss counter reset"
+    },
+    {
+      "timestamp": "09:17:35",
+      "level": "INFO",
+      "message": "Max swing positions reached (2/2) \u2014 monitoring only"
+    },
+    {
+      "timestamp": "10:47:18",
+      "level": "ORDER",
+      "message": "BANKNIFTY bear_call_spread \u2014 virtual close | Net P&L: -278.60 (charges: \u20b980) | Reason: PROFIT_TARGET"
+    },
+    {
+      "timestamp": "11:45:30",
+      "level": "RESTORE",
+      "message": "Restored swing options state \u2014 NIFTY, BANKNIFTY | Active: 1 | History: 1 | P&L: -278.60"
+    },
+    {
+      "timestamp": "11:45:30",
+      "level": "RESTORE",
+      "message": "Options swing paper trader was running \u2014 auto-resuming..."
+    },
+    {
+      "timestamp": "11:45:30",
+      "level": "INFO",
+      "message": "Background thread started"
+    },
+    {
+      "timestamp": "11:45:30",
+      "level": "SCAN",
+      "message": "Options swing scan #4 \u2014 NIFTY, BANKNIFTY..."
+    },
+    {
+      "timestamp": "11:45:46",
+      "level": "SCAN",
+      "message": "  NIFTY: 0 signals | regime=neutral (15.43s)"
+    },
+    {
+      "timestamp": "11:45:48",
+      "level": "SCAN",
+      "message": "  BANKNIFTY: 0 signals | regime=neutral (2.44s)"
+    },
+    {
+      "timestamp": "11:45:48",
+      "level": "SCAN",
+      "message": "Options swing scan #4 complete \u2014 0 signals"
+    },
+    {
+      "timestamp": "12:16:52",
+      "level": "ORDER",
+      "message": "BANKNIFTY bull_put_spread \u2014 virtual close | Net P&L: -80.00 (charges: \u20b980) | Reason: STOP_LOSS"
+    },
+    {
+      "timestamp": "12:55:38",
+      "level": "RESTORE",
+      "message": "Restored swing options state \u2014 NIFTY, BANKNIFTY | Active: 0 | History: 2 | P&L: -358.60"
+    },
+    {
+      "timestamp": "12:55:38",
+      "level": "RESTORE",
+      "message": "Options swing paper trader was running \u2014 auto-resuming..."
+    },
+    {
+      "timestamp": "12:55:38",
+      "level": "INFO",
+      "message": "Background thread started"
+    },
+    {
+      "timestamp": "12:55:38",
+      "level": "SCAN",
+      "message": "Options swing scan #5 \u2014 NIFTY, BANKNIFTY..."
+    },
+    {
+      "timestamp": "12:55:42",
+      "level": "SCAN",
+      "message": "  NIFTY: 0 signals | regime=mildly_bearish (3.95s)"
+    },
+    {
+      "timestamp": "12:55:44",
+      "level": "SCAN",
+      "message": "  BANKNIFTY: 0 signals | regime=mildly_bearish (2.2s)"
+    },
+    {
+      "timestamp": "12:55:44",
+      "level": "SCAN",
+      "message": "Options swing scan #5 complete \u2014 0 signals"
+    },
+    {
+      "timestamp": "13:14:27",
+      "level": "RESTORE",
+      "message": "Restored swing options state \u2014 NIFTY, BANKNIFTY | Active: 0 | History: 2 | P&L: -358.60"
+    },
+    {
+      "timestamp": "13:14:27",
+      "level": "RESTORE",
+      "message": "Options swing paper trader was running \u2014 auto-resuming..."
+    },
+    {
+      "timestamp": "13:14:27",
+      "level": "INFO",
+      "message": "Background thread started"
+    },
+    {
+      "timestamp": "13:14:27",
+      "level": "SCAN",
+      "message": "Options swing scan #6 \u2014 NIFTY, BANKNIFTY..."
+    },
+    {
+      "timestamp": "13:14:31",
+      "level": "WARN",
+      "message": "Scan error for NIFTY: Could not get spot price for NIFTY"
+    },
+    {
+      "timestamp": "13:14:33",
+      "level": "SCAN",
+      "message": "  BANKNIFTY: 0 signals | regime=mildly_bearish (1.8s)"
+    },
+    {
+      "timestamp": "13:14:33",
+      "level": "SCAN",
+      "message": "Options swing scan #6 complete \u2014 0 signals"
+    }
+  ]
+}

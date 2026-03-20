@@ -1,0 +1,474 @@
+{
+  "date": "2026-03-20",
+  "generated_at": "2026-03-20T15:15:00.306450+05:30",
+  "market_snapshot": {},
+  "engines_active": {},
+  "strategy_performance": {
+    "play8_rsi_divergence|paper": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 1,
+      "target_hits": 0,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": -510.54,
+      "charges": 0,
+      "net_pnl": -510.54,
+      "total_time_seconds": 2706.015863,
+      "trades_detail": [
+        {
+          "symbol": "GRINFRA",
+          "direction": "BUY",
+          "entry": 872.17,
+          "exit": 861.3,
+          "sl": 863.42,
+          "target": 887.06,
+          "pnl": -510.54,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-20T13:30:21.023623+05:30",
+          "time_closed": "2026-03-20T14:15:27.039486+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 1,
+          "pnl": -510.54
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "play8_rsi_divergence",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 0.0,
+      "avg_time_minutes": 45.1,
+      "avg_win": 0,
+      "avg_loss": -510.54,
+      "expectancy_per_trade": -510.54
+    },
+    "play4_supertrend|paper": {
+      "trades": 6,
+      "wins": 4,
+      "losses": 2,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 1,
+      "square_offs": 5,
+      "manual_closes": 0,
+      "gross_pnl": 478.66999999999996,
+      "charges": 0,
+      "net_pnl": 478.66999999999996,
+      "total_time_seconds": 40745.297446,
+      "trades_detail": [
+        {
+          "symbol": "ANGELONE",
+          "direction": "SELL",
+          "entry": 232.57,
+          "exit": 231.02,
+          "sl": 235.0,
+          "target": 231.05,
+          "pnl": 206.49,
+          "exit_reason": "TARGET_HIT",
+          "time_placed": "2026-03-20T13:46:01.321866+05:30",
+          "time_closed": "2026-03-20T14:57:58.956549+05:30"
+        },
+        {
+          "symbol": "SBICARD",
+          "direction": "SELL",
+          "entry": 684.51,
+          "exit": 688.35,
+          "sl": 690.33,
+          "target": 674.94,
+          "pnl": -249.87,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-20T12:56:05.885275+05:30",
+          "time_closed": "2026-03-20T15:15:00.256214+05:30"
+        },
+        {
+          "symbol": "ICICIPRULI",
+          "direction": "SELL",
+          "entry": 556.64,
+          "exit": 553.7,
+          "sl": 553.82,
+          "target": 549.4,
+          "pnl": 154.09,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-20T12:56:05.886041+05:30",
+          "time_closed": "2026-03-20T15:15:00.268997+05:30"
+        },
+        {
+          "symbol": "SHRIRAMFIN",
+          "direction": "SELL",
+          "entry": 948.95,
+          "exit": 936.7,
+          "sl": 941.62,
+          "target": 922.5,
+          "pnl": 435.19,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-20T13:14:50.302890+05:30",
+          "time_closed": "2026-03-20T15:15:00.278498+05:30"
+        },
+        {
+          "symbol": "FINEORG",
+          "direction": "SELL",
+          "entry": 4251.24,
+          "exit": 4255,
+          "sl": 4285.29,
+          "target": 4230.5,
+          "pnl": -69.19,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-20T13:14:50.327368+05:30",
+          "time_closed": "2026-03-20T15:15:00.286192+05:30"
+        },
+        {
+          "symbol": "GNFC",
+          "direction": "SELL",
+          "entry": 407.34,
+          "exit": 406.85,
+          "sl": 410.6,
+          "target": 402.05,
+          "pnl": 1.96,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-20T13:46:01.318304+05:30",
+          "time_closed": "2026-03-20T15:15:00.292740+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 6,
+          "pnl": 478.66999999999996
+        }
+      },
+      "strategy": "play4_supertrend",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 66.7,
+      "avg_time_minutes": 113.2,
+      "avg_win": 199.43,
+      "avg_loss": -159.53,
+      "expectancy_per_trade": 79.78
+    },
+    "play6_bb_contra|paper": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 1,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": 72.87,
+      "charges": 0,
+      "net_pnl": 72.87,
+      "total_time_seconds": 5440.530198,
+      "trades_detail": [
+        {
+          "symbol": "MAXHEALTH",
+          "direction": "SELL",
+          "entry": 967.13,
+          "exit": 964.1,
+          "sl": 974.88,
+          "target": 964.46,
+          "pnl": 72.87,
+          "exit_reason": "TARGET_HIT",
+          "time_placed": "2026-03-20T13:30:21.026568+05:30",
+          "time_closed": "2026-03-20T15:01:01.556766+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 1,
+          "pnl": 72.87
+        }
+      },
+      "strategy": "play6_bb_contra",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 90.7,
+      "avg_win": 72.87,
+      "avg_loss": 0,
+      "expectancy_per_trade": 72.87
+    },
+    "play4_supertrend|auto": {
+      "trades": 2,
+      "wins": 2,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 1,
+      "target_hits": 1,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": 64.8,
+      "charges": 0,
+      "net_pnl": 64.8,
+      "total_time_seconds": 5716.504159,
+      "trades_detail": [
+        {
+          "symbol": "ICICIPRULI",
+          "direction": "SELL",
+          "entry": 557.57,
+          "exit": 557.3,
+          "sl": 561.1,
+          "target": 549.4,
+          "pnl": 6.15,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-20T12:58:01.592920+05:30",
+          "time_closed": "2026-03-20T13:13:08.072357+05:30"
+        },
+        {
+          "symbol": "IRCTC",
+          "direction": "SELL",
+          "entry": 524.8,
+          "exit": 522.25,
+          "sl": 527.27,
+          "target": 522.25,
+          "pnl": 58.65,
+          "exit_reason": "TARGET_HIT",
+          "time_placed": "2026-03-20T13:13:38.975918+05:30",
+          "time_closed": "2026-03-20T14:33:49.000640+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 2,
+          "pnl": 64.8
+        }
+      },
+      "strategy": "play4_supertrend",
+      "source": "auto",
+      "timeframe": "15m",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 47.6,
+      "avg_win": 32.4,
+      "avg_loss": 0,
+      "expectancy_per_trade": 32.4
+    },
+    "bear_call_spread|options_paper": {
+      "trades": 2,
+      "wins": 2,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": 1485.95,
+      "charges": 0,
+      "net_pnl": 1485.95,
+      "total_time_seconds": 24212.410805,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 1359.7,
+          "exit_reason": "PROFIT_TARGET",
+          "time_placed": "2026-03-20T10:00:10.272964+05:30",
+          "time_closed": "2026-03-20T11:43:51.874510+05:30"
+        },
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 126.25,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-20T10:00:10.270098+05:30",
+          "time_closed": "2026-03-20T15:00:01.079357+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "bear_call_spread",
+      "source": "options_paper",
+      "timeframe": "",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 201.8,
+      "avg_win": 742.98,
+      "avg_loss": 0,
+      "expectancy_per_trade": 742.98
+    },
+    "bull_put_spread|options_paper": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": -346.5,
+      "charges": 0,
+      "net_pnl": -346.5,
+      "total_time_seconds": 17990.93508,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": -346.5,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-20T10:00:10.271504+05:30",
+          "time_closed": "2026-03-20T15:00:01.206584+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "bull_put_spread",
+      "source": "options_paper",
+      "timeframe": "",
+      "win_rate_pct": 0.0,
+      "avg_time_minutes": 299.8,
+      "avg_win": 0,
+      "avg_loss": -346.5,
+      "expectancy_per_trade": -346.5
+    },
+    "futures_volume_breakout|futures_paper": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 1,
+      "target_hits": 0,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": -2095.09,
+      "charges": 0,
+      "net_pnl": -2095.09,
+      "total_time_seconds": 8274.490548,
+      "trades_detail": [
+        {
+          "symbol": "NAUKRI",
+          "direction": "BUY",
+          "entry": 1001.2,
+          "exit": 988,
+          "sl": 988.2,
+          "target": 1024.2,
+          "pnl": -2095.09,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-20T11:45:54.035527+05:30",
+          "time_closed": "2026-03-20T14:03:48.526075+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 1,
+          "pnl": -2095.09
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "futures_volume_breakout",
+      "source": "futures_paper",
+      "timeframe": "15m",
+      "win_rate_pct": 0.0,
+      "avg_time_minutes": 137.9,
+      "avg_win": 0,
+      "avg_loss": -2095.09,
+      "expectancy_per_trade": -2095.09
+    }
+  },
+  "source_pnl_summary": {
+    "paper": 40.999999999999964,
+    "auto": 64.8,
+    "options_paper": 1139.45,
+    "futures_paper": -2095.09
+  },
+  "total_trades": 14,
+  "total_net_pnl": -849.84,
+  "best_trade": {
+    "symbol": "",
+    "strategy": "bear_call_spread",
+    "pnl": 1359.7,
+    "source": "options_paper"
+  },
+  "worst_trade": {
+    "symbol": "NAUKRI",
+    "strategy": "futures_volume_breakout",
+    "pnl": -2095.09,
+    "source": "futures_paper"
+  },
+  "auto_insights": [
+    "\u26a0\ufe0f play8_rsi_divergence (paper): 100% SL hit rate \u2014 SLs likely too tight or signals counter-trend",
+    "\u26a0\ufe0f play8_rsi_divergence (paper): negative expectancy \u20b9-510.54 per trade",
+    "\u26a0\ufe0f play4_supertrend (paper): 83% square-off rate \u2014 trades not reaching target within session",
+    "\u2705 play4_supertrend (paper): 66.7% win rate \u2014 strong performer",
+    "\u2705 play6_bb_contra (paper): 100.0% win rate \u2014 strong performer",
+    "\u2705 play4_supertrend (auto): 100.0% win rate \u2014 strong performer",
+    "\u2705 bear_call_spread (options_paper): 100.0% win rate \u2014 strong performer",
+    "\u26a0\ufe0f bull_put_spread (options_paper): 100% square-off rate \u2014 trades not reaching target within session",
+    "\u26a0\ufe0f bull_put_spread (options_paper): negative expectancy \u20b9-346.5 per trade",
+    "\u26a0\ufe0f futures_volume_breakout (futures_paper): 100% SL hit rate \u2014 SLs likely too tight or signals counter-trend",
+    "\u26a0\ufe0f futures_volume_breakout (futures_paper): negative expectancy \u20b9-2095.09 per trade"
+  ],
+  "parameter_changes_today": [],
+  "recommendations": [
+    {
+      "type": "positive",
+      "title": "P&L improved significantly",
+      "detail": "Today: \u20b9-850 vs avg \u20b9-1,594 (prev 2 days). Current parameters working well.",
+      "action": "hold \u2014 don't change what's working"
+    },
+    {
+      "type": "negative",
+      "title": "play4_supertrend (paper) degraded",
+      "detail": "Expectancy: \u20b980/trade vs prev avg \u20b9317/trade. Win rate: 66.7% vs 75%.",
+      "action": "investigate \u2014 check if regime mismatch or SL issues"
+    },
+    {
+      "type": "positive",
+      "title": "bear_call_spread (options_paper) improved",
+      "detail": "Expectancy: \u20b9743/trade vs prev avg \u20b9498/trade. Win rate: 100.0% vs 67%.",
+      "action": "hold \u2014 strategy performing well with current parameters"
+    },
+    {
+      "type": "info",
+      "title": "SELL signals outperformed BUY",
+      "detail": "SELL: \u20b9616 | BUY: \u20b9-2,606. Regime detection should be filtering direction.",
+      "action": "verify regime detection is correctly blocking counter-trend signals"
+    }
+  ]
+}

@@ -135,8 +135,8 @@ VWAP_MARKET_CLOSE_OFFSET_MIN = 60  # stop 1 hour before close
 OPTIONS_UNDERLYINGS = ["NIFTY", "BANKNIFTY"]
 
 OPTIONS_LOT_SIZES = {
-    "NIFTY": 25,       # Updated Nov 2024 (was 75)
-    "BANKNIFTY": 15,    # Updated Nov 2024 (was 30)
+    "NIFTY": 65,       # Updated Mar 2026 (was 25, Fyers min lot = 65)
+    "BANKNIFTY": 30,    # Updated Mar 2026 (was 15, Fyers min lot = 30)
 }
 
 # Fyers symbol prefixes for options
@@ -171,7 +171,7 @@ OPTIONS_SQUAREOFF_HOUR, OPTIONS_SQUAREOFF_MIN = 15, 0  # 3:00 PM (before 3:15 in
 OPTIONS_POSITION_CHECK_INTERVAL = 15  # seconds
 OPTIONS_DAILY_LOSS_LIMIT_PCT = 5.0  # Stop opening new positions if daily realized loss exceeds this % of capital
 OPTIONS_MAX_BID_ASK_SPREAD_PCT = 5.0  # Skip options with bid-ask spread wider than this %
-OPTIONS_SKIP_EXPIRY_DAY = True  # Skip intraday scans on weekly expiry day (gamma risk)
+OPTIONS_SKIP_EXPIRY_DAY = False  # Disabled — trade every day including expiry. Use wider SL on expiry days instead.
 
 # Swing options
 OPTIONS_SWING_MAX_POSITIONS = 2

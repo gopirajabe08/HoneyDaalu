@@ -4,18 +4,25 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { getDailyPnl, getPositions, getOrderbook, getFyersFunds, getCapitalInfo, setInitialCapital, addCapitalTransaction, deleteCapitalTransaction } from '../services/api'
 
 const STRATEGY_NAMES = {
-  play1: 'EMA Crossover',
-  play2: 'Triple MA',
-  play3: 'VWAP Pullback',
-  play4: 'Supertrend',
-  play5: 'BB Squeeze',
-  play6: 'BB Contra',
+  play1: 'EMA Crossover', play1_ema_crossover: 'EMA Crossover',
+  play2: 'Triple MA', play2_triple_ma: 'Triple MA',
+  play3: 'VWAP Pullback', play3_vwap_pullback: 'VWAP Pullback',
+  play4: 'Supertrend', play4_supertrend: 'Supertrend',
+  play5: 'BB Squeeze', play5_bb_squeeze: 'BB Squeeze',
+  play6: 'BB Contra', play6_bb_contra: 'BB Contra',
+  play7_orb: 'ORB Breakout',
+  play8_rsi_divergence: 'RSI Divergence',
+  play9_gap_analysis: 'Gap Analysis',
   bull_call_spread: 'Bull Call Spread',
   bull_put_spread: 'Bull Put Spread',
   bear_call_spread: 'Bear Call Spread',
   bear_put_spread: 'Bear Put Spread',
   iron_condor: 'Iron Condor',
   long_straddle: 'Long Straddle',
+  futures_volume_breakout: 'Fut Vol Breakout',
+  futures_candlestick_reversal: 'Fut Reversal',
+  futures_mean_reversion: 'Fut Mean Rev',
+  futures_ema_rsi_pullback: 'Fut EMA Pullback',
 }
 
 // Calculate brokerage from actual Fyers turnover + filled order count
@@ -84,7 +91,8 @@ export default function DailyPnL() {
   async function refresh() {
     setLoading(true)
     try {
-      const promises = [getDailyPnl(days, sourceMode)]
+      const apiSource = sourceMode === 'paper' ? 'all_paper' : sourceMode
+      const promises = [getDailyPnl(days, apiSource)]
       if (sourceMode === 'live') {
         promises.push(getPositions().catch(() => null))
         promises.push(getOrderbook().catch(() => null))

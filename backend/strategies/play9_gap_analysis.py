@@ -231,7 +231,7 @@ class GapAnalysis(BaseStrategy):
             if vol_sma is not None and len(vol_sma) >= 20:
                 candle_global_idx = today_df.index[actual_idx]
                 sma_val = vol_sma.loc[candle_global_idx]
-                if pd.notna(sma_val) and candle["Volume"] < sma_val * 1.3:
+                if pd.notna(sma_val) and candle["Volume"] < sma_val * (0.8 if len(df) < 60 else 1.1):
                     continue
 
             # ── Entry & Risk Management ──
@@ -311,7 +311,7 @@ class GapAnalysis(BaseStrategy):
             if vol_sma is not None and len(vol_sma) >= 20:
                 candle_global_idx = today_df.index[actual_idx]
                 sma_val = vol_sma.loc[candle_global_idx]
-                if pd.notna(sma_val) and candle["Volume"] < sma_val * 1.3:
+                if pd.notna(sma_val) and candle["Volume"] < sma_val * (0.8 if len(df) < 60 else 1.1):
                     continue
 
             # ── Entry & Risk Management ──
@@ -408,7 +408,7 @@ class GapAnalysis(BaseStrategy):
             if vol_sma is not None and len(vol_sma) >= 20:
                 candle_global_idx = today_df.index[actual_idx]
                 sma_val = vol_sma.loc[candle_global_idx]
-                if pd.notna(sma_val) and candle["Volume"] < sma_val * 1.3:
+                if pd.notna(sma_val) and candle["Volume"] < sma_val * (0.8 if len(df) < 60 else 1.1):
                     continue
 
             # ── Entry & Risk Management ──
@@ -489,7 +489,7 @@ class GapAnalysis(BaseStrategy):
             if vol_sma is not None and len(vol_sma) >= 20:
                 candle_global_idx = today_df.index[actual_idx]
                 sma_val = vol_sma.loc[candle_global_idx]
-                if pd.notna(sma_val) and candle["Volume"] < sma_val * 1.3:
+                if pd.notna(sma_val) and candle["Volume"] < sma_val * (0.8 if len(df) < 60 else 1.1):
                     continue
 
             # ── Entry & Risk Management ──

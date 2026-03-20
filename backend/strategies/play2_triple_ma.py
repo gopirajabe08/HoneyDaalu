@@ -83,15 +83,19 @@ class TripleMA(BaseStrategy):
         if not (near_ema20 or near_sma50):
             return None
 
-        # ── Confirm with bullish candlestick pattern ──
-        if not has_bullish_reversal(last, prev):
+        # ── Confirm with bullish candlestick pattern (relaxed: green candle also qualifies) ──
+        is_green = last["Close"] > last["Open"]
+        if not is_green and not has_bullish_reversal(last, prev):
             return None
 
-        # Volume confirmation — reject low-conviction signals
+        # Volume confirmation — relaxed for low-volume sessions
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None  # Low volume — skip
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         entry = last["Close"]
         swing_sl = find_recent_swing_low(df, lookback=8)
@@ -133,15 +137,19 @@ class TripleMA(BaseStrategy):
         if not (near_ema20 or near_sma50):
             return None
 
-        # ── Confirm with bearish candlestick pattern ──
-        if not has_bearish_reversal(last, prev):
+        # ── Confirm with bearish candlestick pattern (relaxed: red candle also qualifies) ──
+        is_red = last["Close"] < last["Open"]
+        if not is_red and not has_bearish_reversal(last, prev):
             return None
 
-        # Volume confirmation — reject low-conviction signals
+        # Volume confirmation — relaxed for low-volume sessions
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None  # Low volume — skip
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         entry = last["Close"]
         swing_sl = find_recent_swing_high(df, lookback=8)

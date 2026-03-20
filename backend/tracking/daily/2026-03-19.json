@@ -1,0 +1,226 @@
+{
+  "date": "2026-03-19",
+  "generated_at": "2026-03-19T15:15:00.624145+05:30",
+  "market_snapshot": {},
+  "engines_active": {},
+  "strategy_performance": {
+    "play4_supertrend|paper": {
+      "trades": 2,
+      "wins": 2,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 1,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": 328.3,
+      "charges": 0,
+      "net_pnl": 328.3,
+      "total_time_seconds": 16632.063125,
+      "trades_detail": [
+        {
+          "symbol": "UNITDSPR",
+          "direction": "SELL",
+          "entry": 1291.41,
+          "exit": 1286.3,
+          "sl": 1302.53,
+          "target": 1286.8,
+          "pnl": 105.12,
+          "exit_reason": "TARGET_HIT",
+          "time_placed": "2026-03-19T12:43:08.989465+05:30",
+          "time_closed": "2026-03-19T14:48:29.436502+05:30"
+        },
+        {
+          "symbol": "UBL",
+          "direction": "SELL",
+          "entry": 1579.52,
+          "exit": 1568,
+          "sl": 1571.31,
+          "target": 1558.96,
+          "pnl": 223.18,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-19T12:43:08.987493+05:30",
+          "time_closed": "2026-03-19T15:15:00.603581+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 2,
+          "pnl": 328.3
+        }
+      },
+      "strategy": "play4_supertrend",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 138.6,
+      "avg_win": 164.15,
+      "avg_loss": 0,
+      "expectancy_per_trade": 164.15
+    },
+    "bear_call_spread|options_paper": {
+      "trades": 2,
+      "wins": 2,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": 1743.5,
+      "charges": 0,
+      "net_pnl": 1743.5,
+      "total_time_seconds": 16290.287318,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 1370.5,
+          "exit_reason": "PROFIT_TARGET",
+          "time_placed": "2026-03-19T12:30:14.800655+05:30",
+          "time_closed": "2026-03-19T14:31:59.636550+05:30"
+        },
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 373.0,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-19T12:30:14.801756+05:30",
+          "time_closed": "2026-03-19T15:00:00.253179+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "bear_call_spread",
+      "source": "options_paper",
+      "timeframe": "",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 135.8,
+      "avg_win": 871.75,
+      "avg_loss": 0,
+      "expectancy_per_trade": 871.75
+    },
+    "bull_put_spread|options_paper": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": 1994.25,
+      "charges": 0,
+      "net_pnl": 1994.25,
+      "total_time_seconds": 7304.84796,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 1994.25,
+          "exit_reason": "PROFIT_TARGET",
+          "time_placed": "2026-03-19T12:30:14.801214+05:30",
+          "time_closed": "2026-03-19T14:31:59.649174+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "bull_put_spread",
+      "source": "options_paper",
+      "timeframe": "",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 121.7,
+      "avg_win": 1994.25,
+      "avg_loss": 0,
+      "expectancy_per_trade": 1994.25
+    }
+  },
+  "source_pnl_summary": {
+    "paper": 328.3,
+    "options_paper": 3737.75
+  },
+  "total_trades": 5,
+  "total_net_pnl": 4066.05,
+  "best_trade": {
+    "symbol": "",
+    "strategy": "bull_put_spread",
+    "pnl": 1994.25,
+    "source": "options_paper"
+  },
+  "worst_trade": {
+    "symbol": "UNITDSPR",
+    "strategy": "play4_supertrend",
+    "pnl": 105.12,
+    "source": "paper"
+  },
+  "auto_insights": [
+    "\u2705 play4_supertrend (paper): 100.0% win rate \u2014 strong performer",
+    "\u2705 bear_call_spread (options_paper): 100.0% win rate \u2014 strong performer",
+    "\u2705 bull_put_spread (options_paper): 100.0% win rate \u2014 strong performer"
+  ],
+  "parameter_changes_today": [],
+  "recommendations": [
+    {
+      "type": "positive",
+      "title": "P&L improved significantly",
+      "detail": "Today: \u20b94,066 vs avg \u20b9-7,254 (prev 1 days). Current parameters working well.",
+      "action": "hold \u2014 don't change what's working"
+    },
+    {
+      "type": "negative",
+      "title": "play4_supertrend (paper) degraded",
+      "detail": "Expectancy: \u20b9164/trade vs prev avg \u20b9470/trade. Win rate: 100.0% vs 50%.",
+      "action": "investigate \u2014 check if regime mismatch or SL issues"
+    },
+    {
+      "type": "positive",
+      "title": "bear_call_spread (options_paper) improved",
+      "detail": "Expectancy: \u20b9872/trade vs prev avg \u20b9-250/trade. Win rate: 100.0% vs 0%.",
+      "action": "hold \u2014 strategy performing well with current parameters"
+    },
+    {
+      "type": "positive",
+      "title": "bull_put_spread (options_paper) improved",
+      "detail": "Expectancy: \u20b91,994/trade vs prev avg \u20b9273/trade. Win rate: 100.0% vs 75%.",
+      "action": "hold \u2014 strategy performing well with current parameters"
+    },
+    {
+      "type": "positive",
+      "title": "SL hit rate healthy: 0%",
+      "detail": "Only 0 of 5 trades hit SL. Current SL width is working.",
+      "action": "hold \u2014 SL levels appropriate"
+    }
+  ]
+}

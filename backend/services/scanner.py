@@ -142,15 +142,16 @@ def _calc_conviction(signal: dict) -> float:
     # Strategy preference (based on 30-day performance data)
     strategy = signal.get("_strategy", "")
     strategy_boost = {
-        "play4_supertrend": 1.3,     # Best performer: +₹4,133 over 30 days
-        "play7_orb": 1.25,           # ORB: high probability morning breakout (new — start high)
-        "play9_gap_analysis": 1.2,   # Gap Analysis: morning gap exploitation (new — start high)
-        "play3_vwap_pullback": 1.2,  # 75% win rate, fewer signals
-        "play8_rsi_divergence": 1.15, # RSI Divergence: proven reversal signal (new — start moderate)
-        "play6_bb_contra": 1.1,      # 100% win rate (small sample)
-        "play5_bb_squeeze": 1.0,     # Neutral
-        "play1_ema_crossover": 0.9,  # Mediocre
-        "play2_triple_ma": 0.7,      # Worst performer: -₹5,531
+        "play4_supertrend": 1.4,
+        "play7_orb": 1.0,
+        "play9_gap_analysis": 1.0,
+        "play3_vwap_pullback": 1.0,
+        "play8_rsi_divergence": 1.0,
+        "play6_bb_contra": 1.0,
+        "play5_bb_squeeze": 1.0,
+        "play1_ema_crossover": 0.5,
+        "play2_triple_ma": 1.0,
+    
     }
     score *= strategy_boost.get(strategy, 1.0)
 

@@ -13,6 +13,7 @@ import {
 import { formatINRCompact } from '../utils/formatters'
 import DailyStrategyStats from './DailyStrategyStats'
 import TodayImprovements from './TodayImprovements'
+import SystemBrain from './SystemBrain'
 
 const inr2 = (v) => `${Math.abs(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -204,6 +205,9 @@ export default function Dashboard({ fyersStatus }) {
     <div className="space-y-5">
       {/* Today's Improvements Banner */}
       <TodayImprovements />
+
+      {/* System Brain — real-time decision-making */}
+      <SystemBrain />
 
       {/* Refresh bar */}
       <div className="flex items-center justify-between">

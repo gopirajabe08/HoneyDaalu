@@ -72,15 +72,27 @@ class BBContra(BaseStrategy):
         return self._scan_short(df, last, prev, symbol)
 
     def _scan_long(self, df, last, prev, symbol) -> Optional[dict]:
-        """Long: mean reversion buy at lower BB in macro uptrend."""
-        # ── Trend Filter: Price > 200 SMA, sloping up ──
-        if last["Close"] <= last["sma200"]:
-            return None
+        """Long: mean reversion buy at lower BB. Relaxed in oversold markets."""
+        # ── Trend Filter: Price > 200 SMA in normal conditions ──
+        # BUT: skip trend filter if RSI is extremely oversold (< 30)
+        # Rationale: in crash markets, oversold bounces work even without uptrend
+        rsi_val = 50
+        try:
+            from .base import calc_rsi
+            rsi = calc_rsi(df, 14)
+            rsi_val = float(rsi.iloc[-1]) if len(rsi) > 0 and not pd.isna(rsi.iloc[-1]) else 50
+        except Exception:
+            pass
 
-        sma200_now = last["sma200"]
-        sma200_prev = df["sma200"].iloc[-10]
-        if pd.isna(sma200_prev) or sma200_now <= sma200_prev:
-            return None
+        extremely_oversold = rsi_val < 30
+
+        if not extremely_oversold:
+            if last["Close"] <= last["sma200"]:
+                return None
+            sma200_now = last["sma200"]
+            sma200_prev = df["sma200"].iloc[-10]
+            if pd.isna(sma200_prev) or sma200_now <= sma200_prev:
+                return None
 
         # ── Price touches/pierces Lower Band ──
         if pd.isna(last["bb_lower"]):
@@ -93,9 +105,11 @@ class BBContra(BaseStrategy):
         if not touched_lower:
             return None
 
-        # ── Reversal candle at the lower band ──
+        # ── Reversal candle at the lower band (relaxed: green candle also qualifies) ──
+        is_green = last["Close"] > last["Open"]
         has_reversal = (
-            is_hammer(last)
+            is_green
+            or is_hammer(last)
             or is_doji(last)
             or is_bullish_engulfing(last, prev)
             or (is_hammer(prev) and is_bullish_candle(last))
@@ -104,11 +118,14 @@ class BBContra(BaseStrategy):
         if not has_reversal:
             return None
 
-        # Volume confirmation — reject low-conviction signals
+        # Volume confirmation — relaxed for low-volume sessions
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None  # Low volume — skip
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         if is_hammer(last) or is_doji(last) or is_bullish_engulfing(last, prev):
             reversal = last
@@ -168,9 +185,11 @@ class BBContra(BaseStrategy):
         if not touched_upper:
             return None
 
-        # ── Bearish reversal candle at the upper band ──
+        # ── Bearish reversal candle at the upper band (relaxed: red candle also qualifies) ──
+        is_red = last["Close"] < last["Open"]
         has_reversal = (
-            is_shooting_star(last)
+            is_red
+            or is_shooting_star(last)
             or is_doji(last)
             or is_bearish_engulfing(last, prev)
             or (is_shooting_star(prev) and is_bearish_candle(last))
@@ -179,11 +198,14 @@ class BBContra(BaseStrategy):
         if not has_reversal:
             return None
 
-        # Volume confirmation — reject low-conviction signals
+        # Volume confirmation — relaxed for low-volume sessions
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None  # Low volume — skip
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         if is_shooting_star(last) or is_doji(last) or is_bearish_engulfing(last, prev):
             reversal = last

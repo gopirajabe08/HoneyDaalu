@@ -124,7 +124,7 @@ class ORBBreakout(BaseStrategy):
         # ── Volume confirmation: vol > 1.3x SMA20 ──
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if candle["Volume"] < vol_sma * 1.3:
+            if candle["Volume"] < vol_sma * (0.8 if len(df) < 60 else 1.1):
                 return None
 
         # ── Entry & Risk Management ──
@@ -179,7 +179,7 @@ class ORBBreakout(BaseStrategy):
         # ── Volume confirmation: vol > 1.3x SMA20 ──
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if candle["Volume"] < vol_sma * 1.3:
+            if candle["Volume"] < vol_sma * (0.8 if len(df) < 60 else 1.1):
                 return None
 
         # ── Entry & Risk Management ──

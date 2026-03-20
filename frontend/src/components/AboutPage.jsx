@@ -32,6 +32,7 @@ const tabs = [
   { id: 'options', label: 'Options', icon: BarChart3 },
   { id: 'futures', label: 'Futures', icon: TrendingUp },
   { id: 'pages', label: 'App Pages', icon: BookOpen },
+  { id: 'shortcuts', label: 'Shortcuts', icon: Zap },
   { id: 'e2e-flow', label: 'E2E Flow', icon: Layers },
 ]
 
@@ -1058,6 +1059,119 @@ function AutoSystemTab() {
 
 
 /* ─── Tab: E2E Flow & Architecture ─── */
+/* ─── Tab: Shortcuts ─── */
+function ShortcutsTab() {
+  const paperShortcuts = [
+    { key: 'status', desc: 'All 6 paper engines + regime + P&L' },
+    { key: 'trades', desc: 'Open paper positions across all engines' },
+    { key: 'pnl', desc: "Today's paper P&L breakdown by engine" },
+    { key: 'regime', desc: 'Market regime + VIX + ADX + strategies' },
+    { key: 'monitor', desc: 'Daemon health check log (last 15 entries)' },
+    { key: 'review', desc: 'Full day review + what worked + recommendations' },
+    { key: 'history', desc: 'Last 7 days paper trade history' },
+    { key: 'changelog', desc: 'Recent parameter changes by auto-tuner' },
+    { key: 'start', desc: 'Start servers + all paper engines' },
+    { key: 'stop', desc: 'Stop servers for the day' },
+    { key: 'push', desc: 'Commit + push code to GitHub' },
+  ]
+
+  const liveShortcuts = [
+    { key: 'live status', desc: 'All live engines + capital + positions' },
+    { key: 'live trades', desc: 'Open REAL positions from Fyers' },
+    { key: 'live pnl', desc: "Today's real P&L (Fyers source of truth)" },
+    { key: 'live funds', desc: 'Fyers available balance + margin used' },
+    { key: 'live orders', desc: 'Fyers order book (filled/pending/rejected)' },
+    { key: 'live positions', desc: 'Fyers net positions with real P&L' },
+    { key: 'capital', desc: 'Current capital + allocation across engines' },
+    { key: 'scale', desc: 'Which engines are active based on capital' },
+  ]
+
+  const bothShortcuts = [
+    { key: 'regime', desc: 'Current market regime (same for both modes)' },
+    { key: 'monitor', desc: 'System health daemon (runs every 5 min)' },
+    { key: 'review', desc: 'Combined paper + live day review' },
+    { key: 'tracker', desc: 'Improvement tracker sidebar data' },
+  ]
+
+  return (
+    <>
+      <div className="bg-gradient-to-br from-blue-500/10 via-dark-700 to-purple-500/10 rounded-2xl border border-dark-500 p-6 mb-6">
+        <h2 className="text-xl font-bold text-white mb-2">Claude CLI Shortcuts</h2>
+        <p className="text-sm text-gray-400">Type these keywords in the Claude conversation to get instant system info.</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        {/* Paper Shortcuts */}
+        <div className="bg-dark-700 rounded-2xl border border-blue-500/20 p-5">
+          <h3 className="text-sm font-bold text-blue-400 mb-3 flex items-center gap-2">
+            <Monitor size={14} /> Paper Mode (Testing)
+          </h3>
+          <div className="space-y-2">
+            {paperShortcuts.map((s, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <code className="text-xs bg-dark-600 text-blue-300 px-2 py-1 rounded font-mono whitespace-nowrap">{s.key}</code>
+                <span className="text-xs text-gray-400 pt-0.5">{s.desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Live Shortcuts */}
+        <div className="bg-dark-700 rounded-2xl border border-orange-500/20 p-5">
+          <h3 className="text-sm font-bold text-orange-400 mb-3 flex items-center gap-2">
+            <Zap size={14} /> Live Mode (From Mar 25)
+          </h3>
+          <div className="space-y-2">
+            {liveShortcuts.map((s, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <code className="text-xs bg-dark-600 text-orange-300 px-2 py-1 rounded font-mono whitespace-nowrap">{s.key}</code>
+                <span className="text-xs text-gray-400 pt-0.5">{s.desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Both Modes */}
+      <div className="bg-dark-700 rounded-2xl border border-purple-500/20 p-5 mt-6">
+        <h3 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
+          <Settings size={14} /> Both Modes
+        </h3>
+        <div className="grid grid-cols-2 gap-2">
+          {bothShortcuts.map((s, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <code className="text-xs bg-dark-600 text-purple-300 px-2 py-1 rounded font-mono whitespace-nowrap">{s.key}</code>
+              <span className="text-xs text-gray-400 pt-0.5">{s.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Capital Allocation */}
+      <div className="bg-dark-700 rounded-2xl border border-emerald-500/20 p-5 mt-6">
+        <h3 className="text-sm font-bold text-emerald-400 mb-3">Live Capital Auto-Allocation</h3>
+        <p className="text-xs text-gray-400 mb-3">System auto-detects available capital from Fyers and allocates engines accordingly:</p>
+        <div className="space-y-1.5">
+          {[
+            { cap: '< ₹1L', engines: 'Options Intraday only', alloc: '100% options' },
+            { cap: '₹1L – ₹2.5L', engines: 'Options + Equity Intraday', alloc: '50/50 split' },
+            { cap: '₹2.5L – ₹5L', engines: '+ Equity Swing + Options Swing', alloc: '4 engines' },
+            { cap: '₹5L – ₹10L', engines: '+ Futures Intraday', alloc: '5 engines' },
+            { cap: '₹10L+', engines: 'All 6 engines', alloc: 'Full deployment' },
+          ].map((r, i) => (
+            <div key={i} className="flex items-center justify-between bg-dark-600/50 rounded-lg px-3 py-2 border border-dark-500/30 text-xs">
+              <span className="text-emerald-400 font-medium w-28">{r.cap}</span>
+              <span className="text-white flex-1">{r.engines}</span>
+              <span className="text-gray-500">{r.alloc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+
 function E2EFlowTab() {
   const [registry, setRegistry] = useState(null)
   const [changelog, setChangelog] = useState([])
@@ -1352,6 +1466,7 @@ export default function AboutPage() {
       case 'options': return <OptionsTab />
       case 'futures': return <FuturesTab />
       case 'pages': return <AppPagesTab />
+      case 'shortcuts': return <ShortcutsTab />
       case 'auto-system': return <AutoSystemTab />
       case 'e2e-flow': return <E2EFlowTab />
       default: return <OverviewTab />

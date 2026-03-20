@@ -63,7 +63,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
         try {
           const posRes = await getPositions()
           const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
-          const intraday = posArr.filter(p => p.productType === 'INTRADAY' && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
+          const intraday = posArr.filter(p => (p.productType === 'INTRADAY' || p.productType === 'BO') && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
           setFyersPositions(intraday)
         } catch {}
       }

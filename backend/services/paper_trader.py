@@ -26,6 +26,20 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
+# Basic sector mapping for concentration limit
+SECTOR_MAP = {
+    'HDFCBANK': 'banking', 'ICICIBANK': 'banking', 'SBIN': 'banking', 'AXISBANK': 'banking',
+    'KOTAKBANK': 'banking', 'BANKBARODA': 'banking', 'PNB': 'banking', 'INDUSINDBK': 'banking',
+    'FEDERALBNK': 'banking', 'IDFCFIRSTB': 'banking', 'BANDHANBNK': 'banking', 'CANBK': 'banking',
+    'TCS': 'it', 'INFY': 'it', 'WIPRO': 'it', 'HCLTECH': 'it', 'TECHM': 'it', 'LTIM': 'it',
+    'RELIANCE': 'energy', 'ONGC': 'energy', 'IOC': 'energy', 'BPCL': 'energy', 'NTPC': 'energy',
+    'POWERGRID': 'energy', 'ADANIGREEN': 'energy', 'ADANIPORTS': 'infra',
+    'TATAMOTORS': 'auto', 'MARUTI': 'auto', 'BAJAJ-AUTO': 'auto', 'HEROMOTOCO': 'auto', 'M&M': 'auto',
+    'HDFCLIFE': 'insurance', 'SBILIFE': 'insurance', 'ICICIPRULI': 'insurance',
+    'BAJFINANCE': 'nbfc', 'BAJAJFINSV': 'nbfc', 'CHOLAFIN': 'nbfc', 'SHRIRAMFIN': 'nbfc',
+}
+MAX_PER_SECTOR = 2
+
 STATE_FILE = get_state_path(".paper_trader_state.json")
 
 
@@ -331,6 +345,14 @@ class PaperTrader:
                 elif _is_past_order_cutoff():
                     self._log("INFO", "Past 2:00 PM — no new virtual orders. Monitoring until square-off.")
 
+            # Periodic re-scan: if slots available, re-scan every 15 min to fill them
+            elif current_open_count < INTRADAY_PAPER_MAX_POSITIONS and not _is_past_order_cutoff() and is_market_open():
+                if _monitor_tick > 0 and _monitor_tick % 45 == 0:  # ~15 min at 20s intervals
+                    slots = INTRADAY_PAPER_MAX_POSITIONS - current_open_count
+                    self._log("SCAN", f"{slots} slots open — periodic re-scan")
+                    self._execute_scan_cycle()
+                    current_open_count = len(self._active_trades)
+
             prev_open_count = current_open_count
 
         self._log("INFO", "Background thread exited")
@@ -434,7 +456,9 @@ class PaperTrader:
                     self._log("FILTER", f"  {strategy_key}: skipped (5m only, no 15m)")
                     continue
 
-            scan_result = run_scan(strategy_key, timeframe, self._capital)
+            # High VIX → half position size (trade with less capital, reduce risk)
+            scan_capital = self._capital * 0.5 if vix > 20 else self._capital
+            scan_result = run_scan(strategy_key, timeframe, scan_capital)
 
             if "error" in scan_result:
                 self._log("WARN", f"Scan error for {strategy_key}: {scan_result['error']}")
@@ -480,8 +504,11 @@ class PaperTrader:
         if not unique_signals:
             return
 
-        # Stagger: max 2 orders per scan to avoid correlated losses
-        max_orders_per_scan = 1 if self._check_drawdown_breaker() else min(2, slots_available)
+        # First scan of day: allow 3 orders (morning has best signals)
+        if self._scan_count <= 1:
+            max_orders_per_scan = min(3, slots_available) if not self._check_drawdown_breaker() else 1
+        else:
+            max_orders_per_scan = 1 if self._check_drawdown_breaker() else min(2, slots_available)
         orders_placed = 0
 
         for signal in unique_signals:
@@ -499,6 +526,24 @@ class PaperTrader:
             if symbol in active_symbols:
                 self._log("SKIP", f"{symbol} — already in virtual position")
                 continue
+
+            # Sector concentration check
+            sym_sector = SECTOR_MAP.get(signal.get("symbol", ""), "other")
+            sector_count = sum(1 for t in self._active_trades if SECTOR_MAP.get(t.get("symbol", ""), "other") == sym_sector)
+            if sector_count >= MAX_PER_SECTOR and sym_sector != "other":
+                self._log("FILTER", f"Sector limit: {signal['symbol']} ({sym_sector}) — already {sector_count} trades in sector")
+                continue
+
+            # Loss streak protection: track consecutive losses
+            recent_trades = self._trade_history[-3:] if len(self._trade_history) >= 2 else []
+            consecutive_losses = 0
+            for t in reversed(recent_trades):
+                if t.get("pnl", 0) < 0:
+                    consecutive_losses += 1
+                else:
+                    break
+            if consecutive_losses >= 2:
+                self._log("FILTER", f"Loss streak: {consecutive_losses} consecutive losses — caution (VIX half-sizing active if applicable)")
 
             success = self._place_virtual_order(signal)
             if success:

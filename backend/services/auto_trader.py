@@ -514,6 +514,14 @@ class AutoTrader:
                 elif _is_past_order_cutoff():
                     self._log("INFO", "Past 2:00 PM — no new orders. Monitoring until square-off.")
 
+            # Periodic re-scan: if slots available, re-scan every ~15 min to fill them
+            elif current_open_count < self.max_open_positions and not _is_past_order_cutoff() and is_market_open():
+                if self._monitor_tick > 0 and self._monitor_tick % 45 == 0:
+                    slots = self.max_open_positions - current_open_count
+                    self._log("SCAN", f"{slots} slots open — periodic re-scan")
+                    self._execute_scan_cycle()
+                    current_open_count = len([t for t in self._active_trades if t["status"] == "OPEN"])
+
             prev_open_count = current_open_count
 
         self._log("INFO", "Background thread exited")
@@ -621,7 +629,9 @@ class AutoTrader:
                     self._log("FILTER", f"  {strategy_key}: skipped (5m only, no 15m available)")
                     continue
 
-            scan_result = run_scan(strategy_key, timeframe, self._capital)
+            # High VIX → half position size (reduce risk in volatile markets)
+            scan_capital = self._capital * 0.5 if vix > 20 else self._capital
+            scan_result = run_scan(strategy_key, timeframe, scan_capital)
 
             if "error" in scan_result:
                 self._log("WARN", f"Scan error for {strategy_key}: {scan_result['error']}")
@@ -688,8 +698,11 @@ class AutoTrader:
             self._log("FILTER", "No signals remaining after Nifty trend filter")
             return
 
-        # Stagger entries: max 2 orders per scan cycle to avoid correlated losses
-        max_orders_per_scan = min(2, slots_available)
+        # First scan of day: allow 3 orders (morning has best signals)
+        if self._scan_count <= 1:
+            max_orders_per_scan = min(3, slots_available) if not self._check_drawdown_breaker() else 1
+        else:
+            max_orders_per_scan = 1 if self._check_drawdown_breaker() else min(2, slots_available)
         orders_placed = 0
 
         for signal in unique_signals:

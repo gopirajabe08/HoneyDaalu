@@ -126,15 +126,19 @@ class RSIDivergence(BaseStrategy):
         last = df.iloc[-1]
         prev = df.iloc[-2]
 
-        # ── Bullish reversal candle confirmation ──
-        if not has_bullish_reversal(last, prev):
+        # ── Bullish reversal candle confirmation (relaxed: green candle also qualifies) ──
+        is_green = last["Close"] > last["Open"]
+        if not is_green and not has_bullish_reversal(last, prev):
             return None
 
-        # ── Volume confirmation: vol > 1.3x SMA20 ──
+        # ── Volume confirmation — relaxed for low-volume sessions ──
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if pd.isna(vol_sma) or df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if not pd.isna(vol_sma) and vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         # ── Find at least 2 swing lows to compare ──
         swing_lows = _find_swing_lows(df, lookback=20, order=2)
@@ -187,15 +191,19 @@ class RSIDivergence(BaseStrategy):
         last = df.iloc[-1]
         prev = df.iloc[-2]
 
-        # ── Bearish reversal candle confirmation ──
-        if not has_bearish_reversal(last, prev):
+        # ── Bearish reversal candle confirmation (relaxed: red candle also qualifies) ──
+        is_red = last["Close"] < last["Open"]
+        if not is_red and not has_bearish_reversal(last, prev):
             return None
 
-        # ── Volume confirmation: vol > 1.3x SMA20 ──
+        # ── Volume confirmation — relaxed for low-volume sessions ──
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            if pd.isna(vol_sma) or df["Volume"].iloc[-1] < vol_sma * 1.3:
-                return None
+            threshold = 0.8 if len(df) < 60 else 1.1
+            # If market-wide volume is extremely low (<50% avg), don't filter
+            if not pd.isna(vol_sma) and vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
+                if df["Volume"].iloc[-1] < vol_sma * threshold:
+                    return None
 
         # ── Find at least 2 swing highs to compare ──
         swing_highs = _find_swing_highs(df, lookback=20, order=2)
