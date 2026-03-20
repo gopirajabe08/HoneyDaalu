@@ -375,7 +375,8 @@ class PaperTrader:
         try:
             from services.trade_logger import get_all_trades
             recent = get_all_trades(days=5)
-            paper_trades = [t for t in recent if t.get("source") == "paper"]
+            # Portfolio-level: check ALL paper sources combined
+            paper_trades = [t for t in recent if "paper" in t.get("source", "")]
             if len(paper_trades) >= 5:
                 pnl = sum(t.get("pnl", 0) for t in paper_trades)
                 if pnl < -self._capital * 0.15:

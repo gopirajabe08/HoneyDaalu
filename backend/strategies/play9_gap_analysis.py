@@ -94,6 +94,10 @@ class GapAnalysis(BaseStrategy):
     )
 
     def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.debug(f"[GAP] {symbol}: df_len={len(df)}, first_candle_time={df.index[0] if hasattr(df.index, '__getitem__') else 'unknown'}")
+
         # Need at least 5 candles of today's data + previous day data
         if len(df) < 6:
             return None

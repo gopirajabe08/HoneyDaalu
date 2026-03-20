@@ -531,9 +531,10 @@ class AutoTrader:
         try:
             from services.trade_logger import get_all_trades
             recent = get_all_trades(days=5)
-            trades = [t for t in recent if t.get("source") == "auto"]
-            if len(trades) >= 5:
-                pnl = sum(t.get("pnl", 0) for t in trades)
+            # Portfolio-level: check ALL live sources combined
+            live_trades = [t for t in recent if t.get("source") in ("auto", "swing", "options_auto", "futures_auto")]
+            if len(live_trades) >= 5:
+                pnl = sum(t.get("pnl", 0) for t in live_trades)
                 if pnl < -self._capital * 0.15:
                     return True
         except Exception:

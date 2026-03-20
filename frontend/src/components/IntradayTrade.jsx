@@ -488,7 +488,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
 
                   <div className="flex gap-2 mb-3 flex-wrap">
                     <Badge color={isLive ? 'green' : 'blue'} text={isLive ? 'Live Mode' : 'Virtual Mode'} />
-                    {orderCutoff && <Badge color="yellow" text="No new orders (past 2:00 PM)" />}
+                    {orderCutoff && <Badge color="yellow" text="No new orders (past 1:30 PM)" />}
                     {squaredOff && <Badge color="purple" text="Squared off" />}
                   </div>
 
@@ -627,14 +627,14 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                           <>
                             <p className="text-amber-400 font-semibold mb-1">Auto Regime Mode</p>
                             <p>System detects NIFTY trend + VIX + ADX and picks the best strategies automatically.</p>
-                            <p className="mt-1">Orders: 10:30 AM - 2 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2% | Trailing SL (paper) | Daily loss limit 5% | Drawdown breaker 15%/5d</p>
+                            <p className="mt-1">Orders: 10:30 AM - 1:30 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2% | Trailing SL (paper) | Daily loss limit 5% | Drawdown breaker 15%/5d</p>
                             {isLive && <p className="mt-1">VIX {'>'} 18: skips 5m, uses 15m only | Orders verified on Fyers before tracking</p>}
                           </>
                         ) : (
                           <>
                             <p className="text-white font-semibold mb-1">Manual Mode</p>
                             <p>You pick strategies and timeframes. Engine scans at 10:30 AM, re-scans when slot opens.</p>
-                            <p className="mt-1">Orders: 10:30 AM - 2 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2%</p>
+                            <p className="mt-1">Orders: 10:30 AM - 1:30 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2%</p>
                           </>
                         )}
                       </div>
@@ -656,8 +656,8 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                 <AlertTriangle size={10} className="text-gray-600 flex-shrink-0 mt-0.5" />
                 <p className="text-[9px] text-gray-600 leading-relaxed">
                   {isLive
-                    ? 'Max 6 positions \u2022 2% risk \u2022 Orders 10:30 AM-2:00 PM \u2022 Square-off 3:15 PM'
-                    : 'Virtual mode \u2022 Max 10 positions \u2022 2% risk \u2022 Trailing SL \u2022 Orders 10:30 AM-2:00 PM \u2022 No real orders placed'}
+                    ? 'Max 6 positions \u2022 2% risk \u2022 Orders 10:30 AM-1:30 PM \u2022 Square-off 3:15 PM'
+                    : 'Virtual mode \u2022 Max 10 positions \u2022 2% risk \u2022 Trailing SL \u2022 Orders 10:30 AM-1:30 PM \u2022 No real orders placed'}
                 </p>
               </div>
             </div>

@@ -121,7 +121,7 @@ function HowItWorksTab() {
             <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Conviction-based signal ranking. VIX elevated zone (16-20) reduces positions</li>
             <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Places entry + SL orders on Fyers, monitors target every 20s</li>
             <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Max 6 positions (live) / 10 positions (paper)</li>
-            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Orders: 10:30 AM - 2:00 PM. Square-off at 3:15 PM</li>
+            <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Orders: 10:30 AM - 1:30 PM. Square-off at 3:15 PM</li>
             <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>Uses 5m / 15m candle timeframes</li>
             <li className="flex items-start gap-2"><span className="text-orange-400 mt-0.5">&#9679;</span>All 9 strategies available. Price filter: Rs 50 - Rs 5,000</li>
           </ul>
@@ -206,9 +206,9 @@ function TradingDayTab() {
     { time: '9:15 AM', title: 'Market Opens', desc: 'Start intraday engine (Live or Paper). Swing engine scans at 9:20 AM for overnight signals. Intraday waits until 10:30 AM before placing orders.', color: 'bg-green-500', textColor: 'text-green-400', highlight: true },
     { time: '9:20 AM', title: 'Swing Morning Scan', desc: "Swing trader scans all 4 strategies on daily candles. If no signal found and slot open, retries every 2 hours until 2 PM. BUY signals only.", color: 'bg-emerald-500', textColor: 'text-emerald-400' },
     { time: '10:30 AM', title: 'Equity Intraday Orders Begin', desc: 'Initial full scan runs to fill all position slots. Auto regime with dynamic re-detection. Play4 Supertrend prioritized. Volume confirmation + conviction-based ranking.', color: 'bg-orange-500', textColor: 'text-orange-400', highlight: true },
-    { time: '10:30 AM - 2:00 PM', title: 'Active Trading', desc: 'Monitors positions every 20s. When a trade closes (SL/target), scans again to fill the slot. Max 6 live / 10 paper positions. VIX elevated zone (16-20) reduces positions.', color: 'bg-orange-500', textColor: 'text-orange-400' },
-    { time: '2:00 PM', title: 'Order Cutoff', desc: 'No new intraday or swing orders after this time. Existing positions keep running with their SL/target.', color: 'bg-yellow-500', textColor: 'text-yellow-400' },
-    { time: '2:00 - 3:15 PM', title: 'Position Monitoring', desc: 'Intraday engine monitors open positions. Trades can still hit target or SL. No new scans or orders.', color: 'bg-blue-500', textColor: 'text-blue-400' },
+    { time: '10:30 AM - 1:30 PM', title: 'Active Trading', desc: 'Monitors positions every 20s. When a trade closes (SL/target), scans again to fill the slot. Max 6 live / 10 paper positions. VIX elevated zone (16-20) reduces positions.', color: 'bg-orange-500', textColor: 'text-orange-400' },
+    { time: '1:30 PM', title: 'Equity Order Cutoff', desc: 'No new equity intraday or swing orders after this time. Options/futures cutoff at 2:00 PM. Existing positions keep running with their SL/target.', color: 'bg-yellow-500', textColor: 'text-yellow-400' },
+    { time: '1:30 - 3:15 PM', title: 'Position Monitoring', desc: 'Intraday engine monitors open positions. Trades can still hit target or SL. No new scans or orders.', color: 'bg-blue-500', textColor: 'text-blue-400' },
     { time: '3:15 PM', title: 'Intraday Square-Off', desc: 'All remaining intraday positions closed at market price. Swing positions carry overnight (CNC delivery).', color: 'bg-red-500', textColor: 'text-red-400', highlight: true },
     { time: 'After 3:30 PM', title: 'Review & Learn', desc: "Check Trade Log, Daily P&L, and Dashboard for the day's results. Daily Strategy Performance shows per-strategy breakdown on each trading page.", color: 'bg-purple-500', textColor: 'text-purple-400' },
   ]
@@ -847,8 +847,8 @@ function AutoSystemTab() {
     { time: '10:00 AM', title: 'Options Orders Begin', desc: 'Scans for option spread opportunities. Places virtual orders with slippage simulation + brokerage estimation. Max 3 positions per underlying.', role: 'auto', icon: '📈' },
     { time: '10:30 AM', title: 'Equity Intraday Begins', desc: 'Regime detected: NIFTY trend + VIX + ADX + intraday direction → picks from 9 strategies. Play4 Supertrend prioritized (best performer). Play7 ORB for morning breakouts, Play8 RSI Divergence for reversals, Play9 Gap for gap days. Volume confirmation filters noise. Conviction score ranks signals. Max 2 orders per scan.', role: 'auto', icon: '🚀' },
     { time: '11:00 AM', title: 'Futures Intraday Begins', desc: 'Futures regime + OI sentiment analysis. OI hard filter blocks counter-sentiment trades. 2% risk per trade. Margin-based lot sizing.', role: 'auto', icon: '📉' },
-    { time: '10:30–2:00', title: 'Active Trading Loop', desc: 'Every 20 seconds: check LTP for all positions → SL hit? Close. Target hit? Close. Trailing SL activates after 1% profit — locks in 50% of max gain. When slot opens → re-detect regime (may have shifted mid-day) → scan → rank by conviction → place best signal.', role: 'auto', icon: '🔄' },
-    { time: '2:00 PM', title: 'Order Cutoff', desc: 'No new intraday orders. Existing positions monitored every 20s until square-off. Swing positions continue.', role: 'auto', icon: '🚫' },
+    { time: '10:30–1:30', title: 'Equity Active Trading Loop', desc: 'Every 20 seconds: check LTP for all positions → SL hit? Close. Target hit? Close. Trailing SL activates after 1% profit — locks in 50% of max gain. When slot opens → re-detect regime (may have shifted mid-day) → scan → rank by conviction → place best signal.', role: 'auto', icon: '🔄' },
+    { time: '1:30 PM', title: 'Equity Order Cutoff', desc: 'No new equity intraday orders. Options/futures cutoff at 2:00 PM. Existing positions monitored every 20s until square-off. Swing positions continue.', role: 'auto', icon: '🚫' },
     { time: '3:00 PM', title: 'Options Square-off', desc: 'All intraday option spreads closed. Swing option positions carry overnight.', role: 'auto', icon: '⏹️' },
     { time: '3:15 PM', title: 'Equity + Futures Square-off', desc: 'All intraday positions force-closed. Swing positions carry overnight. Trade data logged.', role: 'auto', icon: '⏹️' },
     { time: '3:15 PM', title: 'AUTO — Daily Report Generated', desc: 'Counts all trades by strategy + source. Calculates win rate, expectancy, P&L per strategy. Compares with last 3-5 days. Generates insights + recommendations. Saved to tracking/daily/.', role: 'auto', icon: '📋' },
@@ -1312,7 +1312,7 @@ function E2EFlowTab() {
         <div className="grid grid-cols-2 gap-2 text-xs">
           {[
             { label: 'Market Hours', value: '9:15 AM - 3:30 PM IST (Mon-Fri)' },
-            { label: 'Equity Orders', value: registry?.global_config?.timing?.intraday_order_start ? `${registry.global_config.timing.intraday_order_start} - ${registry.global_config.timing.intraday_order_cutoff}` : '10:30 AM - 2:00 PM' },
+            { label: 'Equity Orders', value: registry?.global_config?.timing?.intraday_order_start ? `${registry.global_config.timing.intraday_order_start} - ${registry.global_config.timing.intraday_order_cutoff}` : '10:30 AM - 1:30 PM' },
             { label: 'Futures Orders', value: '11:00 AM - 2:00 PM' },
             { label: 'Options Orders', value: registry?.global_config?.timing?.options_order_start ? `${registry.global_config.timing.options_order_start} - ${registry.global_config.timing.options_order_cutoff}` : '10:00 AM - 2:00 PM' },
             { label: 'Equity Square-off', value: registry?.global_config?.timing?.intraday_squareoff || '3:15 PM' },
@@ -1387,7 +1387,7 @@ function RulesTab() {
     { label: 'Intraday Positions', value: '4 (live) / 10 (paper)', icon: Target },
     { label: 'Swing Positions', value: '1 (live) / 5 (paper)', icon: Repeat },
     { label: 'Intraday Scan', value: 'On-demand — re-scans when slot opens', icon: Search },
-    { label: 'Intraday Orders', value: '10:30 AM - 2:00 PM (equity) / 11:00 AM - 2:00 PM (futures)', icon: Clock },
+    { label: 'Intraday Orders', value: '10:30 AM - 1:30 PM (equity) / 11:00 AM - 2:00 PM (futures)', icon: Clock },
     { label: 'Auto Square-Off', value: '3:15 PM (intraday only)', icon: Square },
     { label: 'Swing Scan', value: '9:20 AM + retry every 2 hours', icon: Search },
     { label: 'Swing Direction', value: 'BUY only (no CNC short selling)', icon: TrendingUp },

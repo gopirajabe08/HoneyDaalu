@@ -80,6 +80,15 @@ def auto_connect_fyers():
             from services.equity_regime import detect_equity_regime
             from config import SWING_STRATEGY_TIMEFRAMES
 
+            # Futures paper — use futures regime for strategy selection
+            def _get_futures_regime_strategies():
+                try:
+                    from services.futures_regime import detect_futures_regime
+                    fut_regime = detect_futures_regime()
+                    return fut_regime.get("strategies", [])
+                except Exception:
+                    return []
+
             # Always start ALL paper engines (for data collection)
             paper_configs = [
                 ("Equity Intraday Paper", lambda: paper_trader.start(
@@ -93,9 +102,9 @@ def auto_connect_fyers():
                 ("Options Swing Paper", lambda: options_swing_paper_trader.start(
                     capital=25000, underlyings=["NIFTY", "BANKNIFTY"])),
                 ("Futures Intraday Paper", lambda: futures_paper_trader.start(
-                    strategies=[], capital=100000)),
+                    strategies=_get_futures_regime_strategies(), capital=100000)),
                 ("Futures Swing Paper", lambda: futures_swing_paper_trader.start(
-                    strategies=[], capital=100000)),
+                    strategies=_get_futures_regime_strategies(), capital=100000)),
             ]
 
             for name, start_fn in paper_configs:
@@ -153,7 +162,11 @@ def auto_connect_fyers():
                 # Start live engines
                 if opt_capital >= 20000:
                     try:
-                        r = options_auto_trader.start(capital=opt_capital, underlyings=["NIFTY", "BANKNIFTY"])
+                        # Options: BANKNIFTY first (lower margin), add NIFTY only if capital > 40K
+                        opt_underlyings = ["BANKNIFTY"]
+                        if opt_capital >= 40000:
+                            opt_underlyings = ["NIFTY", "BANKNIFTY"]
+                        r = options_auto_trader.start(capital=opt_capital, underlyings=opt_underlyings)
                         if not r.get("error"):
                             logger.info(f"[AutoStart] Options Live: ₹{opt_capital:,} allocated")
                     except Exception as e:

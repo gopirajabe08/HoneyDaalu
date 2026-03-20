@@ -56,6 +56,10 @@ class ORBBreakout(BaseStrategy):
     stop_loss_rules = "Opposite side of Opening Range with 1.2% ATR-based floor."
 
     def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.debug(f"[ORB] {symbol}: df_len={len(df)}, first_candle_time={df.index[0] if hasattr(df.index, '__getitem__') else 'unknown'}")
+
         # Need at least the 2 OR candles + a few candles after for signal
         if len(df) < 5:
             return None

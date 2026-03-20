@@ -64,7 +64,7 @@ export default function EquityPage({ capital, setCapital }) {
             <span className="text-dark-500">|</span>
             <span>Mode: <span className="text-amber-400">Auto Regime</span> (dynamic re-detection)</span>
             <span className="text-dark-500">|</span>
-            <span>Orders: 10:30 AM - 2:00 PM | Square-off 3:15 PM</span>
+            <span>Orders: 10:30 AM - 1:30 PM | Square-off 3:15 PM</span>
           </>
         ) : (
           <>
@@ -88,7 +88,7 @@ export default function EquityPage({ capital, setCapital }) {
           <span className="text-dark-500">|</span>
           <span>Scan: <span className="text-orange-400">10:30 AM</span> + on-demand when slot opens</span>
           <span className="text-dark-500">|</span>
-          <span>Orders: <span className="text-orange-400">10:30 AM - 2:00 PM</span></span>
+          <span>Orders: <span className="text-orange-400">10:30 AM - 1:30 PM</span></span>
           <span className="text-dark-500">|</span>
           <span>Max: <span className="text-white">2 orders/scan</span> (staggered)</span>
           <span className="text-dark-500">|</span>

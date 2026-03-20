@@ -102,6 +102,10 @@ class RSIDivergence(BaseStrategy):
     stop_loss_rules = "Beyond the last swing high/low, with ATR-based floor of 1.2%."
 
     def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.debug(f"[RSI_DIV] {symbol}: df_len={len(df)}, first_candle_time={df.index[0] if hasattr(df.index, '__getitem__') else 'unknown'}")
+
         if len(df) < 30:
             return None
 
