@@ -337,39 +337,9 @@ def place_bracket_order(
 
     fyers_symbol = format_fyers_symbol(symbol)
 
-    # ── Attempt 1: Bracket Order ──
-    sl_abs = round(abs(limit_price - stop_loss), 2)
-    target_abs = round(abs(target - limit_price), 2)
-
-    bo_data = {
-        "symbol": fyers_symbol,
-        "qty": qty,
-        "type": 1,  # Limit order for BO
-        "side": side,
-        "productType": "BO",
-        "limitPrice": round(limit_price, 2),
-        "stopPrice": 0,
-        "validity": "DAY",
-        "disclosedQty": 0,
-        "offlineOrder": False,
-        "stopLoss": sl_abs,
-        "takeProfit": target_abs,
-    }
-
-    try:
-        response = fyers.place_order(data=bo_data)
-        if response.get("s") == "ok" or "id" in response:
-            response["order_mode"] = "BO"
-            logger.info(f"BO order placed for {symbol}: {response}")
-            return response
-        # BO rejected — fall through to fallback
-        bo_error = response.get("message", str(response))
-        logger.warning(f"BO rejected for {symbol}: {bo_error}. Falling back to INTRADAY+SL.")
-    except Exception as e:
-        bo_error = str(e)
-        logger.warning(f"BO exception for {symbol}: {e}. Falling back to INTRADAY+SL.")
-
-    # ── Attempt 2: INTRADAY market entry + separate SL order ──
+    # Always use INTRADAY + SL-M (not Bracket Order)
+    # BO splits exits into multiple partial fills = extra ₹20/fill charges
+    # INTRADAY+SL = 1 entry + 1 SL = 2 orders max = ₹40 vs ₹100+ for BO
     return _place_intraday_with_sl(fyers, fyers_symbol, qty, side, stop_loss, target)
 
 

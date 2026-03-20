@@ -54,7 +54,7 @@ NSE_HOLIDAYS = {
 
 INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN = 10, 30   # 10:30 AM — start placing orders
 INTRADAY_ORDER_CUTOFF_HOUR, INTRADAY_ORDER_CUTOFF_MIN = 13, 30  # 1:30 PM — stop placing new orders (need 1.75h for trade to develop)
-INTRADAY_SQUAREOFF_HOUR, INTRADAY_SQUAREOFF_MIN = 15, 15       # 3:15 PM — square off all positions
+INTRADAY_SQUAREOFF_HOUR, INTRADAY_SQUAREOFF_MIN = 15, 20       # 3:20 PM — square off (before Fyers auto-square at 3:25)
 INTRADAY_MARKET_CLOSE_HOUR, INTRADAY_MARKET_CLOSE_MIN = 15, 30 # 3:30 PM — market closes
 
 # ── Intraday Position Limits ─────────────────────────────────────────────────
