@@ -413,7 +413,9 @@ def auto_connect_fyers():
                 else:
                     losses += 1
             capital = getattr(auto_trader, '_capital', 100000)
-            charges = round(abs(total_pnl) * 0.10, 2) if total_pnl != 0 else 0
+            # Realistic charge estimation: ₹20 brokerage/order + STT + GST + exchange + stamp
+            # ~₹65 per round-trip trade (buy+sell) at typical intraday volumes
+            charges = round(trades * 65, 2) if trades > 0 else 0
             net_pnl = round(total_pnl - charges, 2)
             btst_open = len([t for t in getattr(btst_trader, '_active_trades', []) if t.get("status") == "OPEN"])
             telegram_notify.day_end(total_pnl, charges, net_pnl, trades, wins, losses, capital, btst_open)
