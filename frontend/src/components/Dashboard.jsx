@@ -9,10 +9,11 @@ import {
   getStrategyStats, getSwingStatus, getSwingPaperStatus,
   getOptionsAutoStatus, getOptionsPaperStatus, getOptionsSwingStatus, getOptionsSwingPaperStatus,
   getFuturesAutoStatus, getFuturesPaperStatus, getFuturesSwingStatus, getFuturesSwingPaperStatus,
+  getBTSTStatus, getBTSTPaperStatus,
 } from '../services/api'
 import { formatINRCompact } from '../utils/formatters'
 import DailyStrategyStats from './DailyStrategyStats'
-import TodayImprovements from './TodayImprovements'
+// import TodayImprovements from './TodayImprovements'  // Disabled — auto-tune removed
 import SystemBrain from './SystemBrain'
 
 const inr2 = (v) => `${Math.abs(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -33,6 +34,8 @@ export default function Dashboard({ fyersStatus }) {
   const [futPaperStatus, setFutPaperStatus] = useState(null)
   const [futSwingStatus, setFutSwingStatus] = useState(null)
   const [futSwingPaperStatus, setFutSwingPaperStatus] = useState(null)
+  const [btstStatus, setBtstStatus] = useState(null)
+  const [btstPaperStatus, setBtstPaperStatus] = useState(null)
   const [intraStats, setIntraStats] = useState({})
   const [swingStats, setSwingStats] = useState({})
   const [brokerage, setBrokerage] = useState(0)
@@ -49,6 +52,7 @@ export default function Dashboard({ fyersStatus }) {
         swingRes, swingPaperRes,
         optAutoRes, optPaperRes, optSwingRes, optSwingPaperRes,
         futAutoRes, futPaperRes, futSwingRes, futSwingPaperRes,
+        btstRes, btstPaperRes,
       ] = await Promise.all([
         getAutoStatus().catch(() => null),
         getPaperStatus().catch(() => null),
@@ -64,6 +68,8 @@ export default function Dashboard({ fyersStatus }) {
         getFuturesPaperStatus().catch(() => null),
         getFuturesSwingStatus().catch(() => null),
         getFuturesSwingPaperStatus().catch(() => null),
+        getBTSTStatus().catch(() => null),
+        getBTSTPaperStatus().catch(() => null),
       ])
 
       if (autoRes) setAutoStatus(autoRes)
@@ -80,6 +86,8 @@ export default function Dashboard({ fyersStatus }) {
       if (futPaperRes) setFutPaperStatus(futPaperRes)
       if (futSwingRes) setFutSwingStatus(futSwingRes)
       if (futSwingPaperRes) setFutSwingPaperStatus(futSwingPaperRes)
+      if (btstRes) setBtstStatus(btstRes)
+      if (btstPaperRes) setBtstPaperStatus(btstPaperRes)
 
       // Fetch Fyers data separately (only when connected)
       let fundsRes = null, posRes = null, ordRes = null
@@ -203,8 +211,7 @@ export default function Dashboard({ fyersStatus }) {
 
   return (
     <div className="space-y-5">
-      {/* Today's Improvements Banner */}
-      <TodayImprovements />
+      {/* Auto-tune banner disabled — SL and strategy config managed manually via strategy_config.json */}
 
       {/* System Brain — real-time decision-making */}
       <SystemBrain />
@@ -232,6 +239,7 @@ export default function Dashboard({ fyersStatus }) {
         optSwingStatus={optSwingStatus} optSwingPaperStatus={optSwingPaperStatus}
         futAutoStatus={futAutoStatus} futPaperStatus={futPaperStatus}
         futSwingStatus={futSwingStatus} futSwingPaperStatus={futSwingPaperStatus}
+        btstStatus={btstStatus} btstPaperStatus={btstPaperStatus}
       />
 
       {error && (
@@ -417,6 +425,76 @@ export default function Dashboard({ fyersStatus }) {
       </div>
       )}
 
+      {/* ── Options Live Positions ── */}
+      {(optAutoStatus?.active_positions?.length > 0) && (
+      <div className="bg-dark-700 rounded-2xl border border-violet-500/20 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Activity size={16} className="text-violet-400" />
+            Options Live Positions
+            <span className="text-[10px] text-gray-500 font-normal">{optAutoStatus.active_positions.length} open</span>
+          </h3>
+          <div className="flex items-center gap-2">
+            {optAutoStatus.total_pnl != null && (
+              <span className={`text-xs font-bold ${(optAutoStatus.total_pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                P&L: {(optAutoStatus.total_pnl ?? 0) >= 0 ? '+' : '-'}₹{inr2(optAutoStatus.total_pnl ?? 0)}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-dark-500">
+                {['Underlying', 'Strategy', 'Legs', 'Net Premium', 'P&L', 'Max Risk', 'Max Reward', 'Qty'].map(h => (
+                  <th key={h} className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {optAutoStatus.active_positions.map((t, i) => {
+                const pnl = t.pnl ?? 0
+                const legs = (t.legs || []).map(l => {
+                  const side = l.side === 1 ? 'B' : 'S'
+                  const sym = (l.symbol || '').split(':').pop()
+                  return `${side} ${sym} @${l.price}`
+                }).join(' / ')
+                return (
+                  <tr key={i} className="border-b border-dark-600/30 hover:bg-dark-600/20">
+                    <td className="px-3 py-2.5 text-sm font-medium text-white">{t.underlying}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-medium text-white">{(t.strategy || '').replace(/_/g, ' ')}</span>
+                        {t.strategy_type && (
+                          <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded ${
+                            t.strategy_type === 'credit' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-blue-500/15 text-blue-400'
+                          }`}>
+                            {t.strategy_type.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="text-[10px] text-gray-300 font-mono">{legs}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-gray-300">₹{inr2(t.net_premium)}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`text-xs font-bold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {pnl >= 0 ? '+' : '-'}₹{inr2(pnl)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-red-400">₹{inr2(t.max_risk)}</td>
+                    <td className="px-3 py-2.5 text-xs text-green-400">₹{inr2(t.max_reward)}</td>
+                    <td className="px-3 py-2.5 text-xs text-gray-300">{t.quantity || 1} lot{(t.quantity || 1) > 1 ? 's' : ''}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
+
       {/* ── Row 3: Strategy Performance — All Engines (always visible) ── */}
       <DashboardStrategyPerformance />
 
@@ -537,6 +615,7 @@ function ActiveEngines({
   autoStatus, paperStatus, swingStatus, swingPaperStatus,
   optAutoStatus, optPaperStatus, optSwingStatus, optSwingPaperStatus,
   futAutoStatus, futPaperStatus, futSwingStatus, futSwingPaperStatus,
+  btstStatus, btstPaperStatus,
 }) {
   const colorStyles = {
     orange: { bg: 'bg-orange-500/5 border-orange-500/20', text: 'text-orange-400', dot: 'bg-orange-400' },
@@ -567,6 +646,9 @@ function ActiveEngines({
     { key: 'fut-paper', label: 'Futures Intraday Paper', status: futPaperStatus, color: 'yellow', icon: Target },
     { key: 'fut-swing', label: 'Futures Swing Live', status: futSwingStatus, color: 'emerald', icon: Activity },
     { key: 'fut-swpaper', label: 'Futures Swing Paper', status: futSwingPaperStatus, color: 'teal', icon: Target },
+    // BTST
+    { key: 'btst-live', label: 'BTST Live', status: btstStatus, color: 'amber', icon: Zap },
+    { key: 'btst-paper', label: 'BTST Paper', status: btstPaperStatus, color: 'yellow', icon: Target },
   ]
 
   const running = engines.filter(e => e.status?.is_running)
@@ -719,7 +801,7 @@ function PositionsGroupedByStrategy({ tradedPositions, autoStatus, closedPositio
                   const netQty = p.netQty || 0
                   const pnl = p.pl || (p.pl || p.realized_profit || 0) || 0
                   const isOpen = netQty !== 0
-                  const isBuy = (p.buyQty || 0) > 0
+                  const isBuy = (p.netQty || 0) > 0
 
                   return (
                     <tr key={i} className="border-b border-dark-600/30 hover:bg-dark-600/20">

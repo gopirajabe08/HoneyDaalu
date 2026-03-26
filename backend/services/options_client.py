@@ -47,24 +47,40 @@ def get_india_vix() -> float:
 # ── Spot Price ─────────────────────────────────────────────────────────────
 
 def get_spot_price(underlying: str) -> float:
-    """Get current spot price for NIFTY or BANKNIFTY via Fyers quotes."""
+    """Get current spot price for NIFTY or BANKNIFTY. Fyers first, yfinance fallback."""
+    # Try Fyers API first (real-time LTP)
     fyers = get_fyers()
-    if fyers is None:
-        return 0.0
-    symbol = OPTIONS_INDEX_SYMBOLS.get(underlying, "")
-    if not symbol:
-        return 0.0
-    try:
-        res = fyers.quotes(data={"symbols": symbol})
-        quotes = res.get("d", [])
-        for q in quotes:
-            v = q.get("v", {})
-            if isinstance(v, dict):
-                lp = v.get("lp", 0) or v.get("close_price", 0)
-                if lp:
-                    return float(lp)
-    except Exception as e:
-        logger.warning(f"[OptionsClient] Failed to get spot price for {underlying}: {e}")
+    if fyers is not None:
+        symbol = OPTIONS_INDEX_SYMBOLS.get(underlying, "")
+        if symbol:
+            try:
+                res = fyers.quotes(data={"symbols": symbol})
+                quotes = res.get("d", [])
+                for q in quotes:
+                    v = q.get("v", {})
+                    if isinstance(v, dict):
+                        lp = v.get("lp", 0) or v.get("close_price", 0)
+                        if lp:
+                            return float(lp)
+            except Exception as e:
+                logger.warning(f"[OptionsClient] Fyers spot price failed for {underlying}: {e}")
+
+    # Fallback to yfinance (delayed but reliable)
+    yf_symbols = {"NIFTY": "^NSEI", "BANKNIFTY": "^NSEBANK"}
+    yf_sym = yf_symbols.get(underlying)
+    if yf_sym:
+        try:
+            ticker = yf.Ticker(yf_sym)
+            hist = ticker.history(period="1d", interval="5m")
+            if hist is not None and len(hist) > 0:
+                price = float(hist["Close"].iloc[-1])
+                if price > 0:
+                    logger.info(f"[OptionsClient] Spot price via yfinance fallback: {underlying}={price}")
+                    return price
+        except Exception as e:
+            logger.warning(f"[OptionsClient] yfinance fallback failed for {underlying}: {e}")
+
+    logger.error(f"[OptionsClient] Could not get spot price for {underlying} from any source")
     return 0.0
 
 

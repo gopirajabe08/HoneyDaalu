@@ -148,13 +148,14 @@ def run_auto_tune() -> dict:
     # 1. Strategy conviction boosts — update daily based on rolling performance
     actions.extend(_tune_strategy_boosts(reports))
 
-    # 2. ATR stop loss width — widen if SL hit rate > 50%, tighten if < 15%
-    if len(reports) >= 3:
-        actions.extend(_tune_atr_stop_loss(reports))
+    # 2. ATR stop loss width — DISABLED: SL config is managed via strategy_config.json (atr_mult=2.5, min_pct=0.012)
+    # Auto-tuning ATR conflicts with manually set values. Leave SL management to strategy_config.json.
+    # if len(reports) >= 3:
+    #     actions.extend(_tune_atr_stop_loss(reports))
 
-    # 3. Volume filter — loosen if too few trades, tighten if win rate drops
-    if len(reports) >= 3:
-        actions.extend(_tune_volume_filter(reports))
+    # 3. Volume filter — DISABLED: volume thresholds managed manually. Auto-tuning conflicts with strategy configs.
+    # if len(reports) >= 3:
+    #     actions.extend(_tune_volume_filter(reports))
 
     # 4. Direction bias — auto-adjust regime intraday override threshold
     if len(reports) >= 3:

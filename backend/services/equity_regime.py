@@ -177,75 +177,85 @@ def _get_vix() -> float:
 # ── Regime → Strategy + Timeframe Mapping ─────────────────────────────────
 
 REGIME_STRATEGY_MAP = {
-    # Strong trending — Gap + ORB for morning, Supertrend for trend, EMA for confirmation, VWAP for pullback
-    ("bullish", "low_vol"):     [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "5m"), ("play1_ema_crossover", "15m"), ("play3_vwap_pullback", "5m")],
-    ("bullish", "normal"):      [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play1_ema_crossover", "15m"), ("play3_vwap_pullback", "5m")],
-    ("bullish", "elevated"):    [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play1_ema_crossover", "15m")],
-    ("bullish", "high_vol"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play1_ema_crossover", "15m")],
+    # ═══════════════════════════════════════════════════════════════════════
+    # DATA-DRIVEN regime map — based on 3-day live results (Mar 23-25):
+    #   play8_rsi_divergence: ONLY profitable strategy (+₹152/trade)
+    #   play6_bb_contra: secondary, profitable on select trades
+    #   play4_supertrend: REMOVED from high-VIX — lost ₹4,357 in 21 trades
+    #   play10_momentum_rank: REMOVED — 0% win rate, -₹438/trade
+    #
+    # Rule: play8 leads ALWAYS. play6 supports. Others only in low VIX.
+    # ═══════════════════════════════════════════════════════════════════════
 
-    ("bearish", "low_vol"):     [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "5m"), ("play1_ema_crossover", "15m"), ("play3_vwap_pullback", "5m")],
-    ("bearish", "normal"):      [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play1_ema_crossover", "15m"), ("play3_vwap_pullback", "5m")],
-    ("bearish", "elevated"):    [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play1_ema_crossover", "15m")],
-    ("bearish", "high_vol"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play1_ema_crossover", "15m")],
+    # Strong trending
+    ("bullish", "low_vol"):     [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play4_supertrend", "5m"), ("play1_ema_crossover", "15m")],
+    ("bullish", "normal"):      [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play4_supertrend", "15m")],
+    ("bullish", "elevated"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("bullish", "high_vol"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    # Pullback — Supertrend continuation + RSI Divergence for reversal entry + VWAP bounce + BB Contra fade
-    ("pullback_in_uptrend", "low_vol"):   [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("pullback_in_uptrend", "normal"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("pullback_in_uptrend", "elevated"):  [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("bearish", "low_vol"):     [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play4_supertrend", "5m"), ("play1_ema_crossover", "15m")],
+    ("bearish", "normal"):      [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play4_supertrend", "15m")],
+    ("bearish", "elevated"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("bearish", "high_vol"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+
+    # Pullback / Bounce — RSI divergence excels at catching reversals
+    ("pullback_in_uptrend", "low_vol"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
+    ("pullback_in_uptrend", "normal"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("pullback_in_uptrend", "elevated"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("pullback_in_uptrend", "high_vol"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    ("bounce_in_downtrend", "low_vol"):   [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("bounce_in_downtrend", "normal"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("bounce_in_downtrend", "elevated"):  [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("bounce_in_downtrend", "low_vol"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
+    ("bounce_in_downtrend", "normal"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("bounce_in_downtrend", "elevated"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("bounce_in_downtrend", "high_vol"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    # Sideways — BB Squeeze for breakout, BB Contra for range, RSI Divergence for reversals
-    ("sideways", "low_vol"):    [("play4_supertrend", "15m"), ("play5_bb_squeeze", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
-    ("sideways", "normal"):     [("play5_bb_squeeze", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    # Sideways — mean reversion strategies shine
+    ("sideways", "low_vol"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("sideways", "normal"):     [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
     ("sideways", "elevated"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("sideways", "high_vol"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    # Reversal — RSI Divergence is the BEST reversal signal + BB Contra
+    # Reversal — RSI Divergence is the BEST reversal signal
     ("reversal", "low_vol"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("reversal", "normal"):     [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("reversal", "elevated"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("reversal", "high_vol"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    # Neutral — Gap + ORB for direction, Supertrend for trend, RSI for reversals
-    ("neutral", "low_vol"):     [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
-    ("neutral", "normal"):      [("play9_gap_analysis", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
-    ("neutral", "elevated"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
-    ("neutral", "high_vol"):    [("play4_supertrend", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    # Neutral — add more strategies in low vol only
+    ("neutral", "low_vol"):     [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play4_supertrend", "15m"), ("play5_bb_squeeze", "15m")],
+    ("neutral", "normal"):      [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play4_supertrend", "15m")],
+    ("neutral", "elevated"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("neutral", "high_vol"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    # Squeeze — BB Squeeze is designed for this + ORB for breakout direction
-    ("squeeze", "low_vol"):     [("play5_bb_squeeze", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m")],
-    ("squeeze", "normal"):      [("play5_bb_squeeze", "15m"), ("play7_orb", "15m"), ("play4_supertrend", "15m")],
-    ("squeeze", "elevated"):    [("play5_bb_squeeze", "15m"), ("play7_orb", "15m")],
-    ("squeeze", "high_vol"):    [("play5_bb_squeeze", "15m"), ("play8_rsi_divergence", "15m")],
+    # Squeeze — BB Squeeze designed for this
+    ("squeeze", "low_vol"):     [("play5_bb_squeeze", "15m"), ("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("squeeze", "normal"):      [("play5_bb_squeeze", "15m"), ("play8_rsi_divergence", "15m")],
+    ("squeeze", "elevated"):    [("play5_bb_squeeze", "15m"), ("play8_rsi_divergence", "15m")],
+    ("squeeze", "high_vol"):    [("play8_rsi_divergence", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Trend Exhaustion — overbought, expect pullback. RSI Divergence + BB Contra for reversal
-    ("trend_exhaustion", "low_vol"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
+    # Trend Exhaustion — RSI divergence + BB contra for mean reversion
+    ("trend_exhaustion", "low_vol"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("trend_exhaustion", "normal"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("trend_exhaustion", "elevated"): [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("trend_exhaustion", "high_vol"): [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    # Oversold Bounce — expect bounce. RSI Divergence for reversal + VWAP for bounce entry
-    ("oversold_bounce", "low_vol"):   [("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("oversold_bounce", "normal"):    [("play8_rsi_divergence", "15m"), ("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
+    # Oversold Bounce
+    ("oversold_bounce", "low_vol"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("oversold_bounce", "normal"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("oversold_bounce", "elevated"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
     ("oversold_bounce", "high_vol"):  [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
 
-    # Expiry Day — reduced activity, wider SLs, only high-conviction strategies
-    ("expiry_day", "low_vol"):    [("play4_supertrend", "15m"), ("play6_bb_contra", "15m")],
-    ("expiry_day", "normal"):     [("play4_supertrend", "15m"), ("play6_bb_contra", "15m")],
-    ("expiry_day", "elevated"):   [("play6_bb_contra", "15m")],
-    ("expiry_day", "high_vol"):   [("play6_bb_contra", "15m")],
+    # Expiry Day — only proven strategies
+    ("expiry_day", "low_vol"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("expiry_day", "normal"):     [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("expiry_day", "elevated"):   [("play8_rsi_divergence", "15m")],
+    ("expiry_day", "high_vol"):   [("play8_rsi_divergence", "15m")],
 
-    # Pre-Holiday — low volume, mean reversion only
-    ("pre_holiday", "low_vol"):   [("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
-    ("pre_holiday", "normal"):    [("play6_bb_contra", "15m")],
-    ("pre_holiday", "elevated"):  [("play6_bb_contra", "15m")],
-    ("pre_holiday", "high_vol"):  [("play6_bb_contra", "15m")],
+    # Pre-Holiday — low volume, minimal risk
+    ("pre_holiday", "low_vol"):   [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("pre_holiday", "normal"):    [("play8_rsi_divergence", "15m"), ("play6_bb_contra", "15m")],
+    ("pre_holiday", "elevated"):  [("play8_rsi_divergence", "15m")],
+    ("pre_holiday", "high_vol"):  [("play8_rsi_divergence", "15m")],
 }
 
 

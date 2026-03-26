@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>IntraTrading — AWS Migration Guide</title>
+<style>
+@media print {
+    body { font-size: 11pt; }
+    h1 { page-break-before: always; }
+    h1:first-of-type { page-break-before: avoid; }
+    pre { page-break-inside: avoid; }
+    table { page-break-inside: avoid; }
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #1a1a1a;
+}
+h1 { color: #0a3d62; border-bottom: 3px solid #0a3d62; padding-bottom: 8px; margin-top: 40px; }
+h2 { color: #1e5f8a; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 30px; }
+h3 { color: #2c7fb8; margin-top: 20px; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.85em; }
+pre code { background: none; color: inherit; padding: 0; }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+th { background: #0a3d62; color: white; }
+tr:nth-child(even) { background: #f9f9f9; }
+blockquote { border-left: 4px solid #0a3d62; margin: 16px 0; padding: 8px 16px; background: #f0f7ff; }
+hr { border: none; border-top: 2px solid #0a3d62; margin: 30px 0; }
+.title-page { text-align: center; margin-top: 200px; }
+</style>
+</head>
+<body>
+<h1 id="intratrading-aws-migration-guide">IntraTrading — AWS Migration Guide</h1>
+
+<h2 id="sebi-compliant-algo-trading-server-with-static-ip">SEBI-Compliant Algo Trading Server with Static IP</h2>
+
+<p><strong>Version:</strong> 1.0 | <strong>Date:</strong> March 26, 2026
+<strong>Author:</strong> Claude (Fund Manager + Engineer)</p>
+
+<hr />
+
+<h2 id="table-of-contents">Table of Contents</h2>
+
+<ol>
+<li>Why AWS? (SEBI Compliance)</li>
+<li>Architecture Overview</li>
+<li>Cost Breakdown</li>
+<li>Prerequisites</li>
+<li>Phase 1: AWS Account Setup</li>
+<li>Phase 2: Launch EC2 Instance</li>
+<li>Phase 3: Elastic IP (Static IP)</li>
+<li>Phase 4: Connect to Your Server</li>
+<li>Phase 5: Server Setup (Automated)</li>
+<li>Phase 6: Upload Credentials</li>
+<li>Phase 7: Fyers Configuration</li>
+<li>Phase 8: GitHub Repository Setup</li>
+<li>Phase 9: GitHub Actions CI/CD Pipeline</li>
+<li>Phase 10: First Deployment Test</li>
+<li>Phase 11: Health Check</li>
+<li>Phase 12: Daily Operations</li>
+<li>Deployment Workflow (How Changes Go Live)</li>
+<li>Troubleshooting</li>
+<li>Security Checklist</li>
+<li>Monthly Maintenance</li>
+</ol>
+
+<hr />
+
+<h2 id="1-why-aws-sebi-compliance">1. Why AWS? (SEBI Compliance)</h2>
+
+<p><strong>SEBI Regulation (2023-2024):</strong> All algorithmic trading orders must originate from a
+whitelisted static IP address. Brokers (including Fyers) are required to verify and register
+the IP address of any automated trading system.</p>
+
+<p><strong>Current Problem:</strong> Your Mac at home uses a dynamic IP from your ISP. This IP changes
+periodically, which means:
+- Fyers cannot permanently whitelist your IP
+- Your algo orders may get rejected if IP changes
+- You are not SEBI compliant</p>
+
+<p><strong>Solution:</strong> AWS EC2 instance with an Elastic IP (static, permanent public IP) in the
+Mumbai region. This IP never changes. You register it once with Fyers, and all algo orders
+originate from this whitelisted IP.</p>
+
+<hr />
+
+<h2 id="2-architecture-overview">2. Architecture Overview</h2>
+
+<pre><code>YOUR MAC (Development)
+    │
+    │  git push (code changes)
+    ▼
+GITHUB (Code Repository)
+    │
+    │  GitHub Actions (automatic)
+    ▼
+AWS EC2 — Mumbai Region
+    │
+    ├── Elastic IP: xx.xx.xx.xx (static, registered with Fyers)
+    ├── Backend: FastAPI on port 8001
+    ├── Frontend: Nginx serves static files on port 80
+    ├── Systemd: Auto-manages backend process
+    ├── Cron: Starts backend at 9:00 AM IST (Mon-Fri)
+    │
+    ▼
+FYERS API → NSE (Trades execute)
+</code></pre>
+
+<p><strong>Key Principle:</strong> You NEVER log into the server to edit code. All changes go through
+GitHub. The server pulls the latest code automatically.</p>
+
+<hr />
+
+<h2 id="3-cost-breakdown">3. Cost Breakdown</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Item</th>
+  <th>Monthly Cost</th>
+  <th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>EC2 t3.small (2 vCPU, 2GB RAM)</td>
+  <td>₹1,100</td>
+  <td>Mumbai region, on-demand</td>
+</tr>
+<tr>
+  <td>Elastic IP</td>
+  <td>₹0</td>
+  <td>Free while attached to running instance</td>
+</tr>
+<tr>
+  <td>EBS Storage (20 GB gp3)</td>
+  <td>₹160</td>
+  <td>SSD storage</td>
+</tr>
+<tr>
+  <td>Data Transfer</td>
+  <td>₹0-100</td>
+  <td>Minimal for API calls</td>
+</tr>
+<tr>
+  <td><strong>TOTAL</strong></td>
+  <td><strong>~₹1,300/month</strong></td>
+  <td></td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Cost optimization:</strong> You can use a t3.micro (₹550/month) initially. If the system needs
+more memory for scanning 500 stocks, upgrade to t3.small.</p>
+
+<p><strong>Free Tier:</strong> If this is a new AWS account, t3.micro is free for 12 months (750 hours/month).</p>
+
+<hr />
+
+<h2 id="4-prerequisites">4. Prerequisites</h2>
+
+<p>Before starting, ensure you have:</p>
+
+<ul>
+<li>[ ] Email address for AWS account</li>
+<li>[ ] Credit/Debit card (AWS requires payment method, charges only what you use)</li>
+<li>[ ] PAN card (AWS India requires PAN for billing)</li>
+<li>[ ] Your Fyers credentials (APP_ID, SECRET_KEY, TOTP_SECRET, PIN)</li>
+<li>[ ] Your Telegram bot token and chat ID</li>
+<li>[ ] GitHub account (free at github.com)</li>
+<li>[ ] Terminal app on your Mac (already have it)</li>
+</ul>
+
+<hr />
+
+<h2 id="5-phase-1-aws-account-setup">5. Phase 1: AWS Account Setup</h2>
+
+<h3 id="step-51-create-aws-account">Step 5.1: Create AWS Account</h3>
+
+<ol>
+<li>Open browser → go to <strong>https://aws.amazon.com</strong></li>
+<li>Click <strong>"Create an AWS Account"</strong></li>
+<li>Enter your email address and choose an account name (e.g., "IntraTrading")</li>
+<li>Verify your email with the OTP sent</li>
+<li>Set a strong root password</li>
+</ol>
+
+<h3 id="step-52-contact-information">Step 5.2: Contact Information</h3>
+
+<ol>
+<li>Select <strong>"Personal"</strong> account type</li>
+<li>Fill in your name, phone number, address</li>
+<li>Enter PAN number when asked</li>
+</ol>
+
+<h3 id="step-53-payment-method">Step 5.3: Payment Method</h3>
+
+<ol>
+<li>Add your credit/debit card</li>
+<li>AWS will charge ₹2 for verification (refunded)</li>
+<li>This card will be billed monthly for usage (~₹1,300/month)</li>
+</ol>
+
+<h3 id="step-54-identity-verification">Step 5.4: Identity Verification</h3>
+
+<ol>
+<li>Enter your phone number</li>
+<li>AWS will call or SMS you with a verification code</li>
+<li>Enter the code</li>
+</ol>
+
+<h3 id="step-55-select-support-plan">Step 5.5: Select Support Plan</h3>
+
+<ol>
+<li>Choose <strong>"Basic Support — Free"</strong></li>
+<li>Click "Complete sign up"</li>
+</ol>
+
+<h3 id="step-56-sign-in">Step 5.6: Sign In</h3>
+
+<ol>
+<li>Go to <strong>https://console.aws.amazon.com</strong></li>
+<li>Sign in with your email and password</li>
+<li>You are now in the AWS Console</li>
+</ol>
+
+<hr />
+
+<h2 id="6-phase-2-launch-ec2-instance">6. Phase 2: Launch EC2 Instance</h2>
+
+<h3 id="step-61-select-mumbai-region">Step 6.1: Select Mumbai Region</h3>
+
+<ol>
+<li>In the top-right corner of the AWS Console, you'll see a region name (e.g., "N. Virginia")</li>
+<li>Click it and select <strong>"Asia Pacific (Mumbai) ap-south-1"</strong></li>
+<li>This is critical — Mumbai region gives lowest latency to NSE</li>
+</ol>
+
+<h3 id="step-62-navigate-to-ec2">Step 6.2: Navigate to EC2</h3>
+
+<ol>
+<li>In the search bar at the top, type <strong>"EC2"</strong></li>
+<li>Click <strong>"EC2"</strong> from the results</li>
+<li>You'll see the EC2 Dashboard</li>
+</ol>
+
+<h3 id="step-63-launch-instance">Step 6.3: Launch Instance</h3>
+
+<ol>
+<li><p>Click the orange <strong>"Launch instance"</strong> button</p></li>
+<li><p><strong>Name:</strong> Enter <code>IntraTrading-Server</code></p></li>
+<li><p><strong>Application and OS Images (AMI):</strong></p>
+
+<ul>
+<li>Select <strong>"Ubuntu"</strong></li>
+<li>Choose <strong>"Ubuntu Server 24.04 LTS (HVM), SSD Volume Type"</strong></li>
+<li>Architecture: <strong>64-bit (x86)</strong></li>
+</ul></li>
+<li><p><strong>Instance type:</strong></p>
+
+<ul>
+<li>Select <strong>"t3.small"</strong> (2 vCPU, 2 GB RAM)</li>
+<li>If budget is tight, use <strong>"t3.micro"</strong> (1 vCPU, 1 GB RAM, free tier eligible)</li>
+</ul></li>
+<li><p><strong>Key pair (login):</strong></p>
+
+<ul>
+<li>Click <strong>"Create new key pair"</strong></li>
+<li>Key pair name: <code>intratrading-key</code></li>
+<li>Key pair type: <strong>RSA</strong></li>
+<li>Private key file format: <strong>.pem</strong></li>
+<li>Click <strong>"Create key pair"</strong></li>
+<li><strong>IMPORTANT:</strong> A file <code>intratrading-key.pem</code> will download. SAVE THIS FILE.
+Move it to a safe location: <code>~/Documents/AWS/intratrading-key.pem</code></li>
+<li><strong>You CANNOT download this file again.</strong> If you lose it, you lose access to your server.</li>
+</ul></li>
+<li><p><strong>Network settings:</strong></p>
+
+<ul>
+<li>Click <strong>"Edit"</strong></li>
+<li>VPC: Keep default</li>
+<li>Subnet: Keep default (any Mumbai AZ)</li>
+<li>Auto-assign public IP: <strong>Enable</strong></li>
+<li><strong>Security group:</strong> Create new security group
+<ul>
+<li>Security group name: <code>IntraTrading-SG</code></li>
+<li>Description: <code>IntraTrading algo trading server</code></li>
+<li>Add the following rules:</li>
+</ul></li>
+</ul>
+
+<table>
+<thead>
+<tr>
+  <th>Type</th>
+  <th>Port</th>
+  <th>Source</th>
+  <th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>SSH</td>
+  <td>22</td>
+  <td>My IP</td>
+  <td>SSH access from your IP</td>
+</tr>
+<tr>
+  <td>HTTP</td>
+  <td>80</td>
+  <td>0.0.0.0/0</td>
+  <td>Web dashboard</td>
+</tr>
+<tr>
+  <td>HTTPS</td>
+  <td>443</td>
+  <td>0.0.0.0/0</td>
+  <td>Secure web dashboard</td>
+</tr>
+<tr>
+  <td>Custom TCP</td>
+  <td>8001</td>
+  <td>0.0.0.0/0</td>
+  <td>Backend API (temporary, remove after nginx setup)</td>
+</tr>
+</tbody>
+</table></li>
+<li><p><strong>Configure storage:</strong></p>
+
+<ul>
+<li>Size: <strong>20 GiB</strong></li>
+<li>Volume type: <strong>gp3</strong></li>
+<li>Delete on termination: <strong>Yes</strong> (checked)</li>
+</ul></li>
+<li><p><strong>Summary:</strong></p>
+
+<ul>
+<li>Review all settings</li>
+<li>Number of instances: <strong>1</strong></li>
+<li>Click <strong>"Launch instance"</strong></li>
+</ul></li>
+<li><p>You'll see "Success! Instance is launching."</p>
+
+<ul>
+<li>Click <strong>"View all instances"</strong></li>
+<li>Wait for Instance State to show <strong>"Running"</strong> and Status Checks to show <strong>"2/2 checks passed"</strong></li>
+<li>This takes 1-2 minutes</li>
+</ul></li>
+</ol>
+
+<h3 id="step-64-note-your-instance-id">Step 6.4: Note Your Instance ID</h3>
+
+<ol>
+<li>Click on your instance</li>
+<li>Note the <strong>Instance ID</strong> (e.g., <code>i-0abc123def456</code>)</li>
+<li>Note the <strong>Public IPv4 address</strong> (temporary — we'll replace with Elastic IP)</li>
+</ol>
+
+<hr />
+
+<h2 id="7-phase-3-elastic-ip-static-ip">7. Phase 3: Elastic IP (Static IP)</h2>
+
+<h3 id="step-71-allocate-elastic-ip">Step 7.1: Allocate Elastic IP</h3>
+
+<ol>
+<li>In the left sidebar of EC2, click <strong>"Elastic IPs"</strong> (under Network &amp; Security)</li>
+<li>Click <strong>"Allocate Elastic IP address"</strong></li>
+<li>Network Border Group: Keep default (ap-south-1)</li>
+<li>Click <strong>"Allocate"</strong></li>
+<li>You'll see a new Elastic IP (e.g., <code>13.235.100.50</code>)</li>
+<li><strong>Write this IP down — this is your permanent static IP</strong></li>
+</ol>
+
+<h3 id="step-72-associate-with-instance">Step 7.2: Associate with Instance</h3>
+
+<ol>
+<li>Select the Elastic IP you just created</li>
+<li>Click <strong>Actions → "Associate Elastic IP address"</strong></li>
+<li>Resource type: <strong>Instance</strong></li>
+<li>Instance: Select your <code>IntraTrading-Server</code> instance</li>
+<li>Click <strong>"Associate"</strong></li>
+</ol>
+
+<h3 id="step-73-verify">Step 7.3: Verify</h3>
+
+<ol>
+<li>Go back to EC2 → Instances</li>
+<li>Click your instance</li>
+<li>The <strong>Public IPv4 address</strong> should now show your Elastic IP</li>
+<li>This IP will NEVER change (unless you release it)</li>
+</ol>
+
+<p><strong>IMPORTANT:</strong> An Elastic IP is free ONLY while associated with a RUNNING instance.
+If you stop the instance, you'll be charged ~₹300/month for the idle Elastic IP.
+Solution: Don't stop the instance. The backend auto-shuts down at 3:45 PM and auto-starts
+at 9:00 AM via cron — the instance stays running but uses minimal CPU when idle.</p>
+
+<hr />
+
+<h2 id="8-phase-4-connect-to-your-server">8. Phase 4: Connect to Your Server</h2>
+
+<h3 id="step-81-set-key-permissions">Step 8.1: Set Key Permissions</h3>
+
+<p>Open Terminal on your Mac and run:</p>
+
+<pre><code># Move the key file to a safe location
+mkdir -p ~/Documents/AWS
+mv ~/Downloads/intratrading-key.pem ~/Documents/AWS/
+
+# Set permissions (required by SSH)
+chmod 400 ~/Documents/AWS/intratrading-key.pem
+</code></pre>
+
+<h3 id="step-82-ssh-into-the-server">Step 8.2: SSH into the Server</h3>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+</code></pre>
+
+<p>Replace <code>YOUR_ELASTIC_IP</code> with your actual Elastic IP (e.g., <code>13.235.100.50</code>).</p>
+
+<p>You should see:</p>
+
+<pre><code>Welcome to Ubuntu 24.04 LTS
+ubuntu@ip-172-31-xx-xx:~$
+</code></pre>
+
+<p><strong>You are now connected to your AWS server.</strong></p>
+
+<h3 id="step-83-create-a-shortcut-optional">Step 8.3: Create a Shortcut (Optional)</h3>
+
+<p>Add this to your Mac's <code>~/.zshrc</code> for easy access:</p>
+
+<pre><code>echo 'alias it-server="ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP"' &gt;&gt; ~/.zshrc
+source ~/.zshrc
+</code></pre>
+
+<p>Now you can type <code>it-server</code> to connect.</p>
+
+<hr />
+
+<h2 id="9-phase-5-server-setup-automated">9. Phase 5: Server Setup (Automated)</h2>
+
+<h3 id="step-91-upload-and-run-setup-script">Step 9.1: Upload and Run Setup Script</h3>
+
+<p>From your Mac (NOT from SSH), run:</p>
+
+<pre><code>cd "/Users/vgopiraja/Documents/MY Applications/IntraTrading"
+
+# Upload the setup script to the server
+scp -i ~/Documents/AWS/intratrading-key.pem \
+    deploy/setup-server.sh \
+    ubuntu@YOUR_ELASTIC_IP:/tmp/setup-server.sh
+
+# SSH in and run it
+ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP \
+    'sudo bash /tmp/setup-server.sh'
+</code></pre>
+
+<p>This script automatically installs:
+- Python 3.12 with venv
+- Node.js 20 (for frontend build)
+- Nginx (reverse proxy)
+- All pip and npm dependencies
+- Systemd service for auto-management
+- Cron job for 9:00 AM auto-start
+- UFW firewall
+- Log rotation</p>
+
+<p><strong>This takes about 5-10 minutes.</strong> Wait for it to complete.</p>
+
+<h3 id="step-92-verify-setup">Step 9.2: Verify Setup</h3>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+
+# Check Python
+/opt/intratrading/app/backend/venv/bin/python --version
+# Should show: Python 3.12.x
+
+# Check Nginx
+sudo systemctl status nginx
+# Should show: active (running)
+
+# Check service exists
+sudo systemctl status intratrading-backend
+# Should show: inactive (dead) — hasn't been started yet
+</code></pre>
+
+<hr />
+
+<h2 id="10-phase-6-upload-credentials">10. Phase 6: Upload Credentials</h2>
+
+<p><strong>Credentials (.env file) NEVER go in Git.</strong> Upload them directly and securely.</p>
+
+<h3 id="step-101-upload-env">Step 10.1: Upload .env</h3>
+
+<p>From your Mac:</p>
+
+<pre><code>cd "/Users/vgopiraja/Documents/MY Applications/IntraTrading"
+bash deploy/update-env.sh YOUR_ELASTIC_IP ~/Documents/AWS/intratrading-key.pem
+</code></pre>
+
+<p>This securely copies your local <code>backend/.env</code> to the server with proper permissions (600).</p>
+
+<h3 id="step-102-verify-env-on-server">Step 10.2: Verify .env on Server</h3>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+
+# Check file exists and has correct permissions
+ls -la /opt/intratrading/app/backend/.env
+# Should show: -rw------- intratrading intratrading ... .env
+
+# Verify contents (check, don't share)
+sudo -u intratrading cat /opt/intratrading/app/backend/.env
+# Should show your FYERS_APP_ID, SECRET_KEY, TOTP_SECRET, etc.
+</code></pre>
+
+<hr />
+
+<h2 id="11-phase-7-fyers-configuration">11. Phase 7: Fyers Configuration</h2>
+
+<h3 id="step-111-register-static-ip-with-fyers">Step 11.1: Register Static IP with Fyers</h3>
+
+<ol>
+<li>Login to <strong>Fyers Dashboard</strong>: https://myapi.fyers.in/dashboard</li>
+<li>Go to your app settings</li>
+<li>Find <strong>"Allowed IPs"</strong> or <strong>"Whitelisted IPs"</strong></li>
+<li>Add your Elastic IP: <code>YOUR_ELASTIC_IP</code></li>
+<li>Save</li>
+</ol>
+
+<h3 id="step-112-update-oauth-redirect-uri">Step 11.2: Update OAuth Redirect URI</h3>
+
+<ol>
+<li>In Fyers Dashboard, find your app's <strong>Redirect URI</strong></li>
+<li>Change it from:
+<pre><code>http://localhost:8001/api/fyers/callback
+</code></pre>
+To:
+<pre><code>http://YOUR_ELASTIC_IP:8001/api/fyers/callback
+</code></pre></li>
+<li>Save</li>
+</ol>
+
+<h3 id="step-113-update-backend-config">Step 11.3: Update Backend Config</h3>
+
+<p>On the server, update the Fyers redirect URI:</p>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+
+sudo -u intratrading nano /opt/intratrading/app/backend/.env
+</code></pre>
+
+<p>Make sure <code>FYERS_REDIRECT_URI</code> points to the Elastic IP:</p>
+
+<pre><code>FYERS_REDIRECT_URI=http://YOUR_ELASTIC_IP:8001/api/fyers/callback
+</code></pre>
+
+<h3 id="step-114-register-ip-for-fo-segment">Step 11.4: Register IP for F&amp;O Segment</h3>
+
+<p>Since your Options and Futures segments are now active on Fyers:
+1. Check if Fyers requires separate IP registration for NFO/MCX segments
+2. If yes, register the same Elastic IP for all segments</p>
+
+<hr />
+
+<h2 id="12-phase-8-github-repository-setup">12. Phase 8: GitHub Repository Setup</h2>
+
+<h3 id="step-121-create-github-repository">Step 12.1: Create GitHub Repository</h3>
+
+<ol>
+<li>Go to <strong>https://github.com</strong> and sign in</li>
+<li>Click <strong>"+"</strong> → <strong>"New repository"</strong></li>
+<li>Repository name: <code>IntraTrading</code></li>
+<li>Visibility: <strong>Private</strong> (important — your trading code is proprietary)</li>
+<li>Do NOT initialize with README (we'll push existing code)</li>
+<li>Click <strong>"Create repository"</strong></li>
+</ol>
+
+<h3 id="step-122-push-existing-code">Step 12.2: Push Existing Code</h3>
+
+<p>From your Mac:</p>
+
+<pre><code>cd "/Users/vgopiraja/Documents/MY Applications/IntraTrading"
+
+# Initialize git (if not already)
+git init
+
+# Add GitHub as remote
+git remote add origin https://github.com/YOUR_USERNAME/IntraTrading.git
+
+# Make sure .gitignore is proper (already updated)
+# Verify no secrets will be committed
+git status
+
+# Add all files
+git add -A
+
+# Commit
+git commit -m "Initial push: IntraTrading algo trading platform"
+
+# Push
+git push -u origin main
+</code></pre>
+
+<h3 id="step-123-verify-on-github">Step 12.3: Verify on GitHub</h3>
+
+<ol>
+<li>Go to <code>https://github.com/YOUR_USERNAME/IntraTrading</code></li>
+<li>Verify the code is there</li>
+<li>Verify <code>.env</code> is NOT in the repo (check .gitignore is working)</li>
+</ol>
+
+<hr />
+
+<h2 id="13-phase-9-github-actions-cicd-pipeline">13. Phase 9: GitHub Actions CI/CD Pipeline</h2>
+
+<h3 id="step-131-generate-ssh-key-for-github-actions">Step 13.1: Generate SSH Key for GitHub Actions</h3>
+
+<p>The CI/CD pipeline needs to SSH into your EC2 instance. We'll use your existing key.</p>
+
+<h3 id="step-132-add-github-secrets">Step 13.2: Add GitHub Secrets</h3>
+
+<ol>
+<li>Go to your GitHub repo → <strong>Settings</strong> → <strong>Secrets and variables</strong> → <strong>Actions</strong></li>
+<li>Click <strong>"New repository secret"</strong></li>
+</ol>
+
+<p>Add these two secrets:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Secret Name</th>
+  <th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>EC2_HOST</code></td>
+  <td>Your Elastic IP (e.g., <code>13.235.100.50</code>)</td>
+</tr>
+<tr>
+  <td><code>EC2_SSH_KEY</code></td>
+  <td>The ENTIRE contents of your <code>intratrading-key.pem</code> file</td>
+</tr>
+</tbody>
+</table>
+
+<p>To get the key contents:</p>
+
+<pre><code>cat ~/Documents/AWS/intratrading-key.pem
+</code></pre>
+
+<p>Copy everything (including <code>-----BEGIN RSA PRIVATE KEY-----</code> and <code>-----END RSA PRIVATE KEY-----</code>) and paste as the secret value.</p>
+
+<h3 id="step-133-verify-workflow-file">Step 13.3: Verify Workflow File</h3>
+
+<p>The file <code>.github/workflows/deploy.yml</code> is already created. It triggers on every push to
+the <code>main</code> branch and runs <code>deploy/deploy.sh</code> on the EC2 server.</p>
+
+<h3 id="step-134-set-up-deploy-key-on-ec2">Step 13.4: Set Up Deploy Key on EC2</h3>
+
+<p>The EC2 server needs to pull from your private GitHub repo:</p>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+
+# Generate SSH key for the intratrading user
+sudo -u intratrading ssh-keygen -t ed25519 -C "intratrading@ec2" -f /home/intratrading/.ssh/id_ed25519 -N ""
+
+# Show the public key
+sudo cat /home/intratrading/.ssh/id_ed25519.pub
+</code></pre>
+
+<p>Copy the output. Then:</p>
+
+<ol>
+<li>Go to GitHub repo → <strong>Settings</strong> → <strong>Deploy keys</strong></li>
+<li>Click <strong>"Add deploy key"</strong></li>
+<li>Title: <code>EC2 Server</code></li>
+<li>Key: Paste the public key</li>
+<li>Allow write access: <strong>No</strong> (read-only is sufficient)</li>
+<li>Click <strong>"Add key"</strong></li>
+</ol>
+
+<h3 id="step-135-configure-git-on-ec2">Step 13.5: Configure Git on EC2</h3>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+
+# Set the remote URL to use SSH
+sudo -u intratrading git -C /opt/intratrading/app remote set-url origin git@github.com:YOUR_USERNAME/IntraTrading.git
+
+# Test connection
+sudo -u intratrading ssh -T git@github.com
+# Should show: "Hi YOUR_USERNAME! You've successfully authenticated"
+</code></pre>
+
+<hr />
+
+<h2 id="14-phase-10-first-deployment-test">14. Phase 10: First Deployment Test</h2>
+
+<h3 id="step-141-manual-start">Step 14.1: Manual Start</h3>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+
+# Start the backend
+sudo systemctl start intratrading-backend
+
+# Check status
+sudo systemctl status intratrading-backend
+
+# Watch logs
+tail -f /var/log/intratrading/backend.log
+</code></pre>
+
+<p>You should see:</p>
+
+<pre><code>[Startup] Attempting fresh TOTP login...
+[Startup] Fyers connected: YOUR_NAME (attempt 1)
+[AutoStart] Starting engines...
+</code></pre>
+
+<h3 id="step-142-test-from-browser">Step 14.2: Test from Browser</h3>
+
+<p>Open in your browser:</p>
+
+<pre><code>http://YOUR_ELASTIC_IP
+</code></pre>
+
+<p>You should see the IntraTrading dashboard.</p>
+
+<h3 id="step-143-test-api">Step 14.3: Test API</h3>
+
+<pre><code>curl http://YOUR_ELASTIC_IP:8001/api/strategies
+curl http://YOUR_ELASTIC_IP:8001/api/fyers/status
+curl http://YOUR_ELASTIC_IP:8001/api/market-status
+</code></pre>
+
+<h3 id="step-144-stop-the-backend">Step 14.4: Stop the Backend</h3>
+
+<p>Since today (Mar 26) is a holiday:</p>
+
+<pre><code>sudo systemctl stop intratrading-backend
+</code></pre>
+
+<h3 id="step-145-test-auto-deploy">Step 14.5: Test Auto-Deploy</h3>
+
+<p>From your Mac, make a small change and push:</p>
+
+<pre><code>cd "/Users/vgopiraja/Documents/MY Applications/IntraTrading"
+git add -A
+git commit -m "Test: verify CI/CD pipeline"
+git push origin main
+</code></pre>
+
+<p>Go to GitHub → Actions tab → you should see the deploy workflow running.
+After ~60 seconds, the code will be updated on the server.</p>
+
+<hr />
+
+<h2 id="15-phase-11-health-check">15. Phase 11: Health Check</h2>
+
+<h3 id="step-151-run-health-check-from-mac">Step 15.1: Run Health Check from Mac</h3>
+
+<pre><code>cd "/Users/vgopiraja/Documents/MY Applications/IntraTrading"
+bash deploy/health-check.sh YOUR_ELASTIC_IP
+</code></pre>
+
+<p>Expected output:</p>
+
+<pre><code>═══ IntraTrading Health Check (YOUR_ELASTIC_IP) ═══
+
+1. Backend reachable: ✅ (HTTP 200)
+2. Fyers connection: ✅ Connected
+3. Market status: OPEN | Next: Square-off at 3:15 PM
+4. Equity Live: RUNNING | Trades: 2 | P&amp;L: ₹815.00
+5. Options Live: RUNNING | Positions: 1
+6. BTST Live: RUNNING | Trades: 0
+
+═══ Health Check Complete ═══
+</code></pre>
+
+<hr />
+
+<h2 id="16-phase-12-daily-operations">16. Phase 12: Daily Operations</h2>
+
+<h3 id="what-happens-automatically-no-action-needed">What Happens Automatically (No Action Needed)</h3>
+
+<table>
+<thead>
+<tr>
+  <th>Time (IST)</th>
+  <th>Event</th>
+  <th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>9:00 AM</td>
+  <td>Backend starts</td>
+  <td>Cron job</td>
+</tr>
+<tr>
+  <td>9:10 AM</td>
+  <td>Fyers TOTP login</td>
+  <td>Auto on startup</td>
+</tr>
+<tr>
+  <td>9:15 AM</td>
+  <td>Market opens</td>
+  <td>Engines start</td>
+</tr>
+<tr>
+  <td>9:30 AM</td>
+  <td>Morning brief</td>
+  <td>Telegram notification</td>
+</tr>
+<tr>
+  <td>10:00 AM</td>
+  <td>Options scan begins</td>
+  <td>Auto</td>
+</tr>
+<tr>
+  <td>10:30 AM</td>
+  <td>Equity scan begins</td>
+  <td>Auto</td>
+</tr>
+<tr>
+  <td>1:00 PM</td>
+  <td>Half-day summary</td>
+  <td>Telegram notification</td>
+</tr>
+<tr>
+  <td>1:50 PM</td>
+  <td>BTST engine starts</td>
+  <td>Deferred start</td>
+</tr>
+<tr>
+  <td>2:00 PM</td>
+  <td>BTST scan + buy</td>
+  <td>Auto</td>
+</tr>
+<tr>
+  <td>3:15 PM</td>
+  <td>Equity square-off</td>
+  <td>Auto</td>
+</tr>
+<tr>
+  <td>3:20 PM</td>
+  <td>All intraday closed</td>
+  <td>Auto</td>
+</tr>
+<tr>
+  <td>3:45 PM</td>
+  <td>Day-end summary</td>
+  <td>Telegram notification</td>
+</tr>
+<tr>
+  <td>3:45 PM</td>
+  <td>Backend shuts down</td>
+  <td>Auto-shutdown</td>
+</tr>
+</tbody>
+</table>
+
+<h3 id="what-you-do">What You Do</h3>
+
+<ol>
+<li><strong>Morning:</strong> Check Telegram for morning brief</li>
+<li><strong>During day:</strong> Check Telegram for trade alerts</li>
+<li><strong>Evening:</strong> Check Telegram for day-end summary</li>
+<li><strong>If needed:</strong> Run health check from Mac</li>
+</ol>
+
+<h3 id="if-something-goes-wrong">If Something Goes Wrong</h3>
+
+<pre><code># Check logs
+ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+tail -100 /var/log/intratrading/backend.log
+
+# Restart backend
+sudo systemctl restart intratrading-backend
+
+# Check if backend is running
+sudo systemctl status intratrading-backend
+</code></pre>
+
+<hr />
+
+<h2 id="17-deployment-workflow-how-changes-go-live">17. Deployment Workflow (How Changes Go Live)</h2>
+
+<h3 id="the-golden-rule-never-edit-code-on-the-server">The Golden Rule: Never Edit Code on the Server</h3>
+
+<p>All changes follow this flow:</p>
+
+<pre><code>1. Edit code on your Mac (with Claude)
+2. Test locally if possible
+3. git add + git commit + git push
+4. GitHub Actions automatically deploys to EC2
+5. If backend is running, it restarts with new code
+6. If backend is off (after hours), code updates silently — next startup uses new code
+</code></pre>
+
+<h3 id="example-claude-makes-a-strategy-change">Example: Claude Makes a Strategy Change</h3>
+
+<pre><code># Claude edits files on your Mac
+# Then you (or Claude) push:
+cd "/Users/vgopiraja/Documents/MY Applications/IntraTrading"
+git add -A
+git commit -m "Strategy: tighten play8 SL for high VIX"
+git push origin main
+
+# GitHub Actions deploys automatically
+# If market is open, backend restarts with new code
+# If market is closed, code waits for next startup
+</code></pre>
+
+<h3 id="updating-credentials">Updating Credentials</h3>
+
+<p>Credentials (.env) NEVER go through GitHub:</p>
+
+<pre><code># Edit .env locally on your Mac
+# Then upload directly:
+bash deploy/update-env.sh YOUR_ELASTIC_IP ~/Documents/AWS/intratrading-key.pem
+</code></pre>
+
+<hr />
+
+<h2 id="18-troubleshooting">18. Troubleshooting</h2>
+
+<h3 id="problem-cannot-ssh-into-server">Problem: Cannot SSH into server</h3>
+
+<pre><code># Check your IP hasn't changed (security group allows "My IP" only)
+curl ifconfig.me
+# If your IP changed, update the Security Group in AWS Console:
+# EC2 → Security Groups → IntraTrading-SG → Edit Inbound Rules → Update SSH source
+</code></pre>
+
+<h3 id="problem-backend-wont-start">Problem: Backend won't start</h3>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+# Check logs for errors
+sudo journalctl -u intratrading-backend -n 100
+tail -100 /var/log/intratrading/backend.log
+
+# Common fixes:
+# 1. .env missing or incorrect
+sudo -u intratrading cat /opt/intratrading/app/backend/.env
+
+# 2. Dependency issue
+cd /opt/intratrading/app/backend
+sudo -u intratrading ./venv/bin/pip install -r requirements.txt
+
+# 3. Port already in use
+sudo lsof -i :8001
+</code></pre>
+
+<h3 id="problem-fyers-login-fails">Problem: Fyers login fails</h3>
+
+<pre><code># Check if the Elastic IP is whitelisted in Fyers
+# Check if redirect URI is correct in Fyers dashboard
+# Check TOTP secret is correct in .env
+
+# Test manually:
+ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+cd /opt/intratrading/app/backend
+sudo -u intratrading ./venv/bin/python -c "
+from services.fyers_client import headless_login
+result = headless_login()
+print(result)
+"
+</code></pre>
+
+<h3 id="problem-github-actions-deploy-fails">Problem: GitHub Actions deploy fails</h3>
+
+<ol>
+<li>Go to GitHub → Actions → click the failed workflow</li>
+<li>Check the error message</li>
+<li>Common issues:
+<ul>
+<li>SSH key incorrect in GitHub Secrets</li>
+<li>EC2 security group blocks GitHub's IP on port 22</li>
+<li>Fix: Change SSH rule source from "My IP" to "0.0.0.0/0" (less secure but works)</li>
+<li>Better: Add GitHub's IP ranges to security group</li>
+</ul></li>
+</ol>
+
+<h3 id="problem-no-trades-being-placed">Problem: No trades being placed</h3>
+
+<pre><code># Check engine status
+curl http://YOUR_ELASTIC_IP:8001/api/auto/status | python3 -m json.tool
+curl http://YOUR_ELASTIC_IP:8001/api/options/auto/status | python3 -m json.tool
+
+# Check scan logs
+tail -200 /var/log/intratrading/backend.log | grep -i "scan\|signal\|order"
+</code></pre>
+
+<hr />
+
+<h2 id="19-security-checklist">19. Security Checklist</h2>
+
+<ul>
+<li>[ ] <code>.env</code> file has 600 permissions (owner read/write only)</li>
+<li>[ ] <code>.pem</code> key file stored safely on Mac, not in cloud storage</li>
+<li>[ ] GitHub repository is <strong>Private</strong></li>
+<li>[ ] SSH access restricted to "My IP" in security group</li>
+<li>[ ] No credentials in git history (check with <code>git log --all --full-history -- '*.env'</code>)</li>
+<li>[ ] Fyers API key has IP restriction enabled</li>
+<li>[ ] UFW firewall enabled on server</li>
+<li>[ ] Regular OS updates: <code>sudo apt update &amp;&amp; sudo apt upgrade</code></li>
+</ul>
+
+<hr />
+
+<h2 id="20-monthly-maintenance">20. Monthly Maintenance</h2>
+
+<h3 id="weekly-every-friday">Weekly (Every Friday)</h3>
+
+<ol>
+<li>Check AWS bill: https://console.aws.amazon.com/billing</li>
+<li>Run health check: <code>bash deploy/health-check.sh YOUR_ELASTIC_IP</code></li>
+</ol>
+
+<h3 id="monthly">Monthly</h3>
+
+<ol>
+<li><p>Update server OS:</p>
+
+<pre><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP
+sudo apt update &amp;&amp; sudo apt upgrade -y
+</code></pre></li>
+<li><p>Check disk space:</p>
+
+<pre><code>df -h /
+# If &gt;80% full, clean old logs:
+sudo find /var/log/intratrading -name "*.log.*.gz" -mtime +30 -delete
+</code></pre></li>
+<li><p>Review trading performance and adjust strategies as needed</p></li>
+<li><p>Check if Fyers IP whitelist is still active</p></li>
+</ol>
+
+<hr />
+
+<h2 id="quick-reference-card">Quick Reference Card</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Task</th>
+  <th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>SSH into server</td>
+  <td><code>ssh -i ~/Documents/AWS/intratrading-key.pem ubuntu@YOUR_ELASTIC_IP</code></td>
+</tr>
+<tr>
+  <td>Start backend</td>
+  <td><code>sudo systemctl start intratrading-backend</code></td>
+</tr>
+<tr>
+  <td>Stop backend</td>
+  <td><code>sudo systemctl stop intratrading-backend</code></td>
+</tr>
+<tr>
+  <td>Check status</td>
+  <td><code>sudo systemctl status intratrading-backend</code></td>
+</tr>
+<tr>
+  <td>View logs</td>
+  <td><code>tail -f /var/log/intratrading/backend.log</code></td>
+</tr>
+<tr>
+  <td>Deploy code</td>
+  <td><code>git push origin main</code> (auto-deploys via GitHub Actions)</td>
+</tr>
+<tr>
+  <td>Upload .env</td>
+  <td><code>bash deploy/update-env.sh IP KEY</code></td>
+</tr>
+<tr>
+  <td>Health check</td>
+  <td><code>bash deploy/health-check.sh YOUR_ELASTIC_IP</code></td>
+</tr>
+<tr>
+  <td>Update OS</td>
+  <td><code>sudo apt update &amp;&amp; sudo apt upgrade -y</code></td>
+</tr>
+</tbody>
+</table>
+
+<hr />
+
+<p><strong>Document End</strong></p>
+
+<p>Replace <code>YOUR_ELASTIC_IP</code> and <code>YOUR_USERNAME</code> with your actual values throughout this guide.</p>
+
+<p>For support, ask Claude in the next session.</p>
+
+</body>
+</html>

@@ -12,6 +12,7 @@ import {
   Microscope,
   TrendingUp,
   TrendingDown,
+  Sunrise,
 } from 'lucide-react'
 
 const navItems = [
@@ -19,6 +20,7 @@ const navItems = [
   { icon: CandlestickChart, label: 'Equity', page: 'equity' },
   { icon: TrendingUp, label: 'Options', page: 'options' },
   { icon: TrendingDown, label: 'Futures', page: 'futures' },
+  { icon: Sunrise, label: 'BTST', page: 'btst' },
   { icon: FlaskConical, label: 'Backtest', page: 'backtest' },
   { icon: Briefcase, label: 'Positions', page: 'positions' },
   { icon: ScrollText, label: 'Trade Log', page: 'logs' },

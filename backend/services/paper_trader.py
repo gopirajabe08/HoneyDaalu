@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Optional
 
 from services.scanner import run_scan, is_market_open, _calc_conviction
+from services.market_data import get_nifty_trend
 from services.trade_logger import log_trade, log_trades_batch
 from services.fyers_client import get_quotes, is_authenticated
 from utils.time_utils import now_ist, is_past_time, is_before_time
@@ -505,12 +506,66 @@ class PaperTrader:
         if not unique_signals:
             return
 
+        # ── Nifty Trend Filter ──
+        # Check Nifty 50 direction to avoid trading against the market
+        # Contra/mean-reversion strategies are EXEMPT — they trade against the trend by design
+        CONTRA_STRATEGIES = {"play6_bb_contra", "play8_rsi_divergence"}
+
+        nifty_trend = get_nifty_trend("5m")
+        trend_signals = [s for s in unique_signals if s.get("strategy") not in CONTRA_STRATEGIES]
+        contra_signals = [s for s in unique_signals if s.get("strategy") in CONTRA_STRATEGIES]
+
+        buy_count = sum(1 for s in trend_signals if s.get("signal_type") == "BUY")
+        sell_count = sum(1 for s in trend_signals if s.get("signal_type") == "SELL")
+        contra_count = len(contra_signals)
+
+        if nifty_trend == "BEARISH":
+            trend_signals = [s for s in trend_signals if s.get("signal_type") == "SELL"]
+            self._log("FILTER", f"Nifty BEARISH — trend: blocked {buy_count} BUY, kept {sell_count} SELL | contra: {contra_count} exempt")
+        elif nifty_trend == "BULLISH":
+            trend_signals = [s for s in trend_signals if s.get("signal_type") == "BUY"]
+            self._log("FILTER", f"Nifty BULLISH — trend: kept {buy_count} BUY, blocked {sell_count} SELL | contra: {contra_count} exempt")
+        else:
+            self._log("FILTER", f"Nifty {nifty_trend} — allowing all ({buy_count} BUY, {sell_count} SELL, {contra_count} contra)")
+
+        unique_signals = trend_signals + contra_signals
+
+        if not unique_signals:
+            self._log("FILTER", "No signals remaining after Nifty trend filter")
+            return
+
+        # ── Strategy diversity: interleave signals from different strategies ──
+        from collections import OrderedDict
+        by_strategy = OrderedDict()
+        for s in unique_signals:
+            strat = s.get("strategy", s.get("_strategy", "unknown"))
+            if strat not in by_strategy:
+                by_strategy[strat] = []
+            by_strategy[strat].append(s)
+
+        diversified = []
+        max_rounds = max((len(v) for v in by_strategy.values()), default=0)
+        for round_idx in range(max_rounds):
+            for strat, signals in by_strategy.items():
+                if round_idx < len(signals):
+                    diversified.append(signals[round_idx])
+
+        if len(by_strategy) > 1:
+            strat_summary = ", ".join(f"{k}:{len(v)}" for k, v in by_strategy.items())
+            self._log("FILTER", f"Strategy diversity: {strat_summary} — interleaved {len(diversified)} signals")
+
+        unique_signals = diversified
+
         # First scan of day: allow 3 orders (morning has best signals)
         if self._scan_count <= 1:
             max_orders_per_scan = min(3, slots_available) if not self._check_drawdown_breaker() else 1
         else:
             max_orders_per_scan = 1 if self._check_drawdown_breaker() else min(2, slots_available)
         orders_placed = 0
+
+        # Track strategy count per scan to cap concentration
+        strategy_count_this_scan = {}
+        max_per_strategy = max(2, slots_available // max(len(by_strategy), 1))
 
         for signal in unique_signals:
             if orders_placed >= max_orders_per_scan:
@@ -522,6 +577,14 @@ class PaperTrader:
                 break
 
             symbol = signal.get("symbol", "")
+            sig_strategy = signal.get("strategy", signal.get("_strategy", "unknown"))
+
+            # Strategy concentration limit
+            existing_for_strategy = sum(1 for t in self._active_trades if t.get("strategy") == sig_strategy)
+            scan_for_strategy = strategy_count_this_scan.get(sig_strategy, 0)
+            if existing_for_strategy + scan_for_strategy >= max_per_strategy:
+                self._log("FILTER", f"{symbol} — skipping, {sig_strategy} already has {existing_for_strategy + scan_for_strategy} positions (max {max_per_strategy})")
+                continue
 
             active_symbols = {t["symbol"] for t in self._active_trades}
             if symbol in active_symbols:
@@ -549,6 +612,7 @@ class PaperTrader:
             success = self._place_virtual_order(signal)
             if success:
                 orders_placed += 1
+                strategy_count_this_scan[sig_strategy] = strategy_count_this_scan.get(sig_strategy, 0) + 1
 
         self._update_position_pnl()
 

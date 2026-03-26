@@ -33,6 +33,7 @@ from utils.time_utils import now_ist, is_before_time, is_past_time
 from utils.state_manager import get_state_path, save_state, load_state
 from utils.trader_log import TraderLogger
 from utils.sleep_manager import SleepManager
+from services import telegram_notify
 from config import (
     INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN,
     INTRADAY_ORDER_CUTOFF_HOUR, INTRADAY_ORDER_CUTOFF_MIN,
@@ -42,6 +43,20 @@ from config import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Basic sector mapping for concentration limit (parity with paper_trader)
+SECTOR_MAP = {
+    'HDFCBANK': 'banking', 'ICICIBANK': 'banking', 'SBIN': 'banking', 'AXISBANK': 'banking',
+    'KOTAKBANK': 'banking', 'BANKBARODA': 'banking', 'PNB': 'banking', 'INDUSINDBK': 'banking',
+    'FEDERALBNK': 'banking', 'IDFCFIRSTB': 'banking', 'BANDHANBNK': 'banking', 'CANBK': 'banking',
+    'TCS': 'it', 'INFY': 'it', 'WIPRO': 'it', 'HCLTECH': 'it', 'TECHM': 'it', 'LTIM': 'it',
+    'RELIANCE': 'energy', 'ONGC': 'energy', 'IOC': 'energy', 'BPCL': 'energy', 'NTPC': 'energy',
+    'POWERGRID': 'energy', 'ADANIGREEN': 'energy', 'ADANIPORTS': 'infra',
+    'TATAMOTORS': 'auto', 'MARUTI': 'auto', 'BAJAJ-AUTO': 'auto', 'HEROMOTOCO': 'auto', 'M&M': 'auto',
+    'HDFCLIFE': 'insurance', 'SBILIFE': 'insurance', 'ICICIPRULI': 'insurance',
+    'BAJFINANCE': 'nbfc', 'BAJAJFINSV': 'nbfc', 'CHOLAFIN': 'nbfc', 'SHRIRAMFIN': 'nbfc',
+}
+MAX_PER_SECTOR = 2
 
 STATE_FILE = get_state_path(".auto_trader_state.json")
 
@@ -129,10 +144,12 @@ class AutoTrader:
             "active_trades": self._active_trades,
             "trade_history": self._trade_history,
             "total_pnl": self._total_pnl,
+            "daily_realized_pnl": self._daily_realized_pnl,
             "scan_count": self._scan_count,
             "order_count": self._order_count,
             "started_at": self._started_at,
             "squared_off": self._squared_off,
+            "margin_exhausted": getattr(self, '_margin_exhausted', False),
             "logs": self._logger.recent(200),
         }
         save_state(STATE_FILE, state, "AutoTrader")
@@ -148,18 +165,28 @@ class AutoTrader:
             today = now_ist().strftime("%Y-%m-%d")
             if state.get("date") != today:
                 logger.info(f"[AutoTrader] State file is from {state.get('date')}, not today ({today}) — ignoring")
+                # Clear any stale active trades from previous day
+                self._active_trades = []
+                self._trade_history = []
                 return
 
             self._strategy_keys = state.get("strategy_keys", [])
             self._timeframes = state.get("timeframes", {})
             self._capital = state.get("capital", 0.0)
             self._active_trades = state.get("active_trades", [])
+            # Fix any positions with missing SL from old state
+            for t in self._active_trades:
+                if (t.get("stop_loss") or 0) == 0 and t.get("entry_price", 0) > 0:
+                    ep = t["entry_price"]
+                    t["stop_loss"] = round(ep * (0.985 if t.get("side", 1) == 1 else 1.015), 2)
             self._trade_history = state.get("trade_history", [])
             self._total_pnl = state.get("total_pnl", 0.0)
+            self._daily_realized_pnl = state.get("daily_realized_pnl", 0.0)
             self._scan_count = state.get("scan_count", 0)
             self._order_count = state.get("order_count", 0)
             self._started_at = state.get("started_at")
             self._squared_off = state.get("squared_off", False)
+            self._margin_exhausted = state.get("margin_exhausted", False)
             self._logger.entries = state.get("logs", [])
 
             # Recalculate max positions from restored capital
@@ -235,12 +262,18 @@ class AutoTrader:
                         inherited_timeframe = hist.get("timeframe", "")
                         break
 
+                # Calculate fallback SL (1.5% from entry) since original strategy SL is unknown
+                if side == 1:  # BUY/LONG
+                    recovered_sl = round(entry_price * 0.985, 2)
+                else:  # SELL/SHORT
+                    recovered_sl = round(entry_price * 1.015, 2)
+
                 trade = {
                     "symbol": plain,
                     "signal_type": "BUY" if side == 1 else "SELL",
                     "side": side,
                     "entry_price": round(entry_price, 2),
-                    "stop_loss": 0,
+                    "stop_loss": recovered_sl,
                     "target": 0,
                     "quantity": abs(qty),
                     "order_id": "recovered",
@@ -254,10 +287,27 @@ class AutoTrader:
                     "recovered": True,
                 }
                 self._active_trades.append(trade)
-                self._log("RESTORE", f"Recovered orphaned position: {plain} {'LONG' if side==1 else 'SHORT'} x{abs(qty)} @ ₹{entry_price:.2f} | P&L ₹{pnl:.2f}")
+                self._log("WARN", f"Recovered orphaned position with calculated SL: {plain} {'LONG' if side==1 else 'SHORT'} x{abs(qty)} @ ₹{entry_price:.2f} | SL=₹{recovered_sl} (1.5% fallback) | P&L ₹{pnl:.2f}")
+
+            # Fix any existing tracked positions that have SL=0 (from old state files)
+            for t in self._active_trades:
+                if (t.get("stop_loss") or 0) == 0 and t.get("entry_price", 0) > 0:
+                    ep = t["entry_price"]
+                    if t.get("side", 1) == 1:
+                        t["stop_loss"] = round(ep * 0.985, 2)
+                    else:
+                        t["stop_loss"] = round(ep * 1.015, 2)
+                    self._log("WARN", f"Fixed missing SL for {t['symbol']}: SL=₹{t['stop_loss']} (1.5% fallback)")
 
             if any(t.get("recovered") for t in self._active_trades):
                 self._save_state()
+
+            # If any positions were recovered, set margin exhausted to prevent new orders
+            # Engine should only MONITOR recovered positions, not place new ones
+            recovered_count = sum(1 for t in self._active_trades if t.get("recovered"))
+            if recovered_count > 0:
+                self._margin_exhausted = True
+                self._log("WARN", f"{recovered_count} recovered positions — monitor only mode, no new orders")
 
         except Exception as e:
             self._log("WARN", f"Position recovery failed: {e}")
@@ -446,6 +496,20 @@ class AutoTrader:
                 return
 
             self._log("SCAN", "10:30 AM — executing initial full scan to fill all slots")
+
+            # Smart scan timing: wait for 15m candle close
+            # Candle closes at XX:00, XX:15, XX:30, XX:45
+            # Scanning mid-candle uses incomplete data → false signals
+            now = now_ist()
+            minutes = now.minute
+            next_candle_close = 15 - (minutes % 15)
+            if next_candle_close > 2 and next_candle_close < 15:
+                self._log("INFO", f"Waiting {next_candle_close} min for 15m candle close before scanning")
+                for _ in range(next_candle_close * 60):
+                    if not self._running:
+                        break
+                    time.sleep(1)
+
             self._execute_scan_cycle()
 
         # ── Phase 3: Monitor loop — check positions every 60s, scan on slot open ──
@@ -479,20 +543,36 @@ class AutoTrader:
                 continue  # will hit square-off at top of loop
 
             # ── Monitor positions: detect closures, update P&L ──
-            self._update_position_pnl()
             _monitor_tick += 1
+            self._update_position_pnl(monitor_tick=_monitor_tick)
 
             # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
             if _monitor_tick % 5 == 0:
                 try:
                     if not is_authenticated():
+                        _disconnect_ticks = getattr(self, '_fyers_disconnect_ticks', 0) + 1
+                        self._fyers_disconnect_ticks = _disconnect_ticks
                         self._log("WARN", "Fyers disconnected — attempting reconnect...")
+                        try:
+                            telegram_notify.fyers_disconnected()
+                            # Alert after 2+ failed checks (~10 min down)
+                            if _disconnect_ticks >= 2:
+                                telegram_notify.fyers_still_disconnected(_disconnect_ticks * 5)
+                        except Exception:
+                            pass
                         from services.fyers_client import headless_login
                         result = headless_login()
                         if "error" in result:
                             self._log("ALERT", f"Fyers reconnect FAILED: {result['error']} — positions at risk!")
                         else:
                             self._log("INFO", "Fyers reconnected successfully")
+                            self._fyers_disconnect_ticks = 0
+                            try:
+                                telegram_notify.fyers_reconnected()
+                            except Exception:
+                                pass
+                    else:
+                        self._fyers_disconnect_ticks = 0
                 except Exception:
                     pass
 
@@ -507,6 +587,18 @@ class AutoTrader:
                 if current_open_count < self.max_open_positions and not _is_past_order_cutoff():
                     if is_market_open() and is_authenticated():
                         self._log("SCAN", f"Slot available — triggering scan to fill {self.max_open_positions - current_open_count} open slot(s)")
+
+                        # Smart scan timing: wait for 15m candle close
+                        now = now_ist()
+                        minutes = now.minute
+                        next_candle_close = 15 - (minutes % 15)
+                        if next_candle_close > 2 and next_candle_close < 15:
+                            self._log("INFO", f"Waiting {next_candle_close} min for 15m candle close before scanning")
+                            for _ in range(next_candle_close * 60):
+                                if not self._running:
+                                    break
+                                time.sleep(1)
+
                         self._execute_scan_cycle()
                         current_open_count = len([t for t in self._active_trades if t["status"] == "OPEN"])
                     elif not is_authenticated():
@@ -516,9 +608,21 @@ class AutoTrader:
 
             # Periodic re-scan: if slots available, re-scan every ~15 min to fill them
             elif current_open_count < self.max_open_positions and not _is_past_order_cutoff() and is_market_open():
-                if self._monitor_tick > 0 and self._monitor_tick % 45 == 0:
+                if _monitor_tick > 0 and _monitor_tick % 45 == 0:
                     slots = self.max_open_positions - current_open_count
                     self._log("SCAN", f"{slots} slots open — periodic re-scan")
+
+                    # Smart scan timing: wait for 15m candle close
+                    now = now_ist()
+                    minutes = now.minute
+                    next_candle_close = 15 - (minutes % 15)
+                    if next_candle_close > 2 and next_candle_close < 15:
+                        self._log("INFO", f"Waiting {next_candle_close} min for 15m candle close before scanning")
+                        for _ in range(next_candle_close * 60):
+                            if not self._running:
+                                break
+                            time.sleep(1)
+
                     self._execute_scan_cycle()
                     current_open_count = len([t for t in self._active_trades if t["status"] == "OPEN"])
 
@@ -554,6 +658,42 @@ class AutoTrader:
             return True
         return False
 
+    def _is_correlated(self, symbol: str) -> bool:
+        """Check if symbol is in same sector/industry group as existing positions.
+        Avoids picking stocks that move together — reduces portfolio correlation risk."""
+        CORRELATION_GROUPS = {
+            "banking": ["HDFCBANK", "ICICIBANK", "SBIN", "AXISBANK", "KOTAKBANK", "BANDHANBNK", "FEDERALBNK", "IDFCFIRSTB", "INDUSINDBK", "PNB"],
+            "it": ["TCS", "INFY", "WIPRO", "HCLTECH", "TECHM", "LTIM", "MPHASIS", "COFORGE", "PERSISTENT", "NAUKRI"],
+            "pharma": ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "AUROPHARMA", "BIOCON", "LUPIN", "TORNTPHARM", "ALKEM", "IPCALAB"],
+            "auto": ["TATAMOTORS", "M&M", "MARUTI", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT", "ASHOKLEY", "TVSMOTOR"],
+            "energy": ["RELIANCE", "ONGC", "BPCL", "HINDPETRO", "IOC", "GAIL", "ADANIENT", "ADANIGREEN", "ADANIPOWER"],
+            "metal": ["TATASTEEL", "HINDALCO", "JSWSTEEL", "VEDL", "NATIONALUM", "COALINDIA", "NMDC", "MOIL"],
+            "fmcg": ["ITC", "HINDUNILVR", "NESTLEIND", "BRITANNIA", "DABUR", "MARICO", "GODREJCP", "COLPAL"],
+            "realty": ["DLF", "GODREJPROP", "OBEROIRLTY", "PRESTIGE", "BRIGADE", "LODHA", "SOBHA"],
+            "finance": ["BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "MUTHOOTFIN", "SHRIRAMFIN", "M&MFIN", "LICHSGFIN"],
+        }
+
+        # Find which group the new symbol belongs to
+        symbol_group = None
+        for group, members in CORRELATION_GROUPS.items():
+            if symbol in members:
+                symbol_group = group
+                break
+
+        if symbol_group is None:
+            return False  # Unknown group = no correlation concern
+
+        # Check if any active trade is in the same group
+        for trade in self._active_trades:
+            if trade.get("status") != "OPEN":
+                continue
+            trade_sym = trade.get("symbol", "")
+            for group, members in CORRELATION_GROUPS.items():
+                if trade_sym in members and group == symbol_group:
+                    return True
+
+        return False
+
     def _execute_scan_cycle(self):
         """Run one scan across all selected strategies: find signals and place orders."""
         # Re-detect regime on each scan cycle (strategies adapt to intraday shifts)
@@ -575,11 +715,50 @@ class AutoTrader:
         except Exception as e:
             pass  # Regime detection failed, keep current strategies
 
+        # VIX-adjusted SL multiplier — wider SL in high VIX to avoid premature hits
+        try:
+            from services.equity_regime import detect_equity_regime as _detect_regime
+            _regime_data = _detect_regime()
+            _vix = _regime_data.get("components", {}).get("vix", 15)
+            from config import VIX_SL_ADJUSTMENTS
+            self._vix_atr_mult = 2.5  # default
+            for level in ["high", "elevated", "normal", "low"]:
+                adj = VIX_SL_ADJUSTMENTS[level]
+                if _vix >= adj["threshold"] or level == "low":
+                    self._vix_atr_mult = adj["atr_mult"]
+                    break
+            if self._vix_atr_mult != 2.5:
+                self._log("VIX", f"VIX={_vix:.1f} — SL multiplier adjusted to {self._vix_atr_mult}x ATR")
+        except Exception:
+            self._vix_atr_mult = 2.5
+
         # Daily loss check
         if self._check_daily_loss_limit():
             self._log("INFO", "Daily loss limit active — skipping scan, monitoring only")
             self._update_position_pnl()
             return
+
+        # Margin check — skip ALL orders if available funds are insufficient
+        try:
+            from services.fyers_client import get_funds as _get_funds
+            funds = _get_funds()
+            for f in funds.get("fund_limit", []):
+                if f.get("id") == 10:
+                    avail = f.get("equityAmount", 0)
+                    if avail < 10000:  # Less than ₹10K available = margin exhausted
+                        self._margin_exhausted = True
+                        self._log("WARN", f"Insufficient margin: ₹{avail:,.0f} available — skipping scan")
+                        try:
+                            telegram_notify.margin_warning(avail)
+                        except Exception:
+                            pass
+                        self._update_position_pnl()
+                        return
+                    else:
+                        self._margin_exhausted = False  # Reset if margin is available
+                    break
+        except Exception:
+            pass  # Funds check failed, proceed cautiously
 
         self._scan_count += 1
         num_strategies = len(self._strategy_keys)
@@ -590,10 +769,13 @@ class AutoTrader:
         open_symbols_fyers, _ = self._get_open_positions_detail()
         # Combine both: internal OPEN trades + any Fyers positions not yet tracked
         open_symbols = {t["symbol"] for t in internal_open} | open_symbols_fyers
-        open_count = len(internal_open)  # internal count is more accurate for slot tracking
+        # Use MAX of internal count and Fyers count as the authority
+        fyers_open_count = len(open_symbols_fyers)
+        open_count = max(len(internal_open), fyers_open_count)
 
         if open_count >= self.max_open_positions:
             self._log("INFO", f"Max positions reached ({open_count}/{self.max_open_positions}) — skipping order placement")
+            self._margin_exhausted = True  # Prevent SL health check from spamming orders
             self._update_position_pnl()
             return
 
@@ -680,24 +862,54 @@ class AutoTrader:
 
         # ── Nifty Trend Filter ──
         # Check Nifty 50 direction to avoid trading against the market
+        # Contra/mean-reversion strategies are EXEMPT — they trade against the trend by design
+        CONTRA_STRATEGIES = {"play6_bb_contra", "play8_rsi_divergence"}
+
         nifty_trend = get_nifty_trend("5m")
-        buy_count = sum(1 for s in unique_signals if s.get("signal_type") == "BUY")
-        sell_count = sum(1 for s in unique_signals if s.get("signal_type") == "SELL")
+        trend_signals = [s for s in unique_signals if s.get("strategy") not in CONTRA_STRATEGIES]
+        contra_signals = [s for s in unique_signals if s.get("strategy") in CONTRA_STRATEGIES]
+
+        buy_count = sum(1 for s in trend_signals if s.get("signal_type") == "BUY")
+        sell_count = sum(1 for s in trend_signals if s.get("signal_type") == "SELL")
+        contra_count = len(contra_signals)
 
         if nifty_trend == "BEARISH":
-            # Block BUY signals on bearish days — only allow shorts
-            unique_signals = [s for s in unique_signals if s.get("signal_type") == "SELL"]
-            self._log("FILTER", f"Nifty BEARISH — blocked {buy_count} BUY signals, kept {sell_count} SELL signals")
+            trend_signals = [s for s in trend_signals if s.get("signal_type") == "SELL"]
+            self._log("FILTER", f"Nifty BEARISH — trend: blocked {buy_count} BUY, kept {sell_count} SELL | contra: {contra_count} exempt")
         elif nifty_trend == "BULLISH":
-            # Block SELL signals on bullish days — only allow longs
-            unique_signals = [s for s in unique_signals if s.get("signal_type") == "BUY"]
-            self._log("FILTER", f"Nifty BULLISH — kept {buy_count} BUY signals, blocked {sell_count} SELL signals")
+            trend_signals = [s for s in trend_signals if s.get("signal_type") == "BUY"]
+            self._log("FILTER", f"Nifty BULLISH — trend: kept {buy_count} BUY, blocked {sell_count} SELL | contra: {contra_count} exempt")
         else:
-            self._log("FILTER", f"Nifty {nifty_trend} — allowing all signals ({buy_count} BUY, {sell_count} SELL)")
+            self._log("FILTER", f"Nifty {nifty_trend} — allowing all ({buy_count} BUY, {sell_count} SELL, {contra_count} contra)")
+
+        unique_signals = trend_signals + contra_signals
 
         if not unique_signals:
             self._log("FILTER", "No signals remaining after Nifty trend filter")
             return
+
+        # ── Strategy diversity: interleave signals from different strategies ──
+        # Pick the best signal from each strategy first (round-robin), then fill remaining
+        from collections import OrderedDict
+        by_strategy = OrderedDict()
+        for s in unique_signals:
+            strat = s.get("strategy", s.get("_strategy", "unknown"))
+            if strat not in by_strategy:
+                by_strategy[strat] = []
+            by_strategy[strat].append(s)
+
+        diversified = []
+        max_rounds = max((len(v) for v in by_strategy.values()), default=0)
+        for round_idx in range(max_rounds):
+            for strat, signals in by_strategy.items():
+                if round_idx < len(signals):
+                    diversified.append(signals[round_idx])
+
+        if len(by_strategy) > 1:
+            strat_summary = ", ".join(f"{k}:{len(v)}" for k, v in by_strategy.items())
+            self._log("FILTER", f"Strategy diversity: {strat_summary} — interleaved {len(diversified)} signals")
+
+        unique_signals = diversified
 
         # First scan of day: allow 3 orders (morning has best signals)
         if self._scan_count <= 1:
@@ -705,6 +917,10 @@ class AutoTrader:
         else:
             max_orders_per_scan = 1 if self._check_drawdown_breaker() else min(2, slots_available)
         orders_placed = 0
+
+        # Track strategy count per scan to cap concentration
+        strategy_count_this_scan = {}
+        max_per_strategy = max(2, slots_available // max(len(by_strategy), 1))
 
         for signal in unique_signals:
             if orders_placed >= max_orders_per_scan:
@@ -717,6 +933,26 @@ class AutoTrader:
                 break
 
             symbol = signal.get("symbol", "")
+            sig_strategy = signal.get("strategy", signal.get("_strategy", "unknown"))
+
+            # Strategy concentration limit — don't put all eggs in one basket
+            existing_for_strategy = sum(1 for t in self._active_trades if t.get("strategy") == sig_strategy)
+            scan_for_strategy = strategy_count_this_scan.get(sig_strategy, 0)
+            if existing_for_strategy + scan_for_strategy >= max_per_strategy:
+                self._log("FILTER", f"{symbol} — skipping, {sig_strategy} already has {existing_for_strategy + scan_for_strategy} positions (max {max_per_strategy})")
+                continue
+
+            # Sector concentration check (parity with paper_trader)
+            sym_sector = SECTOR_MAP.get(symbol, "other")
+            sector_count = sum(1 for t in self._active_trades if SECTOR_MAP.get(t.get("symbol", ""), "other") == sym_sector)
+            if sector_count >= MAX_PER_SECTOR and sym_sector != "other":
+                self._log("FILTER", f"Sector limit: {symbol} ({sym_sector}) — already {sector_count} trades in sector")
+                continue
+
+            # Correlation check — avoid picking stocks that move together
+            if self._is_correlated(symbol):
+                self._log("FILTER", f"{symbol} — correlated with existing position, skipping")
+                continue
 
             # Skip if already in position
             if symbol in open_symbols:
@@ -730,10 +966,15 @@ class AutoTrader:
 
             # Place order — tag with strategy info
             signal["_placed_via"] = signal.get("_strategy", "")
+            self._margin_exhausted = False
             success = self._place_order_for_signal(signal)
             if success:
                 orders_placed += 1
                 open_symbols.add(symbol)
+                strategy_count_this_scan[sig_strategy] = strategy_count_this_scan.get(sig_strategy, 0) + 1
+            elif self._margin_exhausted:
+                self._log("WARN", "Margin exhausted — stopping order placement for this scan")
+                break
 
         self._update_position_pnl()
 
@@ -752,9 +993,55 @@ class AutoTrader:
             return False
 
         side = 1 if signal_type == "BUY" else -1
+
+        # VIX-adjust the SL and target if VIX is elevated
+        vix_mult = getattr(self, '_vix_atr_mult', 2.5)
+        if vix_mult > 2.5 and entry_price > 0 and stop_loss > 0:
+            sl_distance = abs(entry_price - stop_loss)
+            adjusted_sl_distance = sl_distance * (vix_mult / 2.5)
+            target_distance = abs(target - entry_price)
+            adjusted_target_distance = target_distance * (vix_mult / 2.5)
+            if side == 1:  # BUY
+                stop_loss = round(entry_price - adjusted_sl_distance, 2)
+                target = round(entry_price + adjusted_target_distance, 2)
+            else:  # SELL
+                stop_loss = round(entry_price + adjusted_sl_distance, 2)
+                target = round(entry_price - adjusted_target_distance, 2)
+            self._log("VIX", f"{symbol} — SL/target widened by {vix_mult/2.5:.1f}x (VIX mult {vix_mult}): SL=₹{stop_loss} Target=₹{target}")
+
         capital_req = qty * entry_price
 
         self._log("ORDER", f"Placing {signal_type} order: {symbol} | Qty={qty} | Entry=₹{entry_price} | SL=₹{stop_loss} | Target=₹{target} | R:R={rr} | Capital=₹{capital_req:,.0f}")
+
+        # Dynamic margin check — verify Fyers has enough funds for this order
+        try:
+            from services.fyers_client import get_funds as _check_funds
+            funds_resp = _check_funds()
+            avail = 0
+            for f in funds_resp.get("fund_limit", []):
+                if f.get("id") == 10:
+                    avail = f.get("equityAmount", 0)
+                    break
+            estimated_margin = qty * entry_price * 1.5  # 1.5x for entry + SL + target margin
+            if avail < estimated_margin:
+                self._log("WARN", f"{symbol} — Insufficient margin: available ₹{avail:,.0f} < needed ₹{estimated_margin:,.0f}")
+                self._margin_exhausted = True
+                return False
+        except Exception:
+            pass  # Funds check failed, proceed cautiously
+
+        # Price validation: skip if LTP has moved >0.5% from signal entry
+        try:
+            quotes_res = get_quotes([symbol])
+            if "d" in quotes_res and quotes_res["d"]:
+                current_ltp = quotes_res["d"][0].get("v", {}).get("lp", 0)
+                if current_ltp > 0 and entry_price > 0:
+                    price_diff_pct = abs(current_ltp - entry_price) / entry_price
+                    if price_diff_pct > 0.005:
+                        self._log("SKIP", f"{symbol} — Price moved too far from signal: LTP=₹{current_ltp:.2f} vs Entry=₹{entry_price:.2f} ({price_diff_pct*100:.2f}% drift)")
+                        return False
+        except Exception as e:
+            self._log("WARN", f"{symbol} — LTP check failed ({e}), proceeding with order")
 
         try:
             result = place_bracket_order(
@@ -767,7 +1054,10 @@ class AutoTrader:
             )
 
             if "error" in result:
+                error_msg = result['error'].lower()
                 self._log("ERROR", f"{symbol} — order FAILED: {result['error']}")
+                if "margin" in error_msg or "shortfall" in error_msg:
+                    self._margin_exhausted = True
                 return False
 
             order_mode = result.get("order_mode", "BO")
@@ -803,6 +1093,8 @@ class AutoTrader:
                     entry_price = actual_price
                     self._log("ORDER", f"{symbol} — FILLED at ₹{actual_price} (signal was ₹{signal.get('entry_price', 0)})")
 
+            target_order_id = result.get("target_order_id", "")
+
             trade = {
                 "symbol": symbol,
                 "signal_type": signal_type,
@@ -813,6 +1105,7 @@ class AutoTrader:
                 "quantity": qty,
                 "order_id": order_id,
                 "sl_order_id": sl_order_id,
+                "target_order_id": target_order_id,
                 "order_mode": order_mode,
                 "risk_reward_ratio": rr,
                 "capital_required": capital_req,
@@ -826,6 +1119,17 @@ class AutoTrader:
             self._active_trades.append(trade)
             self._order_count += 1
             self._save_state()
+
+            # Telegram: trade placed notification
+            try:
+                telegram_notify.trade_placed(
+                    symbol, signal_type, qty, entry_price, stop_loss,
+                    signal.get("_placed_via", signal.get("_strategy", "")),
+                    engine="Equity"
+                )
+            except Exception:
+                pass
+
             return True
 
         except Exception as e:
@@ -889,7 +1193,7 @@ class AutoTrader:
 
         self._log("ALERT", f"Squaring off {len(open_symbols)} open position(s): {', '.join(open_symbols)}")
 
-        # Step 1: Cancel all pending SL orders from INTRADAY_SL trades
+        # Step 1: Cancel all pending SL and target orders from INTRADAY_SL trades
         for trade in self._active_trades:
             if trade.get("order_mode") == "INTRADAY_SL" and trade["status"] == "OPEN":
                 sl_order_id = trade.get("sl_order_id", "")
@@ -902,6 +1206,16 @@ class AutoTrader:
                             self._log("WARN", f"{trade['symbol']} — SL cancel failed: {cancel_result.get('error', '')} (may already be triggered)")
                     except Exception as e:
                         self._log("WARN", f"{trade['symbol']} — SL cancel exception: {e}")
+                target_order_id = trade.get("target_order_id", "")
+                if target_order_id:
+                    try:
+                        cancel_result = cancel_order(target_order_id)
+                        if "error" not in cancel_result:
+                            self._log("INFO", f"{trade['symbol']} — cancelled target order before square-off (ID: {target_order_id})")
+                        else:
+                            self._log("WARN", f"{trade['symbol']} — target cancel failed: {cancel_result.get('error', '')} (may already be filled)")
+                    except Exception as e:
+                        self._log("WARN", f"{trade['symbol']} — target cancel exception: {e}")
 
         # Step 2: Re-fetch positions after SL cancellations (SL may have triggered
         # between the first fetch and cancellation, changing position state)
@@ -923,36 +1237,53 @@ class AutoTrader:
 
             self._log("SQUAREOFF", f"Closing {symbol_plain}: qty={net_qty} | P&L=₹{pnl:.2f} | Side={'SELL' if close_side == -1 else 'BUY'}")
 
-            try:
-                result = place_order(
-                    symbol=symbol_plain,
-                    qty=close_qty,
-                    side=close_side,
-                    order_type=2,  # Market order
-                    product_type="INTRADAY",
-                )
+            # Place exit with retry (max 3 attempts, parity with futures_auto_trader)
+            SQUAREOFF_MAX_RETRIES = 3
+            exit_success = False
+            for attempt in range(SQUAREOFF_MAX_RETRIES):
+                try:
+                    result = place_order(
+                        symbol=symbol_plain,
+                        qty=close_qty,
+                        side=close_side,
+                        order_type=2,  # Market order
+                        product_type="INTRADAY",
+                    )
 
-                if "error" in result:
-                    self._log("ERROR", f"Square-off FAILED for {symbol_plain}: {result['error']}")
-                else:
-                    order_id = result.get("id", result.get("order_id", "unknown"))
-                    self._log("SQUAREOFF", f"{symbol_plain} — squared off (ID: {order_id})")
-                    self._total_pnl += pnl; self._daily_realized_pnl += pnl
+                    if "error" not in result:
+                        exit_success = True
+                        order_id = result.get("id", result.get("order_id", "unknown"))
+                        self._log("SQUAREOFF", f"{symbol_plain} — squared off (ID: {order_id})")
+                        break
+                    self._log("WARN", f"{symbol_plain} — square-off attempt {attempt+1}/{SQUAREOFF_MAX_RETRIES} failed: {result.get('error', '')}")
+                except Exception as e:
+                    self._log("WARN", f"{symbol_plain} — square-off attempt {attempt+1}/{SQUAREOFF_MAX_RETRIES} exception: {e}")
+                time.sleep(3)
 
-                    # Move to history
-                    for trade in self._active_trades:
-                        if trade["symbol"] == symbol_plain and trade["status"] == "OPEN":
-                            trade["status"] = "CLOSED"
-                            trade["pnl"] = pnl
-                            trade["closed_at"] = now_ist().isoformat()
-                            trade["exit_reason"] = "SQUARE_OFF"
-                            trade["exit_price"] = pos.get("ltp", 0)
-                            self._trade_history.append(trade)
-                            log_trade(trade, source="auto")
-                            break
+            if exit_success:
+                self._total_pnl += pnl; self._daily_realized_pnl += pnl
 
-            except Exception as e:
-                self._log("ERROR", f"Square-off EXCEPTION for {symbol_plain}: {e}")
+                # Move to history
+                for trade in self._active_trades:
+                    if trade["symbol"] == symbol_plain and trade["status"] == "OPEN":
+                        trade["status"] = "CLOSED"
+                        trade["pnl"] = pnl
+                        trade["closed_at"] = now_ist().isoformat()
+                        trade["exit_reason"] = "SQUARE_OFF"
+                        trade["exit_price"] = pos.get("ltp", 0)
+                        self._trade_history.append(trade)
+                        log_trade(trade, source="auto")
+                        # Telegram: trade closed (square-off)
+                        try:
+                            telegram_notify.trade_closed(
+                                symbol_plain, trade.get("signal_type", "BUY"), pnl,
+                                "SQUARE_OFF", engine="Equity"
+                            )
+                        except Exception:
+                            pass
+                        break
+            else:
+                self._log("ERROR", f"{symbol_plain} — SQUARE-OFF FAILED after {SQUAREOFF_MAX_RETRIES} retries! CLOSE MANUALLY!")
 
         # Clean up active trades
         self._active_trades = [t for t in self._active_trades if t["status"] == "OPEN"]
@@ -971,16 +1302,18 @@ class AutoTrader:
 
     # ── Position Monitoring ───────────────────────────────────────────────
 
-    def _update_position_pnl(self):
-        """Refresh P&L for active trades and check target exits for INTRADAY_SL mode.
+    def _update_position_pnl(self, monitor_tick: int = 0):
+        """Refresh P&L for active trades, trail SL on winners, check target exits.
 
-        NOTE: Trailing stop loss is NOT implemented here for live trading.
-        Fyers bracket orders (BO) manage SL on-exchange — modifying them would
-        require cancelling the BO leg and placing a new SL-M order, which adds
-        execution risk. Trailing SL is implemented in PaperTrader for virtual trades.
-        To add trailing for live: use INTRADAY_SL mode + modify_order() API.
+        Trailing SL for INTRADAY_SL mode: cancels old SL-M, places new one at trailed price.
+        BO mode: Fyers manages SL on-exchange (no trailing for BO).
         """
         _, positions = self._get_open_positions_detail()
+
+        # SL order health check every ~5 minutes (every 15th tick at ~20s intervals)
+        # DISABLED when margin is exhausted to prevent rejection spam
+        if monitor_tick > 0 and monitor_tick % 15 == 0 and not getattr(self, '_margin_exhausted', False):
+            self._check_sl_order_health()
 
         pnl_map = {}
         ltp_map = {}
@@ -1038,14 +1371,30 @@ class AutoTrader:
                 # Position truly closed — determine exit reason and actual P&L
                 trade["status"] = "CLOSED"
                 trade["closed_at"] = now_ist().isoformat()
+
+                # Cancel orphaned target/SL orders for the closed trade
+                _target_oid = trade.get("target_order_id", "")
+                _sl_oid = trade.get("sl_order_id", "")
                 if trade.get("_bo_target_reached"):
                     trade["exit_reason"] = "TARGET_HIT"
                     trade["exit_price"] = trade.get("target", 0)
+                    # Target hit — cancel the SL order if it exists
+                    if _sl_oid:
+                        try:
+                            cancel_order(_sl_oid)
+                        except Exception:
+                            pass
                 else:
                     trade["exit_reason"] = "SL_HIT"
                     # Use last known LTP as exit price (more accurate than theoretical SL)
                     last_ltp = trade.get("ltp", 0)
                     trade["exit_price"] = last_ltp if last_ltp > 0 else trade.get("stop_loss", 0)
+                    # SL hit — cancel the target order if it exists
+                    if _target_oid:
+                        try:
+                            cancel_order(_target_oid)
+                        except Exception:
+                            pass
 
                 # Calculate P&L from actual prices if not already set by Fyers
                 if trade["pnl"] == 0.0 and trade["exit_price"] > 0:
@@ -1059,6 +1408,189 @@ class AutoTrader:
                 log_trade(trade, source="auto")
                 self._log("INFO", f"{symbol} — position closed ({trade['exit_reason']}) P&L: ₹{trade['pnl']:.2f}")
 
+                # Telegram: trade closed notification
+                try:
+                    telegram_notify.trade_closed(
+                        symbol, trade.get("signal_type", "BUY"), trade["pnl"],
+                        trade["exit_reason"], engine="Equity"
+                    )
+                except Exception:
+                    pass
+
+        # ── Flash crash protection — emergency exit if any position drops >3% ──
+        for trade in list(self._active_trades):
+            if trade["status"] != "OPEN":
+                continue
+            entry = trade.get("entry_price", 0)
+            ltp = trade.get("ltp", entry)
+            if entry <= 0 or ltp <= 0:
+                continue
+
+            if trade.get("side", 1) == 1:  # BUY
+                loss_pct = (entry - ltp) / entry
+            else:  # SELL
+                loss_pct = (ltp - entry) / entry
+
+            if loss_pct >= 0.03:  # 3% loss
+                self._log("ALERT", f"FLASH CRASH: {trade['symbol']} down {loss_pct*100:.1f}% — EMERGENCY EXIT")
+                # Telegram: flash crash alert
+                try:
+                    telegram_notify.flash_crash(trade['symbol'], loss_pct * 100)
+                except Exception:
+                    pass
+                # Cancel SL and target orders
+                for oid_key in ["sl_order_id", "target_order_id"]:
+                    oid = trade.get(oid_key, "")
+                    if oid:
+                        try:
+                            cancel_order(oid)
+                        except Exception:
+                            pass
+                # Place market exit order
+                try:
+                    exit_side = -1 if trade.get("side", 1) == 1 else 1
+                    result = place_order(
+                        symbol=trade["symbol"], qty=trade["quantity"], side=exit_side,
+                        order_type=2, product_type="INTRADAY",
+                    )
+                    trade["status"] = "CLOSED"
+                    trade["closed_at"] = now_ist().isoformat()
+                    trade["exit_reason"] = "FLASH_CRASH"
+                    trade["exit_price"] = ltp
+                    trade["pnl"] = round(-loss_pct * entry * trade["quantity"], 2)
+                    self._total_pnl += trade["pnl"]
+                    self._daily_realized_pnl += trade["pnl"]
+                    self._trade_history.append(trade)
+                    log_trade(trade, source="auto")
+                    self._log("ORDER", f"{trade['symbol']} — EMERGENCY EXIT placed (loss {loss_pct*100:.1f}%)")
+                except Exception as e:
+                    self._log("ERROR", f"{trade['symbol']} — emergency exit FAILED: {e}")
+
+        # ── Trailing SL for INTRADAY_SL mode (every 3rd tick ~60s) ──
+        # BO mode: Fyers manages SL on-exchange, no trailing.
+        # INTRADAY_SL mode: cancel old SL-M, place new at trailed price.
+        if monitor_tick > 0 and monitor_tick % 3 == 0:
+            for trade in self._active_trades:
+                if trade["status"] != "OPEN":
+                    continue
+                if trade.get("order_mode") != "INTRADAY_SL":
+                    continue  # Only trail INTRADAY_SL trades (not BO)
+
+                entry = trade.get("entry_price", 0)
+                ltp = trade.get("ltp", entry)
+                side = trade.get("side", 1)
+                current_sl = trade.get("stop_loss", 0)
+                symbol = trade["symbol"]
+
+                if entry <= 0 or ltp <= 0:
+                    continue
+
+                # Store original SL on first pass
+                if "original_sl" not in trade:
+                    trade["original_sl"] = current_sl
+
+                new_sl = current_sl
+
+                if side == 1:  # BUY / LONG
+                    profit_pct = (ltp - entry) / entry
+                    if profit_pct >= 0.02:
+                        # Trail to lock 50% of profit
+                        new_sl = round(entry + (ltp - entry) * 0.5, 2)
+                    elif profit_pct >= 0.01:
+                        # Move to breakeven (tiny buffer above entry)
+                        new_sl = round(entry * 1.001, 2)
+
+                    if new_sl > current_sl:
+                        old_sl_id = trade.get("sl_order_id", "")
+                        if old_sl_id:
+                            try:
+                                cancel_order(old_sl_id)
+                            except Exception:
+                                pass
+                        try:
+                            sl_result = place_order(
+                                symbol=symbol, qty=trade["quantity"], side=-1,
+                                order_type=4, product_type="INTRADAY", stop_price=new_sl,
+                            )
+                            if "error" not in sl_result:
+                                trade["stop_loss"] = new_sl
+                                trade["sl_order_id"] = sl_result.get("id", sl_result.get("order_id", ""))
+                                self._log("TRAIL", f"{symbol} — SL trailed: ₹{current_sl:.2f} → ₹{new_sl:.2f} (profit {profit_pct*100:.1f}%)")
+                                self._save_state()
+                                # Telegram: only notify on breakeven move (risk-free = meaningful)
+                                if not trade.get("_breakeven_notified") and new_sl >= entry * 0.999:
+                                    trade["_breakeven_notified"] = True
+                                    try:
+                                        telegram_notify.sl_breakeven(symbol, entry, new_sl)
+                                    except Exception:
+                                        pass
+                            else:
+                                self._log("WARN", f"{symbol} — SL trail failed: {sl_result.get('error', '')}")
+                        except Exception as e:
+                            self._log("WARN", f"{symbol} — SL trail exception: {e}")
+
+                else:  # SELL / SHORT
+                    profit_pct = (entry - ltp) / entry
+                    if profit_pct >= 0.02:
+                        new_sl = round(entry - (entry - ltp) * 0.5, 2)
+                    elif profit_pct >= 0.01:
+                        new_sl = round(entry * 0.999, 2)
+
+                    if current_sl == 0 or new_sl < current_sl:
+                        old_sl_id = trade.get("sl_order_id", "")
+                        if old_sl_id:
+                            try:
+                                cancel_order(old_sl_id)
+                            except Exception:
+                                pass
+                        try:
+                            sl_result = place_order(
+                                symbol=symbol, qty=trade["quantity"], side=1,
+                                order_type=4, product_type="INTRADAY", stop_price=new_sl,
+                            )
+                            if "error" not in sl_result:
+                                trade["stop_loss"] = new_sl
+                                trade["sl_order_id"] = sl_result.get("id", sl_result.get("order_id", ""))
+                                self._log("TRAIL", f"{symbol} — SL trailed: ₹{current_sl:.2f} → ₹{new_sl:.2f} (profit {profit_pct*100:.1f}%)")
+                                self._save_state()
+                                # Telegram: only notify on breakeven move (risk-free = meaningful)
+                                if not trade.get("_breakeven_notified") and new_sl <= entry * 1.001:
+                                    trade["_breakeven_notified"] = True
+                                    try:
+                                        telegram_notify.sl_breakeven(symbol, entry, new_sl)
+                                    except Exception:
+                                        pass
+                            else:
+                                self._log("WARN", f"{symbol} — SL trail failed: {sl_result.get('error', '')}")
+                        except Exception as e:
+                            self._log("WARN", f"{symbol} — SL trail exception: {e}")
+
+        # ── Cancel orders pending > 60 seconds (every 3rd tick) ──
+        if monitor_tick > 0 and monitor_tick % 3 == 0:
+            for trade in self._active_trades:
+                if trade["status"] != "OPEN":
+                    continue
+                order_id = trade.get("order_id", "")
+                if not order_id or order_id == "recovered":
+                    continue
+                order_status = self._get_order_status(order_id)
+                if order_status == "pending":
+                    placed_at_str = trade.get("placed_at", "")
+                    if placed_at_str:
+                        try:
+                            placed_time = datetime.fromisoformat(placed_at_str)
+                            elapsed = (now_ist() - placed_time).total_seconds()
+                            if elapsed > 60:
+                                cancel_order(order_id)
+                                trade["status"] = "CLOSED"
+                                trade["exit_reason"] = "CANCELLED_PENDING"
+                                trade["closed_at"] = now_ist().isoformat()
+                                trade["pnl"] = 0.0
+                                self._trade_history.append(trade)
+                                self._log("WARN", f"{trade['symbol']} — cancelled pending entry order after {elapsed:.0f}s")
+                        except Exception:
+                            pass
+
         # Exit target-hit positions
         for trade in trades_to_close:
             self._exit_trade_at_target(trade)
@@ -1066,6 +1598,125 @@ class AutoTrader:
         # Clean closed trades from active list
         self._active_trades = [t for t in self._active_trades if t["status"] == "OPEN"]
         self._save_state()
+
+    def _check_sl_order_health(self):
+        """Verify SL orders are still pending on Fyers for all active trades.
+
+        If an SL order was cancelled/rejected (e.g. by exchange glitch), re-place it.
+        Called every ~5 minutes (every 15th monitoring tick).
+        """
+        # Skip if margin is exhausted
+        if getattr(self, '_margin_exhausted', False):
+            return
+
+        # Additional: check actual Fyers funds
+        try:
+            from services.fyers_client import get_funds as _sl_check_funds
+            funds_resp = _sl_check_funds()
+            for f in funds_resp.get("fund_limit", []):
+                if f.get("id") == 10:
+                    if f.get("equityAmount", 0) < 5000:
+                        self._margin_exhausted = True
+                        self._log("WARN", "SL health check: insufficient funds, skipping")
+                        return
+                    break
+        except Exception:
+            pass
+
+        active_with_sl = [t for t in self._active_trades
+                          if t["status"] == "OPEN" and t.get("sl_order_id")]
+        if not active_with_sl:
+            return
+
+        try:
+            from services.fyers_client import get_orderbook
+            orderbook = get_orderbook()
+            orders = orderbook.get("orderBook", [])
+            if not orders:
+                data = orderbook.get("data", {})
+                if isinstance(data, dict):
+                    orders = data.get("orderBook", [])
+
+            # Build lookup: order_id -> status code
+            order_status_map = {}
+            for order in orders:
+                oid = order.get("id", "")
+                if oid:
+                    order_status_map[oid] = order.get("status", 0)
+
+            margin_failed = False
+            for trade in active_with_sl:
+                if margin_failed:
+                    break  # Stop checking all SLs if margin is exhausted
+
+                # Skip SL re-placement for recovered/unknown positions
+                if trade.get("recovered") or trade.get("strategy") == "unknown":
+                    continue
+
+                sl_oid = trade.get("sl_order_id", "")
+                if not sl_oid:
+                    continue
+
+                status = order_status_map.get(sl_oid, None)
+                # Fyers status: 1=cancelled, 2=traded/filled, 4=transit, 5=rejected, 6=pending
+                if status is None:
+                    # Order not found in orderbook — might be too old or system issue
+                    continue
+                if status in (4, 6):
+                    # Still pending/transit — all good
+                    continue
+                if status == 2:
+                    # SL was triggered (filled) — position monitoring will handle closure
+                    continue
+
+                # Status 1 (cancelled) or 5 (rejected) — SL is NOT protecting this position!
+                symbol = trade["symbol"]
+                status_label = "CANCELLED" if status == 1 else "REJECTED"
+
+                # Only re-place if we haven't already failed due to margin
+                sl_retry_key = f"_sl_retry_failed_{symbol}"
+                if getattr(self, sl_retry_key, False):
+                    continue  # Already tried and failed — don't spam Fyers
+
+                self._log("WARN", f"{symbol} — SL order {sl_oid} is {status_label}! Re-placing SL...")
+
+                # Re-place the SL order
+                try:
+                    sl_price = trade.get("stop_loss", 0)
+                    qty = trade.get("quantity", 0)
+                    side = trade.get("side", 1)
+                    sl_side = -1 if side == 1 else 1  # opposite side for SL
+
+                    if sl_price > 0 and qty > 0:
+                        sl_result = place_order(
+                            symbol=symbol,
+                            qty=qty,
+                            side=sl_side,
+                            order_type=4,  # SL-M (stop-loss market)
+                            product_type="INTRADAY",
+                            stop_price=sl_price,
+                        )
+                        if "error" not in sl_result:
+                            new_sl_id = sl_result.get("id", sl_result.get("order_id", ""))
+                            trade["sl_order_id"] = new_sl_id
+                            self._log("ORDER", f"{symbol} — SL re-placed successfully (new ID: {new_sl_id}) @ ₹{sl_price}")
+                            self._save_state()
+                            setattr(self, sl_retry_key, False)
+                        else:
+                            error_msg = sl_result.get('error', '').lower()
+                            self._log("ERROR", f"{symbol} — SL re-place FAILED: {sl_result.get('error', '')}")
+                            if "margin" in error_msg or "shortfall" in error_msg:
+                                setattr(self, sl_retry_key, True)
+                                margin_failed = True
+                                self._margin_exhausted = True
+                                self._log("WARN", f"Margin exhausted — stopping ALL SL re-place attempts")
+                    else:
+                        self._log("ERROR", f"{symbol} — cannot re-place SL: invalid price={sl_price} or qty={qty}")
+                except Exception as e:
+                    self._log("ERROR", f"{symbol} — SL re-place exception: {e}")
+
+        except Exception as e:
+            self._log("WARN", f"SL health check failed: {e}")
 
     def _exit_trade_at_target(self, trade: dict):
         """Close a position that has hit its target price. Cancel SL order first.
@@ -1092,6 +1743,18 @@ class AutoTrader:
                     self._log("WARN", f"{symbol} — SL cancel failed: {cancel_result.get('error', '')} — SL may have already triggered")
             except Exception as e:
                 self._log("WARN", f"{symbol} — SL cancel exception: {e}")
+
+        # Cancel the target order (if it exists as a separate limit order)
+        target_order_id = trade.get("target_order_id", "")
+        if target_order_id:
+            try:
+                cancel_result = cancel_order(target_order_id)
+                if "error" not in cancel_result:
+                    self._log("INFO", f"{symbol} — cancelled target order (ID: {target_order_id})")
+                else:
+                    self._log("WARN", f"{symbol} — target cancel failed: {cancel_result.get('error', '')} — may already be filled")
+            except Exception as e:
+                self._log("WARN", f"{symbol} — target cancel exception: {e}")
 
         # SAFETY: Verify position still exists on Fyers before placing exit order.
         # If the SL triggered before we could cancel it, the position is already closed.

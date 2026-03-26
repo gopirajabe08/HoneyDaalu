@@ -7,6 +7,7 @@ from .play6_bb_contra import BBContra
 from .play7_orb import ORBBreakout
 from .play8_rsi_divergence import RSIDivergence
 from .play9_gap_analysis import GapAnalysis
+from .play10_momentum_rank import MomentumRank
 
 STRATEGY_MAP = {
     "play1_ema_crossover": EMA_Crossover(),
@@ -18,4 +19,5 @@ STRATEGY_MAP = {
     "play7_orb": ORBBreakout(),
     "play8_rsi_divergence": RSIDivergence(),
     "play9_gap_analysis": GapAnalysis(),
+    "play10_momentum_rank": MomentumRank(),
 }

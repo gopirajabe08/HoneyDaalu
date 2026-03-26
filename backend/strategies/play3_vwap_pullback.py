@@ -50,7 +50,7 @@ class VWAPPullback(BaseStrategy):
     exit_rules = "T1 at last intraday swing high. T2 at 1:2 or 1:3 risk-reward."
     stop_loss_rules = "Just below the swing low of the pullback (a few ticks below VWAP zone)."
 
-    def scan(self, df: pd.DataFrame, symbol: str) -> Optional[dict]:
+    def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
         if len(df) < 15:
             return None
 

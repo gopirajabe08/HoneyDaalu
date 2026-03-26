@@ -13,7 +13,8 @@ import AboutPage from './components/AboutPage'
 import DailyPnL from './components/DailyPnL'
 import OptionsPage from './components/OptionsPage'
 import FuturesPage from './components/FuturesPage'
-import ImprovementTracker from './components/ImprovementTracker'
+import BTSTPage from './components/BTSTPage'
+// import ImprovementTracker from './components/ImprovementTracker'  // Disabled — auto-tune removed
 import { getFyersStatus } from './services/api'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
   const [equityCapital, setEquityCapital] = useState(75000)
   const [optionsCapital, setOptionsCapital] = useState(25000)
   const [futuresCapital, setFuturesCapital] = useState(100000)
+  const [btstCapital, setBtstCapital] = useState(100000)
   const [fyersStatus, setFyersStatus] = useState({ connected: false, configured: false })
 
   // Scroll to top on page navigation
@@ -67,6 +69,9 @@ export default function App() {
       case 'futures':
         return <FuturesPage capital={futuresCapital} setCapital={setFuturesCapital} />
 
+      case 'btst':
+        return <BTSTPage capital={btstCapital} setCapital={setBtstCapital} />
+
       default:
         return null
     }
@@ -84,7 +89,7 @@ export default function App() {
         </main>
       </div>
 
-      <ImprovementTracker />
+      {/* ImprovementTracker disabled — auto-tune removed */}
     </div>
   )
 }

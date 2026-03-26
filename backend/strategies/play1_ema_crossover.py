@@ -113,7 +113,7 @@ class EMA_Crossover(BaseStrategy):
     exit_rules = "Exit when opposite crossover occurs (9 crosses back under/over 21). Alternative: Fixed 1:2 Risk-Reward target."
     stop_loss_rules = "Below recent swing low for long, above recent swing high for short. ATR-based SL used for swing trades."
 
-    def scan(self, df: pd.DataFrame, symbol: str) -> Optional[dict]:
+    def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
         if len(df) < 55:
             return None
 

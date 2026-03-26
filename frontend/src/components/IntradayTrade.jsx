@@ -173,7 +173,11 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
   const fyersClosedCount = fyersPositions.filter(p => (p.netQty || 0) === 0).length
   const totalPnl = isLive && fyersPositions.length > 0 ? fyersTotalPnl : (status?.total_pnl ?? 0)
 
-  const allClosed = tradeHistory
+  // For live mode: use Fyers closed positions for win/loss (source of truth)
+  const fyersClosed = fyersPositions.filter(p => (p.netQty || 0) === 0 && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
+  const allClosed = isLive && fyersClosed.length > 0
+    ? fyersClosed.map(p => ({ pnl: p.pl || p.realized_profit || 0, symbol: p.symbol }))
+    : tradeHistory
   const winners = allClosed.filter(t => (t.pnl ?? 0) > 0)
   const losers = allClosed.filter(t => (t.pnl ?? 0) < 0)
   const winRate = allClosed.length > 0 ? Math.round((winners.length / allClosed.length) * 100) : 0
@@ -234,7 +238,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                       const netQty = p.netQty || 0
                       const pnl = p.pl || 0
                       const isOpen = netQty !== 0
-                      const isBuy = (p.buyQty || 0) > (p.sellQty || 0)
+                      const isBuy = (p.netQty || 0) > 0
                       return (
                         <tr key={i} className="border-b border-dark-600/30 hover:bg-dark-600/20">
                           <td className="px-3 py-2.5 text-sm font-medium text-white">{sym}</td>

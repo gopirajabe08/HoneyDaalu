@@ -59,9 +59,9 @@ INTRADAY_MARKET_CLOSE_HOUR, INTRADAY_MARKET_CLOSE_MIN = 15, 30 # 3:30 PM — mar
 
 # ── Intraday Position Limits ─────────────────────────────────────────────────
 
-INTRADAY_CAPITAL_PER_POSITION = 25000  # ~₹25K per slot (auto-calculates max positions from capital)
+INTRADAY_CAPITAL_PER_POSITION = 40000  # ~₹40K per slot (accounts for margin blocked by entry + SL + target orders on Fyers)
 INTRADAY_MIN_POSITIONS = 1
-INTRADAY_MAX_POSITIONS_CAP = 6        # hard cap even for large capital
+INTRADAY_MAX_POSITIONS_CAP = 2        # Safety cap for ₹1L capital level
 INTRADAY_PAPER_MAX_POSITIONS = 10     # paper: more positions for testing
 INTRADAY_POSITION_CHECK_INTERVAL = 20  # seconds between LTP checks (reduced from 60s for faster reaction)
 
@@ -76,6 +76,7 @@ STRATEGY_TIMEFRAMES = {
     "play7_orb": ["15m"],                  # ORB needs 15m (first 2 candles = 30min range)
     "play8_rsi_divergence": ["15m"],       # RSI divergence on 15m for intraday
     "play9_gap_analysis": ["15m"],         # Gap analysis needs 15m (first 2-4 candles for gap detection)
+    "play10_momentum_rank": ["15m"],       # Momentum ranking on 15m intraday
 }
 
 # Swing trading timeframes (positions carry over days)
@@ -92,6 +93,29 @@ SWING_STRATEGY_TIMEFRAMES = {
 SWING_SCAN_INTERVAL_SECONDS = 4 * 60 * 60  # 4 hours default
 SWING_MAX_POSITIONS = 1       # live: only 1 open position at a time
 SWING_PAPER_MAX_POSITIONS = 5  # paper: more positions to test strategies
+
+# ── BTST (Buy Today Sell Tomorrow) Trading Time Windows ──────────────────────
+BTST_ORDER_START_HOUR, BTST_ORDER_START_MIN = 14, 0    # 2:00 PM — buy late afternoon when momentum is confirmed
+BTST_ORDER_CUTOFF_HOUR, BTST_ORDER_CUTOFF_MIN = 15, 15  # 3:15 PM — last entry before market close
+BTST_POSITION_CHECK_INTERVAL = 60  # seconds
+
+BTST_CAPITAL_PER_POSITION = 25000
+BTST_MIN_POSITIONS = 1
+BTST_MAX_POSITIONS = 2  # Conservative — holds overnight
+BTST_PAPER_MAX_POSITIONS = 4
+
+BTST_EXIT_PROFIT_TARGET_PCT = 2.0   # Exit at +2% profit next day
+BTST_EXIT_LOSS_LIMIT_PCT = 1.5      # Exit at -1.5% loss next day
+BTST_MAX_HOLD_DAYS = 2              # Force exit after 2 trading days
+
+BTST_STRATEGY_TIMEFRAMES = {
+    "play1_ema_crossover": ["1d"],
+    "play4_supertrend": ["1d"],
+    "play5_bb_squeeze": ["1d"],
+    "play6_bb_contra": ["1d"],
+    "play8_rsi_divergence": ["1h", "1d"],
+    "play10_momentum_rank": ["1d"],
+}
 
 # Price range filter — skip stocks outside this range
 # Keeps position sizing meaningful and reduces brokerage impact
@@ -225,3 +249,13 @@ FUTURES_SWING_MAX_POSITIONS = 2
 FUTURES_SWING_PAPER_MAX_POSITIONS = 5
 FUTURES_SWING_SCAN_INTERVAL_SECONDS = 4 * 60 * 60  # 4 hours
 FUTURES_SWING_EXIT_DAYS_BEFORE_EXPIRY = 2  # close 2 days before expiry
+
+# ── VIX-Adjusted SL Multipliers ──────────────────────────────────────────
+# In high VIX, intraday noise is larger → fixed ATR SL gets hit more often.
+# Widen SL (and target) proportionally to avoid premature exits.
+VIX_SL_ADJUSTMENTS = {
+    "low": {"threshold": 14, "atr_mult": 2.0},      # Low VIX: tighter SL ok
+    "normal": {"threshold": 18, "atr_mult": 2.5},    # Normal
+    "elevated": {"threshold": 22, "atr_mult": 3.0},  # Elevated: wider SL
+    "high": {"threshold": 99, "atr_mult": 3.5},      # High VIX: widest SL
+}

@@ -65,6 +65,27 @@ Thumbs.db
 *.apk
 
 # ══════════════════════════════════════════════════════════════
+#  BTST STATE FILES
+# ══════════════════════════════════════════════════════════════
+backend/.btst_trader_state.json
+backend/.btst_paper_trader_state.json
+backend/.futures_swing_paper_state.json
+backend/.swing_paper_state.json
+backend/.options_swing_paper_trader_state.json
+
+# ══════════════════════════════════════════════════════════════
+#  AWS / DEPLOY — never commit keys
+# ══════════════════════════════════════════════════════════════
+*.pem
+*.ppk
+deploy/*.key
+
+# ══════════════════════════════════════════════════════════════
+#  CLAUDE CODE LOCAL SETTINGS
+# ══════════════════════════════════════════════════════════════
+.claude/settings.local.json
+
+# ══════════════════════════════════════════════════════════════
 #  LOGS & TEMP
 # ══════════════════════════════════════════════════════════════
 *.log

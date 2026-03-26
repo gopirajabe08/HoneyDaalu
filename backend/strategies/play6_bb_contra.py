@@ -51,7 +51,8 @@ class BBContra(BaseStrategy):
     exit_rules = "Target: The Middle Band (20 SMA)."
     stop_loss_rules = "Below the low of the reversal candle."
 
-    def scan(self, df: pd.DataFrame, symbol: str) -> Optional[dict]:
+    def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
+        timeframe = kwargs.get("timeframe", "1d")
         if len(df) < 210:
             return None
 
@@ -66,12 +67,12 @@ class BBContra(BaseStrategy):
             return None
 
         # Try long first, then short
-        result = self._scan_long(df, last, prev, symbol)
+        result = self._scan_long(df, last, prev, symbol, timeframe)
         if result:
             return result
-        return self._scan_short(df, last, prev, symbol)
+        return self._scan_short(df, last, prev, symbol, timeframe)
 
-    def _scan_long(self, df, last, prev, symbol) -> Optional[dict]:
+    def _scan_long(self, df, last, prev, symbol, timeframe="1d") -> Optional[dict]:
         """Long: mean reversion buy at lower BB. Relaxed in oversold markets."""
         # ── Trend Filter: Price > 200 SMA in normal conditions ──
         # BUT: skip trend filter if RSI is extremely oversold (< 30)
@@ -85,22 +86,27 @@ class BBContra(BaseStrategy):
             pass
 
         extremely_oversold = rsi_val < 30
+        is_intraday = timeframe in ("5m", "15m")
 
         if not extremely_oversold:
             if last["Close"] <= last["sma200"]:
                 return None
-            sma200_now = last["sma200"]
-            sma200_prev = df["sma200"].iloc[-10]
-            if pd.isna(sma200_prev) or sma200_now <= sma200_prev:
-                return None
+            # 200 SMA slope check: skip for intraday (slope barely moves on 5m/15m)
+            # For intraday, price > SMA200 is sufficient trend confirmation
+            if not is_intraday:
+                sma200_now = last["sma200"]
+                sma200_prev = df["sma200"].iloc[-10]
+                if pd.isna(sma200_prev) or sma200_now <= sma200_prev:
+                    return None
 
         # ── Price touches/pierces Lower Band ──
         if pd.isna(last["bb_lower"]):
             return None
 
+        # Wider BB touch tolerance for more signal generation (0.5% vs 0.2%)
         touched_lower = (
-            last["Low"] <= last["bb_lower"] * 1.002
-            or prev["Low"] <= prev["bb_lower"] * 1.002
+            last["Low"] <= last["bb_lower"] * 1.005
+            or prev["Low"] <= prev["bb_lower"] * 1.005
         )
         if not touched_lower:
             return None
@@ -163,24 +169,30 @@ class BBContra(BaseStrategy):
             "strategy": "play6_bb_contra",
         }
 
-    def _scan_short(self, df, last, prev, symbol) -> Optional[dict]:
+    def _scan_short(self, df, last, prev, symbol, timeframe="1d") -> Optional[dict]:
         """Short: mean reversion sell at upper BB in macro downtrend."""
+        is_intraday = timeframe in ("5m", "15m")
+
         # ── Trend Filter: Price < 200 SMA, sloping down ──
         if last["Close"] >= last["sma200"]:
             return None
 
-        sma200_now = last["sma200"]
-        sma200_prev = df["sma200"].iloc[-10]
-        if pd.isna(sma200_prev) or sma200_now >= sma200_prev:
-            return None
+        # 200 SMA slope check: skip for intraday (slope barely moves on 5m/15m)
+        # For intraday, price < SMA200 is sufficient trend confirmation
+        if not is_intraday:
+            sma200_now = last["sma200"]
+            sma200_prev = df["sma200"].iloc[-10]
+            if pd.isna(sma200_prev) or sma200_now >= sma200_prev:
+                return None
 
         # ── Price touches/pierces Upper Band ──
         if pd.isna(last["bb_upper"]):
             return None
 
+        # Wider BB touch tolerance for more signal generation (0.5% vs 0.2%)
         touched_upper = (
-            last["High"] >= last["bb_upper"] * 0.998
-            or prev["High"] >= prev["bb_upper"] * 0.998
+            last["High"] >= last["bb_upper"] * 0.995
+            or prev["High"] >= prev["bb_upper"] * 0.995
         )
         if not touched_upper:
             return None

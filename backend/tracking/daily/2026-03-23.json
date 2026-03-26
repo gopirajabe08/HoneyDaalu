@@ -1,0 +1,538 @@
+{
+  "date": "2026-03-23",
+  "generated_at": "2026-03-23T15:15:01.469783+05:30",
+  "market_snapshot": {},
+  "engines_active": {},
+  "strategy_performance": {
+    "play4_supertrend|paper": {
+      "trades": 10,
+      "wins": 2,
+      "losses": 8,
+      "breakeven": 0,
+      "sl_hits": 8,
+      "target_hits": 2,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": -2493.1399999999994,
+      "charges": 0,
+      "net_pnl": -2493.1399999999994,
+      "total_time_seconds": 87819.346125,
+      "trades_detail": [
+        {
+          "symbol": "RELIANCE",
+          "direction": "SELL",
+          "entry": 1389.61,
+          "exit": 1400.8,
+          "sl": 1400.74,
+          "target": 1371.52,
+          "pnl": -332.49,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T10:49:16.763102+05:30",
+          "time_closed": "2026-03-23T12:05:38.014000+05:30"
+        },
+        {
+          "symbol": "PIDILITIND",
+          "direction": "SELL",
+          "entry": 1293.21,
+          "exit": 1309.1,
+          "sl": 1308.36,
+          "target": 1266.78,
+          "pnl": -486.56,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T11:43:31.944504+05:30",
+          "time_closed": "2026-03-23T12:33:29.036628+05:30"
+        },
+        {
+          "symbol": "SUNPHARMA",
+          "direction": "SELL",
+          "entry": 1756.94,
+          "exit": 1771.4,
+          "sl": 1771.01,
+          "target": 1753.9,
+          "pnl": -346.09,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T10:30:28.127233+05:30",
+          "time_closed": "2026-03-23T12:41:42.026760+05:30"
+        },
+        {
+          "symbol": "SONATSOFTW",
+          "direction": "SELL",
+          "entry": 228.77,
+          "exit": 223.8,
+          "sl": 226.29,
+          "target": 223.82,
+          "pnl": 767.23,
+          "exit_reason": "TARGET_HIT",
+          "time_placed": "2026-03-23T10:30:28.125413+05:30",
+          "time_closed": "2026-03-23T13:07:30.255694+05:30"
+        },
+        {
+          "symbol": "NTPC",
+          "direction": "SELL",
+          "entry": 370.23,
+          "exit": 373.8,
+          "sl": 373.43,
+          "target": 364.94,
+          "pnl": -403.58,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T10:30:28.128601+05:30",
+          "time_closed": "2026-03-23T13:50:02.684220+05:30"
+        },
+        {
+          "symbol": "AUROPHARMA",
+          "direction": "SELL",
+          "entry": 1269.03,
+          "exit": 1281.6,
+          "sl": 1281.29,
+          "target": 1268.5,
+          "pnl": -406.85,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T11:27:18.050974+05:30",
+          "time_closed": "2026-03-23T14:02:32.493380+05:30"
+        },
+        {
+          "symbol": "NAUKRI",
+          "direction": "SELL",
+          "entry": 964.04,
+          "exit": 977.4,
+          "sl": 975.98,
+          "target": 954.3,
+          "pnl": -549.81,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T11:27:18.053110+05:30",
+          "time_closed": "2026-03-23T14:44:28.625725+05:30"
+        },
+        {
+          "symbol": "DRREDDY",
+          "direction": "SELL",
+          "entry": 1279.62,
+          "exit": 1260.4,
+          "sl": 1270.01,
+          "target": 1261.0,
+          "pnl": 514.7,
+          "exit_reason": "TARGET_HIT",
+          "time_placed": "2026-03-23T12:06:08.858640+05:30",
+          "time_closed": "2026-03-23T14:49:33.913224+05:30"
+        },
+        {
+          "symbol": "RELIANCE",
+          "direction": "SELL",
+          "entry": 1396.7,
+          "exit": 1414.9,
+          "sl": 1414.88,
+          "target": 1391.0,
+          "pnl": -514.96,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T13:08:08.305728+05:30",
+          "time_closed": "2026-03-23T14:52:57.539302+05:30"
+        },
+        {
+          "symbol": "CARBORUNIV",
+          "direction": "SELL",
+          "entry": 743.06,
+          "exit": 756.9,
+          "sl": 755.97,
+          "target": 735.2,
+          "pnl": -734.73,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T11:07:09.603615+05:30",
+          "time_closed": "2026-03-23T14:56:00.718112+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 10,
+          "pnl": -2493.1399999999994
+        }
+      },
+      "strategy": "play4_supertrend",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 20.0,
+      "avg_time_minutes": 146.4,
+      "avg_win": 640.97,
+      "avg_loss": -471.88,
+      "expectancy_per_trade": -249.31
+    },
+    "unknown|auto": {
+      "trades": 5,
+      "wins": 2,
+      "losses": 3,
+      "breakeven": 0,
+      "sl_hits": 5,
+      "target_hits": 0,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": -188.7,
+      "charges": 0,
+      "net_pnl": -188.7,
+      "total_time_seconds": 1810.141956,
+      "trades_detail": [
+        {
+          "symbol": "SONATSOFTW",
+          "direction": "SELL",
+          "entry": 228.86,
+          "exit": 229.95,
+          "sl": 0,
+          "target": 0,
+          "pnl": -113.3,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T10:37:52.736044+05:30",
+          "time_closed": "2026-03-23T10:42:28.467296+05:30"
+        },
+        {
+          "symbol": "GALAXYSURF",
+          "direction": "SELL",
+          "entry": 1565.37,
+          "exit": 1568.3,
+          "sl": 1588.85,
+          "target": 0,
+          "pnl": -96.7,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T12:35:44.396292+05:30",
+          "time_closed": "2026-03-23T12:42:07.994395+05:30"
+        },
+        {
+          "symbol": "GRINDWELL",
+          "direction": "SELL",
+          "entry": 1354.57,
+          "exit": 1352.7,
+          "sl": 1374.89,
+          "target": 0,
+          "pnl": 73.0,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T12:35:44.396410+05:30",
+          "time_closed": "2026-03-23T12:42:07.997553+05:30"
+        },
+        {
+          "symbol": "ICICIBANK",
+          "direction": "SELL",
+          "entry": 1222.7,
+          "exit": 1225.5,
+          "sl": 1241.04,
+          "target": 0,
+          "pnl": -120.4,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T12:35:44.396449+05:30",
+          "time_closed": "2026-03-23T12:42:08.000665+05:30"
+        },
+        {
+          "symbol": "SONATSOFTW",
+          "direction": "SELL",
+          "entry": 228.86,
+          "exit": 228.2,
+          "sl": 232.29,
+          "target": 0,
+          "pnl": 68.7,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T12:35:44.396480+05:30",
+          "time_closed": "2026-03-23T12:42:08.003722+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 5,
+          "pnl": -188.7
+        }
+      },
+      "strategy": "unknown",
+      "source": "auto",
+      "timeframe": "",
+      "win_rate_pct": 40.0,
+      "avg_time_minutes": 6.0,
+      "avg_win": 70.85,
+      "avg_loss": -110.13,
+      "expectancy_per_trade": -37.74
+    },
+    "play4_supertrend|auto": {
+      "trades": 3,
+      "wins": 1,
+      "losses": 2,
+      "breakeven": 0,
+      "sl_hits": 3,
+      "target_hits": 0,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": 166.5,
+      "charges": 0,
+      "net_pnl": 166.5,
+      "total_time_seconds": 696.3485,
+      "trades_detail": [
+        {
+          "symbol": "SUNPHARMA",
+          "direction": "SELL",
+          "entry": 1760.6,
+          "exit": 1761.4,
+          "sl": 1769.4,
+          "target": 1753.6,
+          "pnl": -24.0,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T10:38:33.055773+05:30",
+          "time_closed": "2026-03-23T10:42:28.478472+05:30"
+        },
+        {
+          "symbol": "CLEAN",
+          "direction": "SELL",
+          "entry": 686.12,
+          "exit": 686.2,
+          "sl": 691.66,
+          "target": 680.35,
+          "pnl": -6.0,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T10:38:36.360897+05:30",
+          "time_closed": "2026-03-23T10:42:28.486499+05:30"
+        },
+        {
+          "symbol": "BAYERCROP",
+          "direction": "SELL",
+          "entry": 4499.86,
+          "exit": 4482,
+          "sl": 4554.72,
+          "target": 4333.56,
+          "pnl": 196.5,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-23T10:38:39.693430+05:30",
+          "time_closed": "2026-03-23T10:42:28.493629+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 3,
+          "pnl": 166.5
+        }
+      },
+      "strategy": "play4_supertrend",
+      "source": "auto",
+      "timeframe": "15m",
+      "win_rate_pct": 33.3,
+      "avg_time_minutes": 3.9,
+      "avg_win": 196.5,
+      "avg_loss": -15.0,
+      "expectancy_per_trade": 55.5
+    },
+    "bear_put_spread|options_paper": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": 3.1,
+      "charges": 0,
+      "net_pnl": 3.1,
+      "total_time_seconds": 15261.848663,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 3.1,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-23T10:45:39.182221+05:30",
+          "time_closed": "2026-03-23T15:00:01.030884+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "bear_put_spread",
+      "source": "options_paper",
+      "timeframe": "",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 254.4,
+      "avg_win": 3.1,
+      "avg_loss": 0,
+      "expectancy_per_trade": 3.1
+    },
+    "bear_put_spread|options_auto": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": 228.0,
+      "charges": 0,
+      "net_pnl": 228.0,
+      "total_time_seconds": 15742.452369,
+      "trades_detail": [
+        {
+          "symbol": "",
+          "direction": "",
+          "entry": 0,
+          "exit": 0,
+          "sl": 0,
+          "target": 0,
+          "pnl": 228.0,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-23T10:37:38.695443+05:30",
+          "time_closed": "2026-03-23T15:00:01.147812+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "bear_put_spread",
+      "source": "options_auto",
+      "timeframe": "",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 262.4,
+      "avg_win": 228.0,
+      "avg_loss": 0,
+      "expectancy_per_trade": 228.0
+    },
+    "play4_supertrend|futures_paper": {
+      "trades": 2,
+      "wins": 1,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 1,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": 377.5,
+      "charges": 0,
+      "net_pnl": 377.5,
+      "total_time_seconds": 26853.149945999998,
+      "trades_detail": [
+        {
+          "symbol": "DRREDDY",
+          "direction": "SELL",
+          "entry": 1274.92,
+          "exit": 1258.8,
+          "sl": 1266.86,
+          "target": 1259.03,
+          "pnl": 1895.32,
+          "exit_reason": "TARGET_HIT",
+          "time_placed": "2026-03-23T11:16:53.815196+05:30",
+          "time_closed": "2026-03-23T14:46:19.334142+05:30"
+        },
+        {
+          "symbol": "NAUKRI",
+          "direction": "SELL",
+          "entry": 964.23,
+          "exit": 973.6,
+          "sl": 977.3,
+          "target": 953.61,
+          "pnl": -1517.82,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-23T11:16:53.816681+05:30",
+          "time_closed": "2026-03-23T15:15:01.447681+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 2,
+          "pnl": 377.5
+        }
+      },
+      "strategy": "play4_supertrend",
+      "source": "futures_paper",
+      "timeframe": "15m",
+      "win_rate_pct": 50.0,
+      "avg_time_minutes": 223.8,
+      "avg_win": 1895.32,
+      "avg_loss": -1517.82,
+      "expectancy_per_trade": 188.75
+    }
+  },
+  "source_pnl_summary": {
+    "paper": -2493.1399999999994,
+    "auto": -22.200000000000017,
+    "options_paper": 3.1,
+    "options_auto": 228.0,
+    "futures_paper": 377.5
+  },
+  "total_trades": 22,
+  "total_net_pnl": -1906.74,
+  "best_trade": {
+    "symbol": "DRREDDY",
+    "strategy": "play4_supertrend",
+    "pnl": 1895.32,
+    "source": "futures_paper"
+  },
+  "worst_trade": {
+    "symbol": "NAUKRI",
+    "strategy": "play4_supertrend",
+    "pnl": -1517.82,
+    "source": "futures_paper"
+  },
+  "auto_insights": [
+    "\u26a0\ufe0f play4_supertrend (paper): 80% SL hit rate \u2014 SLs likely too tight or signals counter-trend",
+    "\u26a0\ufe0f play4_supertrend (paper): 20.0% win rate \u2014 consider disabling or restricting",
+    "\u26a0\ufe0f play4_supertrend (paper): negative expectancy \u20b9-249.31 per trade",
+    "\u26a0\ufe0f play4_supertrend (paper): SELL signals lost \u20b92,493 today \u2014 possible regime mismatch",
+    "\u26a0\ufe0f unknown (auto): 100% SL hit rate \u2014 SLs likely too tight or signals counter-trend",
+    "\u26a0\ufe0f unknown (auto): negative expectancy \u20b9-37.74 per trade",
+    "\u26a0\ufe0f play4_supertrend (auto): 100% SL hit rate \u2014 SLs likely too tight or signals counter-trend",
+    "\u26a0\ufe0f play4_supertrend (auto): 33.3% win rate \u2014 consider disabling or restricting",
+    "\u26a0\ufe0f bear_put_spread (options_paper): 100% square-off rate \u2014 trades not reaching target within session",
+    "\u2705 bear_put_spread (options_paper): 100.0% win rate \u2014 strong performer",
+    "\u26a0\ufe0f bear_put_spread (options_auto): 100% square-off rate \u2014 trades not reaching target within session",
+    "\u2705 bear_put_spread (options_auto): 100.0% win rate \u2014 strong performer"
+  ],
+  "parameter_changes_today": [],
+  "recommendations": [
+    {
+      "type": "negative",
+      "title": "P&L declined vs average",
+      "detail": "Today: \u20b9-1,907 vs avg \u20b9-1,346. Check if market regime shifted or if a single bad trade skewed results.",
+      "action": "review worst trade \u2014 was it a regime mismatch or strategy flaw?"
+    },
+    {
+      "type": "negative",
+      "title": "play4_supertrend (paper) degraded",
+      "detail": "Expectancy: \u20b9-249/trade vs prev avg \u20b9175/trade. Win rate: 20.0% vs 70%.",
+      "action": "investigate \u2014 check if regime mismatch or SL issues"
+    },
+    {
+      "type": "warning",
+      "title": "High SL hit rate: 73%",
+      "detail": "16 of 22 trades hit SL. Consider widening ATR multiplier further or checking entry quality.",
+      "action": "if SL rate > 50% for 3 consecutive days \u2192 increase ATR mult by 0.5"
+    },
+    {
+      "type": "info",
+      "title": "BUY signals outperformed SELL",
+      "detail": "BUY: \u20b90 | SELL: \u20b9-2,138. Regime detection should be filtering direction.",
+      "action": "verify regime detection is correctly blocking counter-trend signals"
+    }
+  ]
+}

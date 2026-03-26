@@ -49,7 +49,7 @@ class BBSqueeze(BaseStrategy):
     exit_rules = "First target at 1:1.5 or 1:2 Risk-Reward ratio."
     stop_loss_rules = "Mechanical stop below the Middle Band (20 SMA)."
 
-    def scan(self, df: pd.DataFrame, symbol: str) -> Optional[dict]:
+    def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
         if len(df) < 30:
             return None
 

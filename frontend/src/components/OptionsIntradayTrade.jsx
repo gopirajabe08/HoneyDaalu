@@ -206,8 +206,8 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
             </div>
           )}
 
-          {/* Active trades — hidden for live (Fyers Dashboard is source of truth) */}
-          {!isLive && activeTrades.length > 0 && (
+          {/* Active trades */}
+          {activeTrades.length > 0 && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Activity size={16} className={accentText} />

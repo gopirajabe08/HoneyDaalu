@@ -254,6 +254,56 @@ def get_funds() -> dict:
         return {"error": str(e)}
 
 
+# ── Segment Check ─────────────────────────────────────────────────────────
+
+def is_nfo_enabled() -> bool:
+    """Check if NFO (F&O) segment is enabled on the Fyers account.
+
+    Detection methods (in order):
+    1. Try getting a quote for a NIFTY option — if data returns, NFO is active.
+    2. Check orderbook for NFO rejection messages — definitive NO.
+    3. Check orderbook for any FILLED NFO order — definitive YES.
+    """
+    fyers = get_fyers()
+    if fyers is None:
+        return False
+
+    # Method 1: Try getting a NIFTY option quote (fastest proof)
+    try:
+        from services.options_client import get_nearest_expiry, get_atm_strike
+        expiry_str, _ = get_nearest_expiry("NIFTY", "weekly")
+        # Use a round ATM strike (estimate from NIFTY ~23000-24000 range)
+        test_symbol = f"NSE:NIFTY{expiry_str}23500CE"
+        res = fyers.quotes(data={"symbols": test_symbol})
+        quotes = res.get("d", [])
+        for q in quotes:
+            v = q.get("v", {})
+            if isinstance(v, dict) and (v.get("lp", 0) > 0 or v.get("close_price", 0) > 0):
+                return True  # Got a valid option quote — NFO is active
+    except Exception:
+        pass
+
+    # Method 2: Check orderbook for NFO rejection or filled orders
+    try:
+        orders = fyers.orderbook()
+        order_book = orders.get("orderBook", [])
+
+        for o in order_book:
+            msg = (o.get("message") or "").lower()
+            if "nfo not enabled" in msg or "exchange nfo not enabled" in msg:
+                return False
+
+        for o in order_book:
+            symbol = o.get("symbol", "")
+            if o.get("status") == 2 and ("NIFTY" in symbol or "BANKNIFTY" in symbol) and ("CE" in symbol or "PE" in symbol):
+                return True
+    except Exception:
+        pass
+
+    # No definitive answer — default False (safe)
+    return False
+
+
 # ── Orders ─────────────────────────────────────────────────────────────────
 
 
@@ -408,29 +458,9 @@ def _place_intraday_with_sl(
     else:
         logger.error(f"SL-M order FAILED for {fyers_symbol}: {sl_resp.get('message', sl_resp.get('error', str(sl_resp)))}")
 
-    # Step 3: Limit order at target price — opposite side
-    # This ensures target exit happens on Fyers even if auto-trader monitoring lags
-    target_order_id = ""
-    target_side = -1 if side == 1 else 1  # opposite direction
-    target_data = {
-        "symbol": fyers_symbol,
-        "qty": qty,
-        "type": 1,  # Limit order
-        "side": target_side,
-        "productType": "INTRADAY",
-        "limitPrice": round(target, 2),
-        "stopPrice": 0,
-        "validity": "DAY",
-        "disclosedQty": 0,
-        "offlineOrder": False,
-    }
-
-    target_resp = _place_order_with_tick_retry(fyers, target_data)
-    if target_resp.get("s") == "ok" or "id" in target_resp:
-        target_order_id = target_resp.get("id", target_resp.get("order_id", ""))
-        logger.info(f"Target limit order placed: {fyers_symbol} T@{target} (ID: {target_order_id})")
-    else:
-        logger.warning(f"Target limit order FAILED for {fyers_symbol}: {target_resp.get('message', target_resp.get('error', str(target_resp)))} — auto-trader will monitor target via LTP")
+    # Target: NO order on Fyers — auto-trader monitors LTP and exits at market
+    # Benefits: saves ₹20/trade brokerage, no orphaned target orders, trailing SL is smarter
+    # Safety: SL-M on Fyers protects downside, trailing SL locks profits, Fyers auto-square at 3:25 PM
 
     return {
         "s": "ok",
@@ -438,7 +468,7 @@ def _place_intraday_with_sl(
         "order_mode": "INTRADAY_SL",
         "entry_order_id": entry_order_id,
         "sl_order_id": sl_order_id,
-        "target_order_id": target_order_id,
+        "target_order_id": "",  # No target order — monitored by auto-trader
         "target_price": round(target, 2),
     }
 

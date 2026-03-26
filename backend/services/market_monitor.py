@@ -220,6 +220,10 @@ def _run_monitor_loop():
 def start_monitor():
     global _monitor_thread, _running
     if _running:
+        logger.info("[Monitor] Already running — skipping duplicate start")
+        return
+    if _monitor_thread is not None and _monitor_thread.is_alive():
+        logger.info("[Monitor] Thread still alive — skipping duplicate start")
         return
     _running = True
     _monitor_thread = threading.Thread(target=_run_monitor_loop, daemon=True, name="MarketMonitor")

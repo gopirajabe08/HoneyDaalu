@@ -1,0 +1,374 @@
+{
+  "date": "2026-03-25",
+  "generated_at": "2026-03-25T23:59:46.897409+05:30",
+  "market_snapshot": {},
+  "engines_active": {},
+  "strategy_performance": {
+    "play8_rsi_divergence|paper": {
+      "trades": 5,
+      "wins": 2,
+      "losses": 3,
+      "breakeven": 0,
+      "sl_hits": 3,
+      "target_hits": 0,
+      "square_offs": 2,
+      "manual_closes": 0,
+      "gross_pnl": -248.7000000000001,
+      "charges": 0,
+      "net_pnl": -248.7000000000001,
+      "total_time_seconds": 37119.353203,
+      "trades_detail": [
+        {
+          "symbol": "COFORGE",
+          "direction": "SELL",
+          "entry": 1125.77,
+          "exit": 1137.1,
+          "sl": 1136.83,
+          "target": 1107.04,
+          "pnl": -416.62,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-25T10:30:34.037431+05:30",
+          "time_closed": "2026-03-25T10:44:04.213035+05:30"
+        },
+        {
+          "symbol": "TANLA",
+          "direction": "SELL",
+          "entry": 418.78,
+          "exit": 417.2,
+          "sl": 416.62,
+          "target": 409.08,
+          "pnl": 97.76,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-25T10:30:34.036091+05:30",
+          "time_closed": "2026-03-25T12:14:41.030960+05:30"
+        },
+        {
+          "symbol": "NESTLEIND",
+          "direction": "SELL",
+          "entry": 1199.6,
+          "exit": 1209.9,
+          "sl": 1209.5,
+          "target": 1183.4,
+          "pnl": -362.07,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-25T10:46:49.316148+05:30",
+          "time_closed": "2026-03-25T13:02:56.158298+05:30"
+        },
+        {
+          "symbol": "DMART",
+          "direction": "SELL",
+          "entry": 3911.88,
+          "exit": 3912.1,
+          "sl": 3957.04,
+          "target": 3833.32,
+          "pnl": -42.46,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-25T12:15:03.966871+05:30",
+          "time_closed": "2026-03-25T15:20:00.795602+05:30"
+        },
+        {
+          "symbol": "HDFCBANK",
+          "direction": "SELL",
+          "entry": 791.41,
+          "exit": 780.4,
+          "sl": 785.95,
+          "target": 778.74,
+          "pnl": 474.69,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-25T12:20:02.290243+05:30",
+          "time_closed": "2026-03-25T15:20:00.802092+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 5,
+          "pnl": -248.7000000000001
+        }
+      },
+      "strategy": "play8_rsi_divergence",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 40.0,
+      "avg_time_minutes": 123.7,
+      "avg_win": 286.23,
+      "avg_loss": -273.72,
+      "expectancy_per_trade": -49.74
+    },
+    "play6_bb_contra|paper": {
+      "trades": 4,
+      "wins": 2,
+      "losses": 2,
+      "breakeven": 0,
+      "sl_hits": 1,
+      "target_hits": 0,
+      "square_offs": 3,
+      "manual_closes": 0,
+      "gross_pnl": -689.27,
+      "charges": 0,
+      "net_pnl": -689.27,
+      "total_time_seconds": 50415.777139,
+      "trades_detail": [
+        {
+          "symbol": "ADANIENT",
+          "direction": "SELL",
+          "entry": 1873.22,
+          "exit": 1911,
+          "sl": 1910.21,
+          "target": 1846.03,
+          "pnl": -758.75,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-25T10:30:34.036803+05:30",
+          "time_closed": "2026-03-25T12:19:48.942864+05:30"
+        },
+        {
+          "symbol": "SBILIFE",
+          "direction": "SELL",
+          "entry": 1861.14,
+          "exit": 1849.1,
+          "sl": 1885.36,
+          "target": 1847.05,
+          "pnl": 197.99,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-25T10:44:29.606060+05:30",
+          "time_closed": "2026-03-25T15:20:00.779064+05:30"
+        },
+        {
+          "symbol": "HINDALCO",
+          "direction": "SELL",
+          "entry": 866.18,
+          "exit": 868.8,
+          "sl": 880.06,
+          "target": 861.23,
+          "pnl": -155.49,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-25T10:44:29.607032+05:30",
+          "time_closed": "2026-03-25T15:20:00.788450+05:30"
+        },
+        {
+          "symbol": "MASTEK",
+          "direction": "SELL",
+          "entry": 1452.75,
+          "exit": 1450,
+          "sl": 1477.52,
+          "target": 1446.79,
+          "pnl": 26.98,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-25T12:20:02.291296+05:30",
+          "time_closed": "2026-03-25T15:20:00.807952+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 4,
+          "pnl": -689.27
+        }
+      },
+      "strategy": "play6_bb_contra",
+      "source": "paper",
+      "timeframe": "15m",
+      "win_rate_pct": 50.0,
+      "avg_time_minutes": 210.1,
+      "avg_win": 112.48,
+      "avg_loss": -457.12,
+      "expectancy_per_trade": -172.32
+    },
+    "play6_bb_contra|auto": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 1,
+      "target_hits": 0,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": 358.8,
+      "charges": 0,
+      "net_pnl": 358.8,
+      "total_time_seconds": 16398.119202,
+      "trades_detail": [
+        {
+          "symbol": "SBILIFE",
+          "direction": "SELL",
+          "entry": 1863.6,
+          "exit": 1849.8,
+          "sl": 1889.83,
+          "target": 1843.86,
+          "pnl": 358.8,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-25T10:46:02.955830+05:30",
+          "time_closed": "2026-03-25T15:19:21.075032+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 1,
+          "pnl": 358.8
+        }
+      },
+      "strategy": "play6_bb_contra",
+      "source": "auto",
+      "timeframe": "15m",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 273.3,
+      "avg_win": 358.8,
+      "avg_loss": 0,
+      "expectancy_per_trade": 358.8
+    },
+    "play8_rsi_divergence|auto": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "breakeven": 0,
+      "sl_hits": 1,
+      "target_hits": 0,
+      "square_offs": 0,
+      "manual_closes": 0,
+      "gross_pnl": 456.25,
+      "charges": 0,
+      "net_pnl": 456.25,
+      "total_time_seconds": 14618.702295,
+      "trades_detail": [
+        {
+          "symbol": "POONAWALLA",
+          "direction": "SELL",
+          "entry": 394,
+          "exit": 390.35,
+          "sl": 399.1,
+          "target": 384.09,
+          "pnl": 456.25,
+          "exit_reason": "SL_HIT",
+          "time_placed": "2026-03-25T11:15:42.379198+05:30",
+          "time_closed": "2026-03-25T15:19:21.081493+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 0,
+          "pnl": 0
+        },
+        "SELL": {
+          "count": 1,
+          "pnl": 456.25
+        }
+      },
+      "strategy": "play8_rsi_divergence",
+      "source": "auto",
+      "timeframe": "15m",
+      "win_rate_pct": 100.0,
+      "avg_time_minutes": 243.6,
+      "avg_win": 456.25,
+      "avg_loss": 0,
+      "expectancy_per_trade": 456.25
+    },
+    "play4_supertrend|futures_paper": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "breakeven": 0,
+      "sl_hits": 0,
+      "target_hits": 0,
+      "square_offs": 1,
+      "manual_closes": 0,
+      "gross_pnl": -727.87,
+      "charges": 0,
+      "net_pnl": -727.87,
+      "total_time_seconds": 10952.551163,
+      "trades_detail": [
+        {
+          "symbol": "NESTLEIND",
+          "direction": "BUY",
+          "entry": 1205.8,
+          "exit": 1200.9,
+          "sl": 1190.15,
+          "target": 1233.51,
+          "pnl": -727.87,
+          "exit_reason": "SQUARE_OFF",
+          "time_placed": "2026-03-25T12:16:25.983788+05:30",
+          "time_closed": "2026-03-25T15:18:58.534951+05:30"
+        }
+      ],
+      "directions": {
+        "BUY": {
+          "count": 1,
+          "pnl": -727.87
+        },
+        "SELL": {
+          "count": 0,
+          "pnl": 0
+        }
+      },
+      "strategy": "play4_supertrend",
+      "source": "futures_paper",
+      "timeframe": "15m",
+      "win_rate_pct": 0.0,
+      "avg_time_minutes": 182.5,
+      "avg_win": 0,
+      "avg_loss": -727.87,
+      "expectancy_per_trade": -727.87
+    }
+  },
+  "source_pnl_summary": {
+    "paper": -937.97,
+    "auto": 815.05,
+    "futures_paper": -727.87
+  },
+  "total_trades": 12,
+  "total_net_pnl": -850.79,
+  "best_trade": {
+    "symbol": "HDFCBANK",
+    "strategy": "play8_rsi_divergence",
+    "pnl": 474.69,
+    "source": "paper"
+  },
+  "worst_trade": {
+    "symbol": "ADANIENT",
+    "strategy": "play6_bb_contra",
+    "pnl": -758.75,
+    "source": "paper"
+  },
+  "auto_insights": [
+    "\u26a0\ufe0f play8_rsi_divergence (paper): negative expectancy \u20b9-49.74 per trade",
+    "\u26a0\ufe0f play6_bb_contra (paper): 75% square-off rate \u2014 trades not reaching target within session",
+    "\u26a0\ufe0f play6_bb_contra (paper): negative expectancy \u20b9-172.32 per trade",
+    "\u26a0\ufe0f play6_bb_contra (paper): SELL signals lost \u20b9689 today \u2014 possible regime mismatch",
+    "\u26a0\ufe0f play6_bb_contra (auto): 100% SL hit rate \u2014 SLs likely too tight or signals counter-trend",
+    "\u2705 play6_bb_contra (auto): 100.0% win rate \u2014 strong performer",
+    "\u26a0\ufe0f play8_rsi_divergence (auto): 100% SL hit rate \u2014 SLs likely too tight or signals counter-trend",
+    "\u2705 play8_rsi_divergence (auto): 100.0% win rate \u2014 strong performer",
+    "\u26a0\ufe0f play4_supertrend (futures_paper): 100% square-off rate \u2014 trades not reaching target within session",
+    "\u26a0\ufe0f play4_supertrend (futures_paper): negative expectancy \u20b9-727.87 per trade"
+  ],
+  "parameter_changes_today": [],
+  "recommendations": [
+    {
+      "type": "positive",
+      "title": "P&L improved significantly",
+      "detail": "Today: \u20b9-851 vs avg \u20b9-5,979 (prev 3 days). Current parameters working well.",
+      "action": "hold \u2014 don't change what's working"
+    },
+    {
+      "type": "positive",
+      "title": "play6_bb_contra (auto) improved",
+      "detail": "Expectancy: \u20b9359/trade vs prev avg \u20b9-391/trade. Win rate: 100.0% vs 14%.",
+      "action": "hold \u2014 strategy performing well with current parameters"
+    },
+    {
+      "type": "positive",
+      "title": "play8_rsi_divergence (auto) improved",
+      "detail": "Expectancy: \u20b9456/trade vs prev avg \u20b9-627/trade. Win rate: 100.0% vs 0%.",
+      "action": "hold \u2014 strategy performing well with current parameters"
+    }
+  ]
+}

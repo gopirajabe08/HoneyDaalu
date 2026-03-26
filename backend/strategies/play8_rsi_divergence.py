@@ -118,10 +118,21 @@ class RSIDivergence(BaseStrategy):
 
         rsi_val = last["rsi"]
 
+        # Timeframe-aware RSI thresholds:
+        # Intraday (5m/15m): RSI rarely hits extreme zones, relax to 40/60
+        # Swing/daily: keep strict 35/65
+        timeframe = kwargs.get("timeframe", "1d")
+        if timeframe in ("5m", "15m"):
+            oversold_threshold = 40
+            overbought_threshold = 60
+        else:
+            oversold_threshold = 35
+            overbought_threshold = 65
+
         # Route based on RSI zone
-        if rsi_val < 35:
+        if rsi_val < oversold_threshold:
             return self._scan_long(df, symbol)
-        elif rsi_val > 65:
+        elif rsi_val > overbought_threshold:
             return self._scan_short(df, symbol)
         return None
 

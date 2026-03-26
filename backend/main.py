@@ -19,6 +19,8 @@ from services.auto_trader import auto_trader
 from services.paper_trader import paper_trader
 from services.swing_trader import swing_trader
 from services.swing_paper_trader import swing_paper_trader
+from services.btst_trader import btst_trader
+from services.btst_paper_trader import btst_paper_trader
 from services.options_auto_trader import options_auto_trader
 from services.options_paper_trader import options_paper_trader
 from services.options_swing_trader import options_swing_trader
@@ -28,6 +30,7 @@ from services.futures_paper_trader import futures_paper_trader
 from services.futures_swing_trader import futures_swing_trader
 from services.futures_swing_paper_trader import futures_swing_paper_trader
 from services.backtester import run_backtest_api
+from services import telegram_notify
 from services.strategy_tracker import (
     get_daily_report, get_recent_reports, get_strategy_registry,
     get_changelog, generate_report_from_api,
@@ -43,27 +46,40 @@ app = FastAPI(title="IntraTrading Scanner", version="1.0.0")
 
 @app.on_event("startup")
 def auto_connect_fyers():
-    """Auto-connect Fyers on server startup — reuse saved token or TOTP login."""
+    """Auto-connect Fyers on server startup — fresh TOTP login daily."""
+    # C10: Auto-setup sleep prevention
+    try:
+        import subprocess
+        result = subprocess.run(["sudo", "-n", "pmset", "disablesleep", "1"], capture_output=True, timeout=5)
+        if result.returncode == 0:
+            print("[Startup] Sleep prevention: ENABLED (pmset)", flush=True)
+        else:
+            subprocess.Popen(["caffeinate", "-d", "-i", "-s"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print("[Startup] Sleep prevention: ENABLED (caffeinate fallback)", flush=True)
+    except Exception:
+        print("[Startup] Sleep prevention: FAILED — Mac may sleep", flush=True)
+
     if not fyers_client.is_configured():
         logger.warning("Fyers credentials not configured in .env — skipping auto-connect")
         return
 
-    # Try reusing saved token
-    if fyers_client.is_authenticated():
-        profile = fyers_client.get_profile()
-        name = profile.get("data", {}).get("name", "Unknown")
-        logger.info(f"Fyers auto-connected (saved token): {name}")
-        return
-
-    # Token expired or missing — try headless TOTP login
-    logger.info("Fyers token expired — attempting TOTP auto-login...")
-    result = fyers_client.headless_login()
-    if "error" in result:
-        logger.error(f"Fyers auto-login failed: {result['error']}")
+    # A1: Always fresh login daily — clear stale tokens
+    fyers_client.logout()
+    print("[Startup] Attempting fresh TOTP login...", flush=True)
+    for attempt in range(1, 4):
+        result = fyers_client.headless_login()
+        import time as _time
+        _time.sleep(3)  # Wait for token to propagate
+        if fyers_client.is_authenticated():
+            profile = fyers_client.get_profile()
+            name = profile.get("data", {}).get("name", "Unknown")
+            print(f"[Startup] Fyers connected: {name} (attempt {attempt})", flush=True)
+            break
+        else:
+            print(f"[Startup] Login attempt {attempt}/3 — not authenticated yet, retrying...", flush=True)
+            _time.sleep(5)
     else:
-        profile = fyers_client.get_profile()
-        name = profile.get("data", {}).get("name", "Unknown")
-        logger.info(f"Fyers auto-connected (TOTP login): {name}")
+        print("[Startup] WARNING: Fyers login failed after 3 attempts — live engines will not start", flush=True)
 
     # Start market monitor daemon
     from services.market_monitor import start_monitor
@@ -73,12 +89,29 @@ def auto_connect_fyers():
     import threading
     def _auto_start_engines():
         """Auto-start paper + live engines based on capital and conditions."""
-        import time
+        import time, traceback
         time.sleep(5)  # Wait for server to fully initialize
+
+        def _log(msg):
+            """Print to stdout (visible in logs) AND use logger."""
+            print(f"[AutoStart] {msg}", flush=True)
+            logger.info(f"[AutoStart] {msg}")
 
         try:
             from services.equity_regime import detect_equity_regime
             from config import SWING_STRATEGY_TIMEFRAMES
+            from utils.time_utils import now_ist
+
+            # Guard: don't start engines after market close — prevents wasted resources
+            boot_now = now_ist()
+            if boot_now.weekday() >= 5:
+                _log("Weekend — skipping engine start")
+                return
+            if boot_now.hour > 15 or (boot_now.hour == 15 and boot_now.minute >= 30):
+                _log(f"After market close ({boot_now.strftime('%H:%M')}) — skipping engine start")
+                return
+
+            _log("Starting engines...")
 
             # Futures paper — use futures regime for strategy selection
             def _get_futures_regime_strategies():
@@ -89,37 +122,69 @@ def auto_connect_fyers():
                 except Exception:
                     return []
 
-            # Always start ALL paper engines (for data collection)
+            def _btst_strategies():
+                """Build BTST strategy list using BTST-specific timeframes (1d/1h), not intraday 15m."""
+                from config import BTST_STRATEGY_TIMEFRAMES
+                regime_strats = detect_equity_regime().get("strategy_ids", [])
+                btst_strats = []
+                for key in regime_strats:
+                    if key in BTST_STRATEGY_TIMEFRAMES:
+                        tf = BTST_STRATEGY_TIMEFRAMES[key][0]  # Use first valid BTST timeframe
+                        btst_strats.append({"strategy": key, "timeframe": tf})
+                if not btst_strats:
+                    # Fallback: use all BTST strategies with their default timeframes
+                    for key, tfs in BTST_STRATEGY_TIMEFRAMES.items():
+                        btst_strats.append({"strategy": key, "timeframe": tfs[0]})
+                return btst_strats
+
+            # Auto-start only engines with proven edge or clear potential
+            # Others are hidden (not auto-started) but still available via UI/API
             paper_configs = [
                 ("Equity Intraday Paper", lambda: paper_trader.start(
                     strategies=detect_equity_regime().get("strategies", []),
                     capital=75000)),
-                ("Equity Swing Paper", lambda: swing_paper_trader.start(
-                    strategies=[{"strategy": s, "timeframe": tfs[0]} for s, tfs in SWING_STRATEGY_TIMEFRAMES.items()],
-                    capital=75000)),
                 ("Options Intraday Paper", lambda: options_paper_trader.start(
                     capital=25000, underlyings=["NIFTY", "BANKNIFTY"])),
-                ("Options Swing Paper", lambda: options_swing_paper_trader.start(
-                    capital=25000, underlyings=["NIFTY", "BANKNIFTY"])),
-                ("Futures Intraday Paper", lambda: futures_paper_trader.start(
-                    strategies=_get_futures_regime_strategies(), capital=100000)),
-                ("Futures Swing Paper", lambda: futures_swing_paper_trader.start(
-                    strategies=_get_futures_regime_strategies(), capital=100000)),
+                ("BTST Paper", lambda: btst_paper_trader.start(
+                    strategies=_btst_strategies(),
+                    capital=50000)),
+                # Hidden — no proven edge yet. Can start manually from UI if needed:
+                # ("Equity Swing Paper", lambda: swing_paper_trader.start(...)),
+                # ("Options Swing Paper", lambda: options_swing_paper_trader.start(...)),
+                # ("Futures Intraday Paper", lambda: futures_paper_trader.start(...)),
+                # ("Futures Swing Paper", lambda: futures_swing_paper_trader.start(...)),
             ]
 
             for name, start_fn in paper_configs:
                 try:
                     result = start_fn()
                     if result and not result.get("error"):
-                        logger.info(f"[AutoStart] {name}: started")
+                        _log(f"{name}: started")
                     else:
-                        logger.info(f"[AutoStart] {name}: already running or restored from state")
+                        _log(f"{name}: already running or restored from state")
                 except Exception as e:
-                    logger.warning(f"[AutoStart] {name}: {e}")
+                    _log(f"{name}: FAILED — {e}")
 
-            # Live engines: only start if Fyers connected + capital available
-            if not fyers_client.is_authenticated():
-                logger.warning("[AutoStart] Fyers not connected — skipping live engines")
+            # ── Wait for market open before starting live engines ──
+            from services.scanner import is_market_open
+            if not is_market_open():
+                _log("Market not open yet — waiting for 9:15 AM IST...")
+                while not is_market_open():
+                    time.sleep(30)
+                    if not is_market_open():
+                        continue
+                _log("Market is OPEN — starting live engines")
+
+            # ── Live engines: Equity Intraday + Options Intraday ONLY ──
+            # Futures Live and all Swing Live stay paper-only until proven profitable.
+            # A2: Verify Fyers is truly connected (retry up to 5 times)
+            for _fyers_check in range(5):
+                if fyers_client.is_authenticated():
+                    break
+                _log(f"Fyers not ready — retry {_fyers_check+1}/5...")
+                time.sleep(10)
+            else:
+                _log("Fyers not connected after 5 retries — skipping live engines")
                 return
 
             try:
@@ -131,65 +196,237 @@ def auto_connect_fyers():
                         available = f.get("equityAmount", 0)
 
                 if available <= 0:
-                    logger.warning("[AutoStart] No funds available — skipping live engines")
+                    _log("No funds available — skipping live engines")
                     return
 
-                logger.info(f"[AutoStart] Available capital: ₹{available:,.0f}")
+                _log(f"Available capital: ₹{available:,.0f}")
 
                 # Detect market conditions for allocation
                 regime = detect_equity_regime()
                 vix = regime.get("components", {}).get("vix", 15)
                 regime_name = regime.get("regime", "neutral")
 
-                # Dynamic allocation based on capital + conditions
-                if available < 100000:
-                    # < 1L: Options only
-                    opt_capital = available
-                    eq_capital = 0
-                elif available < 250000:
-                    # 1L-2.5L: Options 40% + Equity 35% + reserve
-                    if vix > 20:
-                        opt_capital = int(available * 0.50)
-                        eq_capital = int(available * 0.30)
-                    else:
-                        opt_capital = int(available * 0.35)
-                        eq_capital = int(available * 0.45)
+                # Check if NFO segment is enabled before allocating to Options
+                nfo_enabled = fyers_client.is_nfo_enabled()
+                if nfo_enabled:
+                    _log("NFO segment: ENABLED")
                 else:
-                    # 2.5L+: wider allocation
-                    opt_capital = int(available * 0.40)
-                    eq_capital = int(available * 0.40)
+                    _log("NFO segment: NOT ENABLED — all capital goes to Equity")
 
-                # Start live engines
-                if opt_capital >= 20000:
+                # C11: Delete Options Live state file if NFO not enabled — prevent auto-restore
+                if not nfo_enabled:
                     try:
-                        # Options: BANKNIFTY first (lower margin), add NIFTY only if capital > 40K
+                        import os
+                        opt_state = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.options_auto_trader_state.json')
+                        if os.path.exists(opt_state):
+                            os.remove(opt_state)
+                            _log("Deleted Options Live state file (NFO not enabled)")
+                    except:
+                        pass
+
+                # Capital split — Equity is PROVEN (play8 +₹815 on Mar 25), Options is NEW.
+                # Equity gets priority. Options gets remainder for validation.
+                if not nfo_enabled:
+                    opt_capital = 0
+                    eq_capital = int(available)
+                elif available < 100000:
+                    # < 1L: Equity 65%, Options 35% — don't kill proven engine for unproven
+                    eq_capital = int(available * 0.65)
+                    opt_capital = int(available * 0.35)
+                elif vix > 20:
+                    # High VIX: Equity 50%, Options 50% — options benefit from high premium
+                    eq_capital = int(available * 0.50)
+                    opt_capital = int(available * 0.50)
+                else:
+                    # Normal VIX: Equity 60%, Options 40%
+                    eq_capital = int(available * 0.60)
+                    opt_capital = int(available * 0.40)
+
+                # Start Options Live (only if NFO enabled)
+                if nfo_enabled and opt_capital >= 20000:
+                    try:
                         opt_underlyings = ["BANKNIFTY"]
                         if opt_capital >= 40000:
                             opt_underlyings = ["NIFTY", "BANKNIFTY"]
                         r = options_auto_trader.start(capital=opt_capital, underlyings=opt_underlyings)
                         if not r.get("error"):
-                            logger.info(f"[AutoStart] Options Live: ₹{opt_capital:,} allocated")
+                            _log(f"Options Live: ₹{opt_capital:,} | {opt_underlyings}")
+                        else:
+                            _log(f"Options Live error: {r.get('error')}")
                     except Exception as e:
-                        logger.warning(f"[AutoStart] Options Live failed: {e}")
+                        _log(f"Options Live FAILED: {e}")
+                        traceback.print_exc()
 
+                # BTST Live: deferred start at 1:50 PM (10 min before entry window)
+                # No capital reserved upfront. Equity gets 100%. BTST uses available funds at 2 PM.
+                def _start_btst_deferred():
+                    """Wait until 1:50 PM, then start BTST Live with dynamic capital."""
+                    import time as _time
+                    from utils.time_utils import now_ist
+                    while True:
+                        now = now_ist()
+                        if now.hour > 13 or (now.hour == 13 and now.minute >= 50):
+                            break
+                        if now.hour >= 15 and now.minute >= 30:
+                            _log("BTST Live: market closed before BTST window — skipped today")
+                            return
+                        _time.sleep(30)
+                    try:
+                        _log("BTST Live: 1:50 PM — starting BTST engine")
+                        btst_strats = _btst_strategies()
+                        r = btst_trader.start(strategies=btst_strats, capital=0)
+                        if not r.get("error"):
+                            _log(f"BTST Live: started | {len(btst_strats)} strategies (daily TF) | capital from Fyers at scan time")
+                        else:
+                            _log(f"BTST Live error: {r.get('error')}")
+                    except Exception as e:
+                        _log(f"BTST Live FAILED: {e}")
+                        traceback.print_exc()
+
+                threading.Thread(target=_start_btst_deferred, daemon=True, name="BTSTDeferredStart").start()
+                _log("BTST Live: scheduled for 1:50 PM (deferred start)")
+
+                # Start Equity Live — gets 100% of equity capital
                 if eq_capital >= 20000:
                     try:
                         strategies = regime.get("strategies", [])
                         r = auto_trader.start(strategies=strategies, capital=eq_capital)
                         if not r.get("error"):
-                            logger.info(f"[AutoStart] Equity Live: ₹{eq_capital:,} allocated | {len(strategies)} strategies")
+                            _log(f"Equity Live: ₹{eq_capital:,} | {len(strategies)} strategies | {regime_name}")
+                        else:
+                            _log(f"Equity Live error: {r.get('error')}")
                     except Exception as e:
-                        logger.warning(f"[AutoStart] Equity Live failed: {e}")
+                        _log(f"Equity Live FAILED: {e}")
+                        traceback.print_exc()
 
-                logger.info(f"[AutoStart] Complete — VIX:{vix} Regime:{regime_name}")
+                _log("═" * 50)
+                _log(f"AUTO-START COMPLETE")
+                _log(f"  Regime: {regime_name} | VIX: {vix:.1f}")
+                _log(f"  Equity Live:  ₹{eq_capital:,} | Max 2 positions")
+                _log(f"  Options Live: {'₹'+str(opt_capital) if nfo_enabled else 'DISABLED (NFO pending)'}")
+                _log(f"  BTST Live:    Scheduled 1:50 PM (dynamic capital)")
+                _log(f"  Paper engines: 7 running")
+                _log(f"  Auto-shutdown: 3:45 PM")
+                _log("═" * 50)
+
+                # Telegram: morning brief
+                try:
+                    engines = []
+                    if eq_capital >= 20000:
+                        engines.append(f"Equity Live: ₹{eq_capital:,}")
+                    if nfo_enabled and opt_capital >= 20000:
+                        engines.append(f"Options Live: ₹{opt_capital:,}")
+                    engines.append("BTST Live: Scheduled 1:50 PM")
+                    engines.append("Paper engines running")
+                    telegram_notify.morning_brief(available, regime_name, vix, engines)
+                except Exception:
+                    pass
 
             except Exception as e:
-                logger.warning(f"[AutoStart] Live allocation failed: {e}")
+                _log(f"Live allocation FAILED: {e}")
+                traceback.print_exc()
 
         except Exception as e:
-            logger.error(f"[AutoStart] Failed: {e}")
+            print(f"[AutoStart] FATAL: {e}", flush=True)
+            traceback.print_exc()
 
     threading.Thread(target=_auto_start_engines, daemon=True, name="AutoStartEngines").start()
+
+    # C9: Auto-shutdown after market close
+    def _auto_shutdown():
+        """Auto-shutdown server after market close + EOD analysis."""
+        import time
+        from utils.time_utils import now_ist
+
+        # Cold-start guard: if server starts after 3:45 PM, skip auto-shutdown entirely.
+        # This prevents crash loops when server is restarted after market hours.
+        boot_time = now_ist()
+        if boot_time.hour > 15 or (boot_time.hour == 15 and boot_time.minute >= 45):
+            print(f"[AutoShutdown] Server started at {boot_time.strftime('%H:%M')} (after 3:45 PM) — skipping auto-shutdown to prevent crash loop", flush=True)
+            return
+        if boot_time.weekday() >= 5:
+            print(f"[AutoShutdown] Weekend — skipping auto-shutdown", flush=True)
+            return
+
+        _half_day_sent = False
+        while True:
+            now = now_ist()
+            # Wait until 3:45 PM
+            if now.hour >= 15 and now.minute >= 45:
+                break
+            if now.hour >= 16:
+                break
+
+            # Half-day summary at 1:00 PM
+            if not _half_day_sent and now.hour >= 13:
+                _half_day_sent = True
+                try:
+                    total_pnl = 0.0
+                    open_count = 0
+                    closed_count = 0
+                    wins = 0
+                    losses = 0
+                    # Gather stats from auto_trader
+                    if auto_trader._running:
+                        total_pnl += getattr(auto_trader, '_total_pnl', 0)
+                        open_count += len([t for t in auto_trader._active_trades if t.get("status") == "OPEN"])
+                        for t in getattr(auto_trader, '_trade_history', []):
+                            closed_count += 1
+                            if t.get("pnl", 0) >= 0:
+                                wins += 1
+                            else:
+                                losses += 1
+                    telegram_notify.half_day_summary(total_pnl, open_count, closed_count, wins, losses)
+                except Exception:
+                    pass
+
+            time.sleep(60)
+
+        print("[AutoShutdown] 3:45 PM — starting EOD pipeline...", flush=True)
+
+        # Run EOD analysis
+        try:
+            from services.auto_tuner import run_eod_pipeline
+            run_eod_pipeline("auto_shutdown")
+        except Exception as e:
+            print(f"[AutoShutdown] EOD pipeline error: {e}", flush=True)
+
+        # Re-enable sleep
+        try:
+            import subprocess
+            subprocess.run(["sudo", "-n", "pmset", "disablesleep", "0"], capture_output=True, timeout=5)
+            print("[AutoShutdown] Sleep re-enabled", flush=True)
+        except:
+            pass
+
+        # Telegram: single day-end summary (replaces squareoff + day_summary + shutdown)
+        try:
+            total_pnl = 0.0
+            trades = 0
+            wins = 0
+            losses = 0
+            for t in getattr(auto_trader, '_trade_history', []):
+                trades += 1
+                total_pnl += t.get("pnl", 0)
+                if t.get("pnl", 0) >= 0:
+                    wins += 1
+                else:
+                    losses += 1
+            capital = getattr(auto_trader, '_capital', 100000)
+            charges = round(abs(total_pnl) * 0.10, 2) if total_pnl != 0 else 0
+            net_pnl = round(total_pnl - charges, 2)
+            btst_open = len([t for t in getattr(btst_trader, '_active_trades', []) if t.get("status") == "OPEN"])
+            telegram_notify.day_end(total_pnl, charges, net_pnl, trades, wins, losses, capital, btst_open)
+        except Exception:
+            pass
+
+        print("[AutoShutdown] Server shutting down. Trading day complete.", flush=True)
+
+        # Graceful shutdown
+        import os, signal
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=_auto_shutdown, daemon=True, name="AutoShutdown").start()
 
 # CORS for frontend
 app.add_middleware(
@@ -354,6 +591,12 @@ def fyers_verify(req: AuthCodeRequest):
     """Exchange a manually-pasted auth code for an access token."""
     result = fyers_client.generate_token(req.auth_code)
     return result
+
+
+@app.post("/api/fyers/headless-login")
+def fyers_headless_login():
+    """Trigger headless TOTP login."""
+    return fyers_client.headless_login()
 
 
 @app.post("/api/fyers/logout")
@@ -679,6 +922,109 @@ def swing_paper_trigger_scan():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  BTST Trading (Live) — Buy Today Sell Tomorrow (CNC orders)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class BTSTStartRequest(BaseModel):
+    strategies: list[StrategySelection]
+    capital: float = 100000
+
+
+@app.post("/api/btst/start")
+def btst_start(req: BTSTStartRequest):
+    """Start the live BTST trading engine."""
+    return btst_trader.start(
+        strategies=[s.model_dump() for s in req.strategies],
+        capital=req.capital,
+    )
+
+
+@app.post("/api/btst/start-auto")
+def btst_start_regime(req: EquityAutoStartRequest):
+    """Start BTST live with auto strategy selection from regime."""
+    from services.equity_regime import detect_equity_regime
+    regime = detect_equity_regime()
+    strategies = regime.get("strategies", [])
+    if not strategies:
+        return {"error": "No strategies selected by regime detector"}
+    result = btst_trader.start(strategies=strategies, capital=req.capital)
+    result["auto_regime"] = True
+    result["strategies_count"] = len(strategies)
+    return result
+
+
+@app.post("/api/btst/stop")
+def btst_stop():
+    """Stop the live BTST trading engine."""
+    return btst_trader.stop()
+
+
+@app.get("/api/btst/status")
+def btst_status():
+    """Get BTST trader current state, active trades, and logs."""
+    return btst_trader.status()
+
+
+@app.post("/api/btst/scan")
+def btst_trigger_scan():
+    """Trigger a manual BTST scan."""
+    return btst_trader.trigger_scan()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  BTST Paper Trading (Virtual)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@app.post("/api/btst-paper/start")
+def btst_paper_start(req: BTSTStartRequest):
+    """Start virtual BTST trading."""
+    return btst_paper_trader.start(
+        strategies=[s.model_dump() for s in req.strategies],
+        capital=req.capital,
+    )
+
+
+@app.post("/api/btst-paper/start-auto")
+def btst_paper_start_regime(req: EquityAutoStartRequest):
+    """Start BTST paper with auto strategy selection."""
+    from services.equity_regime import detect_equity_regime
+    regime = detect_equity_regime()
+    strategies = regime.get("strategies", [])
+    if not strategies:
+        return {"error": "No strategies selected by regime detector"}
+    result = btst_paper_trader.start(strategies=strategies, capital=req.capital)
+    result["auto_regime"] = True
+    result["strategies_count"] = len(strategies)
+    return result
+
+
+@app.post("/api/btst-paper/stop")
+def btst_paper_stop():
+    """Stop virtual BTST trading."""
+    return btst_paper_trader.stop()
+
+
+@app.get("/api/btst-paper/status")
+def btst_paper_status():
+    """Get BTST paper trader current state, virtual trades, and logs."""
+    return btst_paper_trader.status()
+
+
+@app.post("/api/btst-paper/close/{symbol}")
+def btst_paper_close_trade(symbol: str):
+    """Force close a single BTST paper trade."""
+    return btst_paper_trader.force_close_trade(symbol)
+
+
+@app.post("/api/btst-paper/scan")
+def btst_paper_trigger_scan():
+    """Trigger a manual BTST paper scan."""
+    return btst_paper_trader.trigger_scan()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 #  Strategy Stats (persistent trade history)
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -700,12 +1046,13 @@ def trade_history(
     trades = get_all_trades(days)
     if source in ("auto", "paper", "swing", "swing_paper",
                    "options_auto", "options_paper", "options_swing", "options_swing_paper",
-                   "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper"):
+                   "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper",
+                   "btst_auto", "btst_paper"):
         trades = [t for t in trades if t.get("source") == source]
     elif source == "live":
-        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing")]
+        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing", "btst_auto")]
     elif source == "all_paper":
-        trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper")]
+        trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper", "btst_paper")]
     # Add brokerage estimate to each trade
     for t in trades:
         t["charges"] = _estimate_trade_brokerage(t)
@@ -720,7 +1067,7 @@ def _estimate_trade_brokerage(trade: dict) -> float:
     Handles both equity intraday and options F&O charge structures.
     Paper trades return 0.
     """
-    if trade.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper"):
+    if trade.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper", "btst_paper"):
         return 0.0
 
     source = trade.get("source", "")
@@ -805,12 +1152,13 @@ def daily_pnl(
     trades = get_all_trades(days)
     if source in ("auto", "paper", "swing", "swing_paper",
                    "options_auto", "options_paper", "options_swing", "options_swing_paper",
-                   "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper"):
+                   "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper",
+                   "btst_auto", "btst_paper"):
         trades = [t for t in trades if t.get("source") == source]
     elif source == "live":
-        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing")]
+        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing", "btst_auto")]
     elif source == "all_paper":
-        trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper")]
+        trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper", "btst_paper")]
     daily = defaultdict(lambda: {
         "total_pnl": 0.0,
         "trades": 0,

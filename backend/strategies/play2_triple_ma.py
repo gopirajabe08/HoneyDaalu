@@ -45,7 +45,7 @@ class TripleMA(BaseStrategy):
     exit_rules = "Close when 20 EMA crosses the 50 SMA in the opposite direction."
     stop_loss_rules = "Beyond the swing extreme of the pullback."
 
-    def scan(self, df: pd.DataFrame, symbol: str) -> Optional[dict]:
+    def scan(self, df: pd.DataFrame, symbol: str, **kwargs) -> Optional[dict]:
         if len(df) < 210:
             return None
 
