@@ -54,29 +54,29 @@
   --scrollbar-thumb-hover: #94a3b8;
 }
 
-/* Midnight Blue Theme */
+/* Midnight Blue Theme — distinct from dark with blue-navy tones + cyan accent */
 [data-theme="midnight"] {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --border: #475569;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --accent: #06b6d4;
-  --accent-hover: #0891b2;
-  --positive: #34d399;
-  --negative: #f87171;
-  --sidebar-bg: #0f172a;
-  --header-bg: #0f172a;
-  --sidebar-gradient-from: #0f172a;
-  --sidebar-gradient-to: #0b1120;
-  --card-gradient-from: #1e293b;
-  --card-gradient-to: #334155;
-  --accent-glow: rgba(6, 182, 212, 0.15);
-  --accent-secondary: #f59e0b;
-  --scrollbar-track: #0f172a;
-  --scrollbar-thumb: #475569;
-  --scrollbar-thumb-hover: #64748b;
+  --bg-primary: #0a1628;
+  --bg-secondary: #132038;
+  --bg-tertiary: #1c2d4a;
+  --border: #2a4066;
+  --text-primary: #e2e8f0;
+  --text-secondary: #8b9fc7;
+  --accent: #22d3ee;
+  --accent-hover: #06b6d4;
+  --positive: #4ade80;
+  --negative: #fb7185;
+  --sidebar-bg: #071020;
+  --header-bg: #0a1628;
+  --sidebar-gradient-from: #071020;
+  --sidebar-gradient-to: #0a1628;
+  --card-gradient-from: #132038;
+  --card-gradient-to: #1c2d4a;
+  --accent-glow: rgba(34, 211, 238, 0.2);
+  --accent-secondary: #fbbf24;
+  --scrollbar-track: #0a1628;
+  --scrollbar-thumb: #2a4066;
+  --scrollbar-thumb-hover: #3b5998;
 }
 
 /* ===== Base Styles ===== */
@@ -171,6 +171,20 @@ body {
 .sparkline-red {
   filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.4));
 }
+
+/* ===== Theme color overrides for non-dark themes ===== */
+/* These make existing Tailwind classes respond to theme without editing every component */
+
+[data-theme="light"] .text-white { color: var(--text-primary) !important; }
+[data-theme="light"] .text-gray-400 { color: var(--text-secondary) !important; }
+[data-theme="light"] .text-gray-500 { color: #94a3b8 !important; }
+[data-theme="light"] .text-gray-300 { color: var(--text-primary) !important; }
+[data-theme="light"] .border-dark-500 { border-color: var(--border) !important; }
+[data-theme="light"] .border-dark-600 { border-color: var(--border) !important; }
+[data-theme="light"] .bg-dark-800\/50 { background-color: var(--bg-tertiary) !important; }
+
+[data-theme="midnight"] .text-gray-400 { color: var(--text-secondary) !important; }
+[data-theme="midnight"] .text-gray-500 { color: #64748b !important; }
 
 /* ===== Theme-aware utility classes ===== */
 

@@ -8,11 +8,11 @@ export default {
     extend: {
       colors: {
         dark: {
-          900: '#0a0a0f',
-          800: '#12121a',
-          700: '#1a1a25',
-          600: '#222230',
-          500: '#2a2a3a',
+          900: 'var(--bg-primary)',
+          800: 'var(--sidebar-bg)',
+          700: 'var(--bg-secondary)',
+          600: 'var(--bg-tertiary)',
+          500: 'var(--border)',
         },
         accent: {
           orange: '#f97316',
