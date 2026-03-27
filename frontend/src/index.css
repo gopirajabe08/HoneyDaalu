@@ -79,6 +79,34 @@
   --scrollbar-thumb-hover: #3b5998;
 }
 
+/* Aurora Theme — colorful gradients, vibrant accents, purple-green energy */
+[data-theme="aurora"] {
+  --bg-primary: #1a0a2e;
+  --bg-secondary: #241540;
+  --bg-tertiary: #2e1f52;
+  --border: #4a2d7a;
+  --text-primary: #f0e6ff;
+  --text-secondary: #b794d6;
+  --accent: #a855f7;
+  --accent-hover: #9333ea;
+  --positive: #34d399;
+  --negative: #fb7185;
+  --sidebar-bg: #120724;
+  --header-bg: #1a0a2e;
+  --sidebar-gradient-from: #120724;
+  --sidebar-gradient-to: #1a0a2e;
+  --card-gradient-from: #241540;
+  --card-gradient-to: #2e1f52;
+  --accent-glow: rgba(168, 85, 247, 0.25);
+  --accent-secondary: #06b6d4;
+  --scrollbar-track: #1a0a2e;
+  --scrollbar-thumb: #4a2d7a;
+  --scrollbar-thumb-hover: #7c3aed;
+}
+
+[data-theme="aurora"] .text-gray-400 { color: var(--text-secondary) !important; }
+[data-theme="aurora"] .text-gray-500 { color: #8b6aad !important; }
+
 /* ===== Base Styles ===== */
 
 * {

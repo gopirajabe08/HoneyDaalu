@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 
 const STORAGE_KEY = 'intratrading-theme'
-const VALID_THEMES = ['dark', 'light', 'midnight']
+const VALID_THEMES = ['dark', 'light', 'midnight', 'aurora']
 const DEFAULT_THEME = 'dark'
 
 const ThemeContext = createContext({
