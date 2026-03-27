@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { RefreshCw, ScrollText, Calendar, X, ChevronDown } from 'lucide-react'
+import { RefreshCw, ScrollText, Calendar, X, ChevronDown, Zap, BookOpen } from 'lucide-react'
 import {
   getTradeHistory, getAutoStatus, getPaperStatus,
   getSwingStatus, getSwingPaperStatus,
@@ -54,11 +54,20 @@ const STRATEGY_COLORS = {
   futures_ema_rsi_pullback: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
 }
 
+// Live source keys (real money engines)
+const LIVE_SOURCES = new Set(['auto', 'swing', 'options_auto', 'options_swing', 'futures_auto', 'futures_swing'])
+// Paper source keys
+const PAPER_SOURCES = new Set(['paper', 'swing_paper', 'options_paper', 'options_swing_paper', 'futures_paper', 'futures_swing_paper'])
+
+// Charges estimate: ~₹65 per executed trade (brokerage + STT + exchange + GST + stamp for a typical intraday equity trade)
+const CHARGES_PER_TRADE = 65
+
 export default function TradeLog() {
   const [trades, setTrades] = useState([])
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
   const [days, setDays] = useState(7)
+  const [liveMode, setLiveMode] = useState('ALL') // 'ALL', 'LIVE', 'PAPER'
   const [sourceFilter, setSourceFilter] = useState('ALL')
   const [strategyFilter, setStrategyFilter] = useState('ALL')
   const [logFilter, setLogFilter] = useState('ALL')
@@ -116,7 +125,11 @@ export default function TradeLog() {
 
   // Filter trades
   const filteredTrades = trades.filter(t => {
-    if (sourceFilter !== 'ALL' && (t.source || '') !== SOURCE_MATCH[sourceFilter]) return false
+    const src = t.source || ''
+    // Live/Paper quick toggle
+    if (liveMode === 'LIVE' && !LIVE_SOURCES.has(src)) return false
+    if (liveMode === 'PAPER' && !PAPER_SOURCES.has(src)) return false
+    if (sourceFilter !== 'ALL' && src !== SOURCE_MATCH[sourceFilter]) return false
     if (strategyFilter !== 'ALL' && t.strategy !== strategyFilter) return false
     const tradeDate = t.date || (t.closed_at || t.placed_at || '').split('T')[0]
     if (dateFrom && tradeDate < dateFrom) return false
@@ -129,13 +142,23 @@ export default function TradeLog() {
     (b.closed_at || b.placed_at || '').localeCompare(a.closed_at || a.placed_at || '')
   )
 
+  // Compute charges for each trade: use existing charges if present, else estimate for live trades
+  const tradesWithCharges = sortedTrades.map(t => {
+    const src = t.source || ''
+    const isLiveTrade = LIVE_SOURCES.has(src)
+    const charges = (t.charges || 0) > 0 ? t.charges : (isLiveTrade ? CHARGES_PER_TRADE : 0)
+    const pnl = t.pnl || 0
+    const netPnl = t.net_pnl ?? (pnl - charges)
+    return { ...t, _charges: charges, _netPnl: netPnl, _isLive: isLiveTrade }
+  })
+
   // Stats from filtered trades
-  const totalPnl = sortedTrades.reduce((s, t) => s + (t.pnl || 0), 0)
-  const totalCharges = sortedTrades.reduce((s, t) => s + (t.charges || 0), 0)
+  const totalPnl = tradesWithCharges.reduce((s, t) => s + (t.pnl || 0), 0)
+  const totalCharges = tradesWithCharges.reduce((s, t) => s + t._charges, 0)
   const totalNetPnl = totalPnl - totalCharges
-  const wins = sortedTrades.filter(t => (t.pnl || 0) > 0).length
-  const losses = sortedTrades.filter(t => (t.pnl || 0) < 0).length
-  const winRate = sortedTrades.length > 0 ? ((wins / sortedTrades.length) * 100).toFixed(1) : '0.0'
+  const wins = tradesWithCharges.filter(t => (t.pnl || 0) > 0).length
+  const losses = tradesWithCharges.filter(t => (t.pnl || 0) < 0).length
+  const winRate = tradesWithCharges.length > 0 ? ((wins / tradesWithCharges.length) * 100).toFixed(1) : '0.0'
 
   // Log filters
   const logFilters = ['ALL', 'ORDER', 'SCAN', 'ALERT', 'ERROR']
@@ -148,9 +171,36 @@ export default function TradeLog() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <ScrollText size={18} className="text-orange-400" />
-          <h2 className="text-lg font-semibold text-white">Trade Log</h2>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Trade Log</h2>
+          {/* Live / Paper / All quick toggle */}
+          <div className="flex items-center rounded-xl border p-0.5" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+            <button
+              onClick={() => setLiveMode('ALL')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                liveMode === 'ALL' ? 'bg-dark-500 text-white' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setLiveMode('LIVE')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                liveMode === 'LIVE' ? 'bg-orange-500/15 text-orange-400' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              <Zap size={10} /> Live
+            </button>
+            <button
+              onClick={() => setLiveMode('PAPER')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                liveMode === 'PAPER' ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              <BookOpen size={10} /> Paper
+            </button>
+          </div>
         </div>
         <button onClick={refresh} disabled={loading} className="text-gray-500 hover:text-gray-300 transition-colors">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -159,39 +209,39 @@ export default function TradeLog() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Gross P&L</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Gross P&L</p>
           <p className={`text-lg font-bold ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {totalPnl >= 0 ? '+' : ''}{'\u20B9'}{totalPnl.toFixed(0)}
           </p>
         </div>
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Charges</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Charges</p>
           <p className="text-lg font-bold text-yellow-400">
             {'\u20B9'}{totalCharges.toFixed(0)}
           </p>
         </div>
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Net P&L</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Net P&L</p>
           <p className={`text-lg font-bold ${totalNetPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {totalNetPnl >= 0 ? '+' : ''}{'\u20B9'}{totalNetPnl.toFixed(0)}
           </p>
         </div>
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Win Rate</p>
-          <p className="text-lg font-bold text-white">{winRate}%</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Win Rate</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{winRate}%</p>
         </div>
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Wins / Losses</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Wins / Losses</p>
           <p className="text-lg font-bold">
             <span className="text-green-400">{wins}</span>
             <span className="text-gray-600 mx-1">/</span>
             <span className="text-red-400">{losses}</span>
           </p>
         </div>
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Total Trades</p>
-          <p className="text-lg font-bold text-white">{sortedTrades.length}</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Total Trades</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{tradesWithCharges.length}</p>
         </div>
       </div>
 
@@ -311,43 +361,43 @@ export default function TradeLog() {
             </div>
 
             {/* Clear all */}
-            {(sourceFilter !== 'ALL' || strategyFilter !== 'ALL' || dateFrom || dateTo) && (
+            {(sourceFilter !== 'ALL' || strategyFilter !== 'ALL' || dateFrom || dateTo || liveMode !== 'ALL') && (
               <button
-                onClick={() => { setSourceFilter('ALL'); setStrategyFilter('ALL'); setDateFrom(''); setDateTo(''); setDays(7) }}
+                onClick={() => { setSourceFilter('ALL'); setStrategyFilter('ALL'); setDateFrom(''); setDateTo(''); setDays(7); setLiveMode('ALL') }}
                 className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] text-red-400 hover:bg-red-500/10 transition-all"
               >
-                <X size={10} /> Clear
+                <X size={10} /> Clear All
               </button>
             )}
           </div>
 
           {/* Trade Table */}
-          <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
-            {sortedTrades.length === 0 ? (
-              <p className="text-xs text-gray-600 text-center py-8">
-                No trades in the last {days} days. Start auto-trading or paper trading to see history.
+          <div className="rounded-2xl border p-5" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+            {tradesWithCharges.length === 0 ? (
+              <p className="text-xs text-center py-8" style={{ color: 'var(--text-secondary)' }}>
+                No trades in the last {days} days{liveMode !== 'ALL' ? ` (${liveMode.toLowerCase()} only)` : ''}. Start auto-trading or paper trading to see history.
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-dark-500">
-                      <th className="text-left text-[10px] text-gray-400 font-medium pb-2">Date</th>
-                      <th className="text-left text-[10px] text-gray-400 font-medium pb-2">Symbol</th>
-                      <th className="text-center text-[10px] text-gray-400 font-medium pb-2">Strategy</th>
-                      <th className="text-center text-[10px] text-gray-400 font-medium pb-2">Source</th>
-                      <th className="text-center text-[10px] text-gray-400 font-medium pb-2">Type</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Entry</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Exit</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Qty</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">P&L</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Charges</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Net P&L</th>
-                      <th className="text-center text-[10px] text-gray-400 font-medium pb-2">Exit Reason</th>
+                    <tr style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+                      <th className="text-left text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Date</th>
+                      <th className="text-left text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Symbol</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Strategy</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Source</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Type</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Entry</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Exit</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Qty</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>P&L</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Charges</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Net P&L</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Exit Reason</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedTrades.map((t, i) => {
+                    {tradesWithCharges.map((t, i) => {
                       const stratKey = t.strategy || ''
                       const stratColor = STRATEGY_COLORS[stratKey] || 'bg-gray-500/15 text-gray-400 border-gray-500/30'
                       const pnl = t.pnl || 0
@@ -359,14 +409,17 @@ export default function TradeLog() {
                         exitReason === 'TARGET_HIT' ? 'text-green-400' :
                         exitReason === 'SL_HIT' ? 'text-red-400' :
                         exitReason === 'SQUARE_OFF' ? 'text-purple-400' : 'text-gray-400'
+                      // Live trade highlight, paper trade dim
+                      const rowOpacity = t._isLive ? '' : 'opacity-60'
+                      const rowBorder = t._isLive ? 'border-l-2 border-l-orange-500/40' : ''
 
                       return (
-                        <tr key={i} className="border-b border-dark-600/50 hover:bg-dark-600/30">
+                        <tr key={i} className={`border-b border-dark-600/50 hover:bg-dark-600/30 ${rowOpacity} ${rowBorder}`}>
                           <td className="py-2">
-                            <div className="text-xs text-gray-300">{date}</div>
+                            <div className="text-xs" style={{ color: 'var(--text-primary)' }}>{date}</div>
                             <div className="text-[10px] text-gray-500">{time}</div>
                           </td>
-                          <td className="py-2 text-xs text-white font-medium">{t.symbol}</td>
+                          <td className="py-2 text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{t.symbol}</td>
                           <td className="py-2 text-center">
                             {stratKey ? (
                               <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${stratColor}`}>
@@ -406,21 +459,21 @@ export default function TradeLog() {
                               {t.signal_type}
                             </span>
                           </td>
-                          <td className="py-2 text-right text-xs text-gray-300">
+                          <td className="py-2 text-right text-xs" style={{ color: 'var(--text-primary)' }}>
                             {'\u20B9'}{Number(t.entry_price).toFixed(2)}
                           </td>
-                          <td className="py-2 text-right text-xs text-gray-300">
+                          <td className="py-2 text-right text-xs" style={{ color: 'var(--text-primary)' }}>
                             {exitPrice !== '-' ? `\u20B9${Number(exitPrice).toFixed(2)}` : '-'}
                           </td>
-                          <td className="py-2 text-right text-xs text-gray-300">{t.quantity}</td>
+                          <td className="py-2 text-right text-xs" style={{ color: 'var(--text-primary)' }}>{t.quantity}</td>
                           <td className={`py-2 text-right text-xs font-semibold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {pnl >= 0 ? '+' : ''}{'\u20B9'}{pnl.toFixed(2)}
                           </td>
                           <td className="py-2 text-right text-xs text-yellow-400/70">
-                            {(t.charges || 0) > 0 ? `\u20B9${(t.charges).toFixed(2)}` : '-'}
+                            {t._charges > 0 ? `\u20B9${t._charges.toFixed(0)}` : '-'}
                           </td>
-                          <td className={`py-2 text-right text-xs font-semibold ${(t.net_pnl || pnl) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {(t.net_pnl || pnl) >= 0 ? '+' : ''}{'\u20B9'}{(t.net_pnl || pnl).toFixed(2)}
+                          <td className={`py-2 text-right text-xs font-semibold ${t._netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {t._netPnl >= 0 ? '+' : ''}{'\u20B9'}{t._netPnl.toFixed(2)}
                           </td>
                           <td className={`py-2 text-center text-[9px] font-medium ${exitReasonColor}`}>
                             {exitReason.replace('_', ' ')}
@@ -432,8 +485,8 @@ export default function TradeLog() {
                   {/* Totals Footer */}
                   <tfoot>
                     <tr className="border-t-2 border-dark-400">
-                      <td colSpan={4} className="py-2.5 text-xs font-semibold text-white">
-                        Total ({sortedTrades.length} trades)
+                      <td colSpan={4} className="py-2.5 text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        Total ({tradesWithCharges.length} trades)
                       </td>
                       <td className="py-2.5 text-center text-[10px] text-gray-500">
                         <span className="text-green-400">{wins}W</span>
@@ -442,14 +495,14 @@ export default function TradeLog() {
                       </td>
                       <td />
                       <td />
-                      <td className="py-2.5 text-right text-xs text-gray-400 font-medium">
-                        {sortedTrades.reduce((s, t) => s + (t.quantity || 0), 0)}
+                      <td className="py-2.5 text-right text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        {tradesWithCharges.reduce((s, t) => s + (t.quantity || 0), 0)}
                       </td>
                       <td className={`py-2.5 text-right text-xs font-bold ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {totalPnl >= 0 ? '+' : ''}{'\u20B9'}{totalPnl.toFixed(2)}
                       </td>
                       <td className="py-2.5 text-right text-xs font-bold text-yellow-400">
-                        {'\u20B9'}{totalCharges.toFixed(2)}
+                        {'\u20B9'}{totalCharges.toFixed(0)}
                       </td>
                       <td className={`py-2.5 text-right text-xs font-bold ${totalNetPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {totalNetPnl >= 0 ? '+' : ''}{'\u20B9'}{totalNetPnl.toFixed(2)}

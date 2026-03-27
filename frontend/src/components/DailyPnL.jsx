@@ -222,7 +222,7 @@ export default function DailyPnL() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <BarChart3 size={18} className={isLive ? 'text-orange-400' : 'text-blue-400'} />
-          <h2 className="text-lg font-semibold text-white">Daily P&L</h2>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Daily P&L</h2>
           {/* Live / Paper toggle */}
           <div className="flex items-center bg-dark-700 rounded-xl border border-dark-500 p-0.5">
             <button
@@ -363,29 +363,29 @@ export default function DailyPnL() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-6 gap-3 mb-4">
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Gross P&L</p>
+      <div className={`grid ${isLive ? 'grid-cols-3 sm:grid-cols-7' : 'grid-cols-3 sm:grid-cols-6'} gap-3 mb-4`}>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Gross P&L</p>
           <p className={`text-lg font-bold ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {totalPnl >= 0 ? '+' : ''}{'\u20B9'}{totalPnl.toFixed(0)}
           </p>
         </div>
         {isLive && (
-          <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-            <p className="text-[10px] text-gray-500 mb-1">Charges</p>
+          <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+            <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Charges</p>
             <p className="text-lg font-bold text-red-400/80">
               -{'\u20B9'}{totalBrokerage.toFixed(0)}
             </p>
           </div>
         )}
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Net P&L</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Net P&L</p>
           <p className={`text-lg font-bold ${(totalPnl - totalBrokerage) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {(totalPnl - totalBrokerage) >= 0 ? '+' : ''}{'\u20B9'}{(totalPnl - totalBrokerage).toFixed(0)}
           </p>
         </div>
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Green / Red Days</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Green / Red Days</p>
           <p className="text-lg font-bold">
             <span className="text-green-400">{greenDays}</span>
             <span className="text-gray-600 mx-1">/</span>
@@ -393,14 +393,14 @@ export default function DailyPnL() {
             {flatDays > 0 && <span className="text-gray-500 text-xs ml-1">({flatDays} flat)</span>}
           </p>
         </div>
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">Total Trades</p>
-          <p className="text-lg font-bold text-white">{totalTrades}</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Total Trades</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{totalTrades}</p>
         </div>
-        <div className="bg-dark-700 rounded-xl border border-dark-500 p-3">
-          <p className="text-[10px] text-gray-500 mb-1">{isLive ? 'Avg Daily P&L' : 'Max Drawdown'}</p>
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>{isLive ? 'Avg Daily P&L' : 'Max Drawdown'}</p>
           <p className={`text-lg font-bold ${isLive ? (avgDailyPnl >= 0 ? 'text-green-400' : 'text-red-400') : 'text-red-400/80'}`}>
-            {isLive ? `${avgDailyPnl >= 0 ? '+' : ''}₹${avgDailyPnl.toFixed(0)}` : `₹${maxDrawdown.toFixed(0)}`}
+            {isLive ? `${avgDailyPnl >= 0 ? '+' : ''}\u20B9${avgDailyPnl.toFixed(0)}` : `\u20B9${maxDrawdown.toFixed(0)}`}
           </p>
         </div>
       </div>
@@ -611,6 +611,7 @@ export default function DailyPnL() {
 
       {/* Daily Breakdown Table */}
       {(() => {
+        const todayStr = new Date().toLocaleDateString('en-CA')
         const filtered = data.filter(d => {
           if (dateFrom && d.date < dateFrom) return false
           if (dateTo && d.date > dateTo) return false
@@ -628,9 +629,16 @@ export default function DailyPnL() {
         const totWinRate = (totWins + totLosses) > 0 ? Math.round((totWins / (totWins + totLosses)) * 1000) / 10 : 0
 
         return (
-          <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
+          <div className="rounded-2xl border p-5" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-gray-400">Daily Breakdown</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Daily Breakdown</h3>
+                {isLive && (
+                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                    Fyers = Source of Truth (today)
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
@@ -658,18 +666,19 @@ export default function DailyPnL() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-dark-500">
-                      <th className="text-left text-[10px] text-gray-400 font-medium pb-2">Date</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Capital Start</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Gross P&L</th>
-                      {isLive && <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Charges</th>}
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Net P&L</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Fund +/-</th>
-                      <th className="text-right text-[10px] text-gray-400 font-medium pb-2">Capital End</th>
-                      <th className="text-center text-[10px] text-gray-400 font-medium pb-2">Trades</th>
-                      <th className="text-center text-[10px] text-gray-400 font-medium pb-2">W / L</th>
-                      <th className="text-center text-[10px] text-gray-400 font-medium pb-2">Win %</th>
-                      <th className="text-center text-[10px] text-gray-400 font-medium pb-2">Strategies</th>
+                    <tr style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+                      <th className="text-left text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Date</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Source</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Capital Start</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Gross P&L</th>
+                      {isLive && <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Charges</th>}
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Net P&L</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Fund +/-</th>
+                      <th className="text-right text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Capital End</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Trades</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>W / L</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Win %</th>
+                      <th className="text-center text-[10px] font-medium pb-2" style={{ color: 'var(--text-secondary)' }}>Strategies</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -677,18 +686,30 @@ export default function DailyPnL() {
                       const hasCapital = d.capital_start > 0
                       const fundNet = (d.fund_added || 0) - (d.fund_withdrawn || 0)
                       const netPnl = d.net_pnl ?? d.total_pnl
+                      const isFyersDay = isLive && d.date === todayStr && d.auto_trades > 0
                       return (
-                        <tr key={i} className="border-b border-dark-600/50 hover:bg-dark-600/30">
-                          <td className="py-2 text-xs text-gray-300">{d.date}</td>
-                          <td className="py-2 text-right text-xs text-gray-400">
-                            {hasCapital ? `₹${d.capital_start.toLocaleString('en-IN')}` : '--'}
+                        <tr key={i} className={`border-b border-dark-600/50 hover:bg-dark-600/30 ${isFyersDay ? 'bg-orange-500/5' : ''}`}>
+                          <td className="py-2 text-xs" style={{ color: 'var(--text-primary)' }}>{d.date}</td>
+                          <td className="py-2 text-center">
+                            {isFyersDay ? (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                                FYERS
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-gray-500/10 text-gray-500">
+                                ENGINE
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 text-right text-xs" style={{ color: 'var(--text-secondary)' }}>
+                            {hasCapital ? `\u20B9${d.capital_start.toLocaleString('en-IN')}` : '--'}
                           </td>
                           <td className={`py-2 text-right text-xs font-semibold ${d.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {d.total_pnl >= 0 ? '+' : ''}{'\u20B9'}{d.total_pnl.toFixed(0)}
                           </td>
                           {isLive && (
                             <td className="py-2 text-right text-xs text-red-400/50">
-                              {d.brokerage > 0 ? `₹${d.brokerage.toFixed(0)}` : '--'}
+                              {d.brokerage > 0 ? `\u20B9${d.brokerage.toFixed(0)}` : '--'}
                             </td>
                           )}
                           <td className={`py-2 text-right text-xs font-semibold ${netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -701,19 +722,19 @@ export default function DailyPnL() {
                               </span>
                             ) : <span className="text-gray-600">--</span>}
                           </td>
-                          <td className={`py-2 text-right text-xs font-medium ${hasCapital && d.capital_end >= d.capital_start ? 'text-green-400/80' : hasCapital ? 'text-red-400/80' : 'text-gray-400'}`}>
-                            {hasCapital ? `₹${d.capital_end.toLocaleString('en-IN')}` : '--'}
+                          <td className={`py-2 text-right text-xs font-medium ${hasCapital && d.capital_end >= d.capital_start ? 'text-green-400/80' : hasCapital ? 'text-red-400/80' : ''}`} style={{ color: !hasCapital ? 'var(--text-secondary)' : undefined }}>
+                            {hasCapital ? `\u20B9${d.capital_end.toLocaleString('en-IN')}` : '--'}
                           </td>
-                          <td className="py-2 text-center text-xs text-gray-300">{d.trades}</td>
+                          <td className="py-2 text-center text-xs" style={{ color: 'var(--text-primary)' }}>{d.trades}</td>
                           <td className="py-2 text-center text-xs">
                             <span className="text-green-400">{d.wins}</span>
                             <span className="text-gray-600 mx-0.5">/</span>
                             <span className="text-red-400">{d.losses}</span>
                           </td>
-                          <td className="py-2 text-center text-xs text-gray-300">{d.win_rate}%</td>
+                          <td className="py-2 text-center text-xs" style={{ color: 'var(--text-primary)' }}>{d.win_rate}%</td>
                           <td className="py-2 text-center">
                             <div className="flex flex-wrap gap-1 justify-center">
-                              {d.strategies.map(s => (
+                              {(d.strategies || []).map(s => (
                                 <span key={s} className="text-[9px] text-gray-400 bg-dark-600 px-1.5 py-0.5 rounded">
                                   {STRATEGY_NAMES[s] || s}
                                 </span>
@@ -727,7 +748,8 @@ export default function DailyPnL() {
                   {/* Totals Row */}
                   <tfoot>
                     <tr className="border-t-2 border-dark-400 bg-dark-800/50">
-                      <td className="py-2.5 text-xs font-bold text-white">Total ({filtered.length} days)</td>
+                      <td className="py-2.5 text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Total ({filtered.length} days)</td>
+                      <td className="py-2.5"></td>
                       <td className="py-2.5 text-right text-xs text-gray-500">--</td>
                       <td className={`py-2.5 text-right text-xs font-bold ${totGross >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {totGross >= 0 ? '+' : ''}{'\u20B9'}{Math.round(totGross).toLocaleString('en-IN')}
@@ -748,13 +770,13 @@ export default function DailyPnL() {
                         ) : <span className="text-gray-600">--</span>}
                       </td>
                       <td className="py-2.5 text-right text-xs text-gray-500">--</td>
-                      <td className="py-2.5 text-center text-xs font-bold text-white">{totTrades}</td>
+                      <td className="py-2.5 text-center text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{totTrades}</td>
                       <td className="py-2.5 text-center text-xs font-bold">
                         <span className="text-green-400">{totWins}</span>
                         <span className="text-gray-600 mx-0.5">/</span>
                         <span className="text-red-400">{totLosses}</span>
                       </td>
-                      <td className="py-2.5 text-center text-xs font-bold text-white">{totWinRate}%</td>
+                      <td className="py-2.5 text-center text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{totWinRate}%</td>
                       <td className="py-2.5"></td>
                     </tr>
                   </tfoot>
