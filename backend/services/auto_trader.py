@@ -238,6 +238,10 @@ class AutoTrader:
                     continue  # Skip CNC (swing) positions
 
                 fyers_sym = pos.get("symbol", "")
+                # Skip options/futures — equity engine only tracks equity (-EQ) positions
+                if "CE" in fyers_sym or "PE" in fyers_sym or "FUT" in fyers_sym:
+                    continue
+
                 plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
                 qty = pos.get("netQty", pos.get("qty", 0))
 
