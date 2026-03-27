@@ -1065,12 +1065,12 @@ class AutoTrader:
                 return False
 
             order_mode = result.get("order_mode", "BO")
-            order_id = result.get("id", result.get("entry_order_id", "unknown"))
+            order_id = result.get("id", result.get("entry_order_id", "")) or ""
             sl_order_id = result.get("sl_order_id", "")
             target_price = result.get("target_price", target)
 
             # Verify order actually went through (not rejected)
-            if order_id == "unknown" or not order_id:
+            if not order_id:
                 self._log("ERROR", f"{symbol} — order returned no ID, likely rejected. Skipping.")
                 return False
 

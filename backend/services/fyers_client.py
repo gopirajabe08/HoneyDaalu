@@ -456,7 +456,22 @@ def _place_intraday_with_sl(
         sl_order_id = sl_resp.get("id", sl_resp.get("order_id", ""))
         logger.info(f"SL-M order placed: {fyers_symbol} SL@{sl_data['stopPrice']} (ID: {sl_order_id})")
     else:
-        logger.error(f"SL-M order FAILED for {fyers_symbol}: {sl_resp.get('message', sl_resp.get('error', str(sl_resp)))}")
+        sl_error = sl_resp.get('message', sl_resp.get('error', str(sl_resp)))
+        logger.error(f"SL-M order FAILED for {fyers_symbol}: {sl_error}")
+        # CRITICAL: SL failed — cancel entry order to avoid unprotected position
+        logger.error(f"Cancelling entry order {entry_order_id} because SL failed — position would be unprotected")
+        try:
+            cancel_order(entry_order_id)
+        except Exception:
+            pass
+        # Also try market exit if entry already filled
+        try:
+            exit_side = -1 if side == 1 else 1
+            place_order(symbol=symbol, qty=qty, side=exit_side, order_type=2, product_type="INTRADAY")
+            logger.info(f"Emergency exit placed for {fyers_symbol} (SL placement failed)")
+        except Exception:
+            pass
+        return {"error": f"SL placement failed: {sl_error}. Entry cancelled/reversed for safety."}
 
     # Target: NO order on Fyers — auto-trader monitors LTP and exits at market
     # Benefits: saves ₹20/trade brokerage, no orphaned target orders, trailing SL is smarter

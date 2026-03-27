@@ -813,7 +813,18 @@ class BTSTTrader:
                 time.sleep(10 if attempt < 2 else 30)
 
             if not sl_order_id:
-                self._log("ERROR", f"{symbol} — SL-M ORDER FAILED after 5 attempts! Position is UNPROTECTED. Place SL manually!")
+                self._log("ERROR", f"{symbol} — SL-M ORDER FAILED after 5 attempts! Closing position for safety.")
+                # CRITICAL: Don't hold overnight without SL — exit immediately
+                try:
+                    exit_side = -1 if side == 1 else 1
+                    exit_result = place_order(symbol=symbol, qty=qty, side=exit_side, order_type=2, product_type="CNC")
+                    if "error" not in exit_result:
+                        self._log("ORDER", f"{symbol} — Emergency CNC exit placed (SL failed, position too risky)")
+                    else:
+                        self._log("ERROR", f"{symbol} — Emergency exit ALSO FAILED: {exit_result.get('error')}. CLOSE MANUALLY!")
+                except Exception as e:
+                    self._log("ERROR", f"{symbol} — Emergency exit exception: {e}. CLOSE MANUALLY!")
+                return False
 
             trade = {
                 "symbol": symbol,

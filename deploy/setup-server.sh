@@ -111,10 +111,38 @@ server {
     listen 80;
     server_name _;
 
+    # ── Security Headers ──
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:8001" always;
+
+    # ── Block sensitive paths ──
+    location ~ /\.env { deny all; return 404; }
+    location ~ /\.git { deny all; return 404; }
+    location ~ /\.pem { deny all; return 404; }
+    location ~ \.json$ {
+        # Allow API JSON responses but block direct state/config file access
+        try_files $uri @backend;
+    }
+
+    # ── Rate limiting for auth endpoints ──
+    limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/m;
+
     # Frontend (built static files)
     location / {
         root /opt/intratrading/app/frontend/dist;
         try_files $uri $uri/ /index.html;
+    }
+
+    # Auth endpoints — rate limited
+    location /api/auth/ {
+        limit_req zone=auth burst=3 nodelay;
+        proxy_pass http://127.0.0.1:8001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
     # Backend API proxy
@@ -125,6 +153,12 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_read_timeout 120s;
         proxy_connect_timeout 10s;
+    }
+
+    location @backend {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 }
 EOF
