@@ -187,6 +187,11 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
   const losers = allClosed.filter(t => (t.pnl ?? 0) < 0)
   const winRate = allClosed.length > 0 ? Math.round((winners.length / allClosed.length) * 100) : 0
 
+  // Charges estimate: each closed trade = ~Rs 65 (brokerage + STT + charges)
+  const closedTradeCount = isLive ? fyersClosedCount : tradeHistory.length
+  const estCharges = closedTradeCount * 65
+  const netAfterCharges = totalPnl - estCharges
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -207,14 +212,17 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
         {/* ── Left: Trades + Stats ── */}
         <div className="flex-1 min-w-0 space-y-4">
           {/* Stats row */}
-          {(running || allClosed.length > 0 || activeTrades.length > 0) && (
-            <div className="grid grid-cols-6 gap-3">
+          {(running || allClosed.length > 0 || activeTrades.length > 0 || (isLive && fyersPositions.length > 0)) && (
+            <div className="grid grid-cols-7 gap-3">
               <StatCard label="Capital" value={status?.capital > 0 ? `₹${(status.capital >= 100000 ? (status.capital/100000).toFixed(1)+'L' : (status.capital/1000).toFixed(0)+'K')}` : '--'} color="text-white" />
               <StatCard label={isLive ? 'P&L (Fyers)' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
                 color={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'} />
+              <StatCard label="Charges Est." value={closedTradeCount > 0 ? `₹${estCharges.toLocaleString('en-IN')}` : '--'}
+                sub={closedTradeCount > 0 ? `${closedTradeCount} trades x ₹65` : ''} color="text-yellow-400" />
+              <StatCard label="Net P&L" value={closedTradeCount > 0 ? `${netAfterCharges >= 0 ? '+' : '-'}${formatINR(netAfterCharges)}` : '--'}
+                color={netAfterCharges >= 0 ? 'text-green-400' : 'text-red-400'} />
               <StatCard label="Win Rate" value={allClosed.length > 0 ? `${winRate}%` : '--'}
                 sub={allClosed.length > 0 ? `${winners.length}W / ${losers.length}L` : ''} />
-              <StatCard label="Scans" value={status?.scan_count ?? 0} />
               <StatCard label="Orders" value={status?.order_count ?? 0} />
               <StatCard label="Open" value={isLive ? fyersOpenCount : activeTrades.length} color={accentText} />
             </div>
@@ -504,7 +512,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     <MiniStat label="Scans" value={status?.scan_count ?? 0} />
                     <MiniStat label="Orders" value={status?.order_count ?? 0} />
-                    <MiniStat label="P&L"
+                    <MiniStat label={isLive ? 'Fyers P&L' : 'P&L'}
                       value={`${totalPnl >= 0 ? '+' : ''}\u20B9${Math.abs(totalPnl).toFixed(0)}`}
                       color={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'} />
                   </div>

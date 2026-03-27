@@ -447,22 +447,63 @@ def auto_connect_fyers():
         except:
             pass
 
-        # Telegram: single day-end summary (replaces squareoff + day_summary + shutdown)
+        # Telegram: day-end summary using FYERS realized P&L (source of truth)
         try:
-            total_pnl = 0.0
-            trades = 0
+            # Get REAL P&L from Fyers positions (realized profit for closed positions)
+            fyers_pnl = 0.0
+            fyers_trades = 0
+            try:
+                positions_data = fyers_client.get_positions()
+                positions = positions_data.get("netPositions", [])
+                if not positions:
+                    data = positions_data.get("data", {})
+                    if isinstance(data, dict):
+                        positions = data.get("netPositions", [])
+                for pos in positions:
+                    realized = pos.get("realized_profit", 0)
+                    traded = pos.get("buyQty", 0) > 0 or pos.get("sellQty", 0) > 0
+                    if traded:
+                        fyers_pnl += realized
+                        if pos.get("netQty", 0) == 0:  # Fully closed
+                            fyers_trades += 1
+            except Exception:
+                pass
+
+            # Fallback to internal tracking if Fyers data unavailable
+            if fyers_trades == 0:
+                for t in getattr(auto_trader, '_trade_history', []):
+                    fyers_trades += 1
+                    fyers_pnl += t.get("pnl", 0)
+                for t in getattr(options_auto_trader, '_trade_history', []):
+                    fyers_trades += 1
+                    fyers_pnl += t.get("pnl", 0)
+
+            total_pnl = round(fyers_pnl, 2)
+            trades = fyers_trades
             wins = 0
             losses = 0
+            # Count wins/losses from both engines
             for t in getattr(auto_trader, '_trade_history', []):
-                trades += 1
-                total_pnl += t.get("pnl", 0)
                 if t.get("pnl", 0) >= 0:
                     wins += 1
                 else:
                     losses += 1
-            capital = getattr(auto_trader, '_capital', 100000)
-            # Realistic charge estimation: ₹20 brokerage/order + STT + GST + exchange + stamp
-            # ~₹65 per round-trip trade (buy+sell) at typical intraday volumes
+            for t in getattr(options_auto_trader, '_trade_history', []):
+                if t.get("pnl", 0) >= 0:
+                    wins += 1
+                else:
+                    losses += 1
+
+            # Get current capital from Fyers (truth)
+            capital = 0
+            try:
+                funds = fyers_client.get_funds()
+                for f_item in funds.get("fund_limit", []):
+                    if f_item.get("id") == 10:
+                        capital = f_item.get("equityAmount", 0)
+            except Exception:
+                capital = getattr(auto_trader, '_capital', 100000)
+
             charges = round(trades * 65, 2) if trades > 0 else 0
             net_pnl = round(total_pnl - charges, 2)
             btst_open = len([t for t in getattr(btst_trader, '_active_trades', []) if t.get("status") == "OPEN"])

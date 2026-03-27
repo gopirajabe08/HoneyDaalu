@@ -7,7 +7,7 @@ import { optionsStrategies } from '../data/mockData'
 import {
   startOptionsAutoTrading, stopOptionsAutoTrading, getOptionsAutoStatus,
   startOptionsPaperTrading, stopOptionsPaperTrading, getOptionsPaperStatus,
-  getMarketRegime,
+  getMarketRegime, getPositions,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
 import DailyStrategyStats from './DailyStrategyStats'
@@ -24,6 +24,7 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
   const [regime, setRegime] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedUnderlyings, setSelectedUnderlyings] = useState({ NIFTY: true, BANKNIFTY: true })
+  const [fyersPositions, setFyersPositions] = useState([])
   const pollRef = useRef(null)
   const regimeRef = useRef(null)
   const logEndRef = useRef(null)
@@ -43,6 +44,20 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
     try {
       const data = isLive ? await getOptionsAutoStatus() : await getOptionsPaperStatus()
       setStatus(data)
+      // For live mode, fetch Fyers positions as source of truth
+      if (isLive) {
+        try {
+          const posRes = await getPositions()
+          const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
+          const intraday = posArr.filter(p => (p.productType === 'INTRADAY' || p.productType === 'BO') && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
+          // Filter to options only: symbols containing CE or PE
+          const optionsOnly = intraday.filter(p => {
+            const sym = (p.symbol || '').toUpperCase()
+            return sym.includes('CE') || sym.includes('PE')
+          })
+          setFyersPositions(optionsOnly)
+        } catch {}
+      }
     } catch {}
   }, [isLive])
 
@@ -59,15 +74,15 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
   // Fetch regime on mount
   useEffect(() => { fetchRegime() }, [fetchRegime])
 
-  // Poll status every 30s while running
+  // Poll status every 10s — always for live (Fyers data), only when running for paper
   useEffect(() => {
-    if (running) {
+    if (running || isLive) {
       pollRef.current = setInterval(pollStatus, POLL_INTERVAL)
     } else {
       clearInterval(pollRef.current)
     }
     return () => clearInterval(pollRef.current)
-  }, [running, pollStatus])
+  }, [running, isLive, pollStatus])
 
   // Refresh regime every 5 min while running
   useEffect(() => {
@@ -146,12 +161,26 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
   const tradeHistory = (status?.trade_history ?? []).filter(isOptionsPosition)
   const orderCutoff = status?.order_cutoff_passed ?? false
   const squaredOff = status?.squared_off ?? false
-  const totalPnl = status?.total_pnl ?? 0
 
-  const allClosed = tradeHistory
+  // For live mode: use Fyers P&L (source of truth). For paper: use engine P&L.
+  const fyersTotalPnl = fyersPositions.reduce((s, p) => s + (p.pl || 0), 0)
+  const fyersOpenCount = fyersPositions.filter(p => (p.netQty || 0) !== 0).length
+  const fyersClosedCount = fyersPositions.filter(p => (p.netQty || 0) === 0).length
+  const totalPnl = isLive && fyersPositions.length > 0 ? fyersTotalPnl : (status?.total_pnl ?? 0)
+
+  // For live mode: use Fyers closed positions for win/loss (source of truth)
+  const fyersClosed = fyersPositions.filter(p => (p.netQty || 0) === 0 && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
+  const allClosed = isLive && fyersClosed.length > 0
+    ? fyersClosed.map(p => ({ pnl: p.pl || p.realized_profit || 0, symbol: p.symbol }))
+    : tradeHistory
   const winners = allClosed.filter(t => (t.pnl ?? 0) > 0)
   const losers = allClosed.filter(t => (t.pnl ?? 0) < 0)
   const winRate = allClosed.length > 0 ? Math.round((winners.length / allClosed.length) * 100) : 0
+
+  // Charges estimate: each closed trade = ~Rs 65 (brokerage + STT + charges)
+  const closedTradeCount = isLive ? fyersClosedCount : tradeHistory.length
+  const estCharges = closedTradeCount * 65
+  const netAfterCharges = totalPnl - estCharges
 
   return (
     <div className="space-y-5">
@@ -206,25 +235,85 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
           )}
 
           {/* Stats row */}
-          {(running || allClosed.length > 0 || activeTrades.length > 0) && (
-            <div className="grid grid-cols-6 gap-3">
+          {(running || allClosed.length > 0 || activeTrades.length > 0 || (isLive && fyersPositions.length > 0)) && (
+            <div className="grid grid-cols-7 gap-3">
               <StatCard label="Capital" value={status?.capital > 0 ? `₹${(status.capital >= 100000 ? (status.capital/100000).toFixed(1)+'L' : (status.capital/1000).toFixed(0)+'K')}` : '--'} color="text-white" />
-              <StatCard label={isLive ? 'P&L' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
+              <StatCard label={isLive ? 'P&L (Fyers)' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
                 color={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'} />
+              <StatCard label="Charges Est." value={closedTradeCount > 0 ? `₹${estCharges.toLocaleString('en-IN')}` : '--'}
+                sub={closedTradeCount > 0 ? `${closedTradeCount} trades x ₹65` : ''} color="text-yellow-400" />
+              <StatCard label="Net P&L" value={closedTradeCount > 0 ? `${netAfterCharges >= 0 ? '+' : '-'}${formatINR(netAfterCharges)}` : '--'}
+                color={netAfterCharges >= 0 ? 'text-green-400' : 'text-red-400'} />
               <StatCard label="Win Rate" value={allClosed.length > 0 ? `${winRate}%` : '--'}
                 sub={allClosed.length > 0 ? `${winners.length}W / ${losers.length}L` : ''} />
-              <StatCard label="Scans" value={status?.scan_count ?? 0} />
               <StatCard label="Orders" value={status?.order_count ?? 0} />
-              <StatCard label="Open" value={activeTrades.length} color={accentText} />
+              <StatCard label="Open" value={isLive ? fyersOpenCount : activeTrades.length} color={accentText} />
             </div>
           )}
 
-          {/* Active trades */}
-          {activeTrades.length > 0 && (
+          {/* Fyers Positions (Live mode -- source of truth) */}
+          {isLive && fyersPositions.length > 0 && (
+            <div className="bg-dark-700 rounded-2xl border border-orange-500/20 p-5">
+              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <Activity size={16} className="text-orange-400" />
+                Fyers Options Positions (Source of Truth)
+                <span className="text-[10px] text-gray-500 font-normal">{fyersOpenCount} open · {fyersClosedCount} closed · P&L: <span className={fyersTotalPnl >= 0 ? 'text-green-400' : 'text-red-400'}>{fyersTotalPnl >= 0 ? '+' : '-'}{formatINR(fyersTotalPnl)}</span></span>
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-dark-500">
+                      {['Symbol', 'Side', 'Net Qty', 'Buy Avg', 'Sell Avg', 'LTP', 'P&L', 'Status'].map(h => (
+                        <th key={h} className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fyersPositions.map((p, i) => {
+                      const sym = (p.symbol || '').replace('NSE:', '').replace('NFO:', '').replace('-EQ', '')
+                      const netQty = p.netQty || 0
+                      const pnl = p.pl || 0
+                      const isOpen = netQty !== 0
+                      const isBuy = netQty > 0
+                      return (
+                        <tr key={i} className="border-b border-dark-600/30 hover:bg-dark-600/20">
+                          <td className="px-3 py-2.5 text-sm font-medium text-white">{sym}</td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${isBuy ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                              {isBuy ? 'BUY' : 'SELL'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-white font-semibold">{netQty}</td>
+                          <td className="px-3 py-2.5 text-xs text-gray-300">{p.buyAvg > 0 ? `₹${p.buyAvg.toFixed(1)}` : '--'}</td>
+                          <td className="px-3 py-2.5 text-xs text-gray-300">{p.sellAvg > 0 ? `₹${p.sellAvg.toFixed(1)}` : '--'}</td>
+                          <td className="px-3 py-2.5 text-xs text-white">₹{(p.ltp || 0).toFixed(1)}</td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-xs font-bold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {pnl >= 0 ? '+' : '-'}{formatINR(pnl)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                              isOpen ? 'bg-blue-500/15 text-blue-400' : pnl > 0 ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
+                            }`}>
+                              {isOpen ? 'OPEN' : pnl >= 0 ? 'PROFIT' : 'LOSS'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Active trades -- show for paper mode, hide for live (Fyers section above is source of truth) */}
+          {!isLive && activeTrades.length > 0 && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Activity size={16} className={accentText} />
-                Open {isLive ? '' : 'Virtual '}Options Positions
+                Open Virtual Options Positions
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -275,7 +364,7 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
             </div>
           )}
 
-          {/* Trade History */}
+          {/* Trade History -- paper only (live uses Fyers table above) */}
           {!isLive && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -398,7 +487,7 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     <MiniStat label="Scans" value={status?.scan_count ?? 0} />
                     <MiniStat label="Orders" value={status?.order_count ?? 0} />
-                    <MiniStat label="P&L"
+                    <MiniStat label={isLive ? 'Fyers P&L' : 'P&L'}
                       value={`${totalPnl >= 0 ? '+' : ''}\u20B9${Math.abs(totalPnl).toFixed(0)}`}
                       color={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'} />
                   </div>

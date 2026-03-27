@@ -493,6 +493,8 @@ class OptionsAutoTrader:
     def _square_off_all(self):
         if not self._active_positions:
             self._log("INFO", "No options positions to square off")
+            # Still check Fyers for orphaned options positions
+            self._force_close_fyers_options()
             self._save_state()
             return
 
@@ -506,9 +508,51 @@ class OptionsAutoTrader:
         if failed:
             self._log("ALERT", f"{len(failed)} position(s) FAILED to close — they remain in active list for manual resolution")
         self._active_positions = failed
+
+        # SAFETY NET: Close any remaining options positions on Fyers
+        # regardless of internal tracking. Prevents the Mar 27 bug where
+        # engine said "squared off" but positions were still open on Fyers.
+        self._force_close_fyers_options()
+
         self._log("ALERT", f"Square-off complete. Total P&L: {self._total_pnl:,.2f}")
         self._sleep_mgr.allow_sleep()
         self._save_state()
+
+    def _force_close_fyers_options(self):
+        """Safety net: close ANY open options positions on Fyers.
+        Called after normal square-off to catch positions that internal tracking missed."""
+        try:
+            from services.fyers_client import get_positions
+            from services.options_client import place_option_order
+            positions_data = get_positions()
+            positions = positions_data.get("netPositions", [])
+            if not positions:
+                data = positions_data.get("data", {})
+                if isinstance(data, dict):
+                    positions = data.get("netPositions", [])
+
+            for pos in positions:
+                qty = pos.get("netQty", 0)
+                if qty == 0:
+                    continue
+                sym = pos.get("symbol", "")
+                prod = pos.get("productType", "")
+                # Only close INTRADAY options (CE/PE)
+                if prod != "INTRADAY" or ("CE" not in sym and "PE" not in sym):
+                    continue
+
+                close_side = -1 if qty > 0 else 1
+                self._log("ALERT", f"Force-closing orphaned option: {sym} qty={qty}")
+                result = place_option_order(
+                    symbol=sym, qty=abs(qty), side=close_side,
+                    order_type=2, product_type="INTRADAY",
+                )
+                if "error" in result:
+                    self._log("ERROR", f"Force-close FAILED: {sym} — {result['error']}. CLOSE MANUALLY!")
+                else:
+                    self._log("ORDER", f"Force-closed: {sym} (order ID: {result.get('id', '?')})")
+        except Exception as e:
+            self._log("ERROR", f"Force-close check failed: {e}")
 
     def _close_position(self, trade: dict, reason: str):
         legs = trade.get("legs", [])
