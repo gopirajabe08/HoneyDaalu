@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Zap,
   Target,
@@ -8,7 +8,9 @@ import {
   Bell,
   Lock,
   Code2,
+  PieChart,
 } from 'lucide-react'
+import { getAuthToken } from '../services/api/base'
 
 function Section({ icon: Icon, title, color, children }) {
   return (
@@ -37,6 +39,126 @@ function Bullet({ children, color = 'text-gray-500' }) {
       <span className={`mt-0.5 ${color}`}>&#9679;</span>
       <span>{children}</span>
     </li>
+  )
+}
+
+function CapitalAllocationLive() {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const token = getAuthToken()
+        const headers = token ? { Authorization: `Bearer ${token}` } : {}
+        const API = 'http://localhost:8001'
+        const [funds, eqStatus, optStatus, btstStatus, regime] = await Promise.all([
+          fetch(`${API}/api/fyers/funds`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`${API}/api/auto/status`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`${API}/api/options/auto/status`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`${API}/api/btst/status`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`${API}/api/equity/regime`, { headers }).then(r => r.json()).catch(() => null),
+        ])
+        let available = 0
+        for (const f of (funds?.fund_limit || [])) {
+          if (f.id === 10) available = f.equityAmount || 0
+        }
+        setData({
+          available,
+          eqCapital: eqStatus?.capital || 0,
+          eqRunning: eqStatus?.is_running || false,
+          eqStrategies: eqStatus?.strategies?.length || 0,
+          optCapital: optStatus?.capital || 0,
+          optRunning: optStatus?.is_running || false,
+          btstCapital: btstStatus?.capital || 0,
+          btstRunning: btstStatus?.is_running || false,
+          vix: regime?.components?.vix || 0,
+          regime: regime?.regime || '?',
+        })
+      } catch {}
+    }
+    load()
+    const id = setInterval(load, 60000)
+    return () => clearInterval(id)
+  }, [])
+
+  if (!data) return null
+
+  const total = data.eqCapital + data.optCapital + data.btstCapital
+  const eqPct = total > 0 ? Math.round(data.eqCapital * 100 / total) : 0
+  const optPct = total > 0 ? Math.round(data.optCapital * 100 / total) : 0
+  const btstPct = total > 0 ? Math.round(data.btstCapital * 100 / total) : 0
+
+  return (
+    <div className="bg-dark-700 rounded-xl border border-dark-500 p-5">
+      <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+        <PieChart size={16} className="text-cyan-400" />
+        Capital Allocation (Live)
+        <span className="text-[9px] bg-dark-600 text-gray-400 px-2 py-0.5 rounded ml-auto">
+          VIX {data.vix} | {data.regime.replace(/_/g, ' ')}
+        </span>
+      </h2>
+
+      {/* Allocation bar */}
+      <div className="flex h-4 rounded-full overflow-hidden mb-3 border border-dark-500">
+        {data.optCapital > 0 && (
+          <div className="bg-violet-500 flex items-center justify-center" style={{ width: `${optPct}%` }}>
+            <span className="text-[8px] text-white font-bold">{optPct}%</span>
+          </div>
+        )}
+        {data.eqCapital > 0 && (
+          <div className="bg-green-500 flex items-center justify-center" style={{ width: `${eqPct}%` }}>
+            <span className="text-[8px] text-white font-bold">{eqPct}%</span>
+          </div>
+        )}
+        {data.btstCapital > 0 && (
+          <div className="bg-amber-500 flex items-center justify-center" style={{ width: `${btstPct}%` }}>
+            <span className="text-[8px] text-white font-bold">{btstPct}%</span>
+          </div>
+        )}
+        {total === 0 && (
+          <div className="bg-gray-600 w-full flex items-center justify-center">
+            <span className="text-[8px] text-gray-300">Market closed</span>
+          </div>
+        )}
+      </div>
+
+      {/* Engine details */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-dark-800/50 rounded-lg p-3 border border-dark-600">
+          <div className="flex items-center gap-1.5 mb-1">
+            <div className="w-2.5 h-2.5 rounded-full bg-violet-500"></div>
+            <span className="text-[10px] text-violet-400 font-semibold">OPTIONS</span>
+            {data.optRunning && <span className="text-[8px] text-green-400 ml-auto">● LIVE</span>}
+          </div>
+          <p className="text-sm font-bold text-white">₹{(data.optCapital || 0).toLocaleString('en-IN')}</p>
+        </div>
+        <div className="bg-dark-800/50 rounded-lg p-3 border border-dark-600">
+          <div className="flex items-center gap-1.5 mb-1">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+            <span className="text-[10px] text-green-400 font-semibold">EQUITY</span>
+            {data.eqRunning && <span className="text-[8px] text-green-400 ml-auto">● LIVE</span>}
+          </div>
+          <p className="text-sm font-bold text-white">₹{(data.eqCapital || 0).toLocaleString('en-IN')}</p>
+          <p className="text-[9px] text-gray-500">{data.eqStrategies} strategies</p>
+        </div>
+        <div className="bg-dark-800/50 rounded-lg p-3 border border-dark-600">
+          <div className="flex items-center gap-1.5 mb-1">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+            <span className="text-[10px] text-amber-400 font-semibold">BTST</span>
+            {data.btstRunning && <span className="text-[8px] text-green-400 ml-auto">● LIVE</span>}
+          </div>
+          <p className="text-sm font-bold text-white">₹{(data.btstCapital || 0).toLocaleString('en-IN')}</p>
+        </div>
+      </div>
+
+      {/* Logic explanation */}
+      <div className="mt-3 text-[10px] text-gray-500 space-y-0.5">
+        <p>&#9679; Allocation based on rolling 3-day P&L — winner gets more capital</p>
+        <p>&#9679; VIX {'>'} 22: options boosted +10% (higher premiums). VIX {'<'} 15: equity boosted +10%</p>
+        <p>&#9679; Both engines losing: 20% cash reserve held back</p>
+        <p>&#9679; Available: ₹{(data.available || 0).toLocaleString('en-IN')} from Fyers</p>
+      </div>
+    </div>
   )
 }
 
@@ -127,6 +249,9 @@ export default function AboutPage() {
           </div>
         </div>
       </Section>
+
+      {/* Dynamic Capital Allocation — LIVE from API */}
+      <CapitalAllocationLive />
 
       {/* Risk Management */}
       <Section icon={Shield} title="Risk Management" color="text-red-400">
