@@ -69,6 +69,25 @@ export default function AboutPage() {
       {/* Live Engines */}
       <Section icon={Zap} title="Live Engines" color="text-orange-400">
         <div className="space-y-4">
+          {/* Options Intraday — PRIMARY */}
+          <div className="bg-dark-800/50 rounded-lg p-4 border border-dark-600">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 size={14} className="text-violet-400" />
+              <h3 className="text-xs font-semibold text-violet-400 uppercase tracking-wide">
+                Options Intraday
+              </h3>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 font-bold">PRIMARY</span>
+            </div>
+            <ul className="space-y-1.5">
+              <Bullet color="text-violet-400">Strategies: Bear call/put spreads, Bull put/call spreads</Bullet>
+              <Bullet color="text-violet-400">Capital: 50% of available (max ₹50K) — proven ₹795/trade on paper</Bullet>
+              <Bullet color="text-violet-400">BUY legs placed first → spread margin ~₹20K (not ₹1.13L naked)</Bullet>
+              <Bullet color="text-violet-400">Orders 10:00 AM - 2:00 PM, square-off 3:00 PM</Bullet>
+              <Bullet color="text-violet-400">Underlyings: NIFTY, BANKNIFTY</Bullet>
+              <Bullet color="text-violet-400">Force-close safety net on orphaned positions</Bullet>
+            </ul>
+          </div>
+
           {/* Equity Intraday */}
           <div className="bg-dark-800/50 rounded-lg p-4 border border-dark-600">
             <div className="flex items-center gap-2 mb-2">
@@ -76,14 +95,15 @@ export default function AboutPage() {
               <h3 className="text-xs font-semibold text-green-400 uppercase tracking-wide">
                 Equity Intraday
               </h3>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">P1</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">SECONDARY</span>
             </div>
             <ul className="space-y-1.5">
-              <Bullet color="text-green-400">Strategies: RSI Divergence (play8), BB Mean Reversion (play6)</Bullet>
-              <Bullet color="text-green-400">Capital: 80% of available (max ₹80K)</Bullet>
+              <Bullet color="text-green-400">9 strategies — regime picks dynamically based on market conditions</Bullet>
+              <Bullet color="text-green-400">Capital: 50% of available (remainder after Options)</Bullet>
               <Bullet color="text-green-400">Orders 10:30 AM - 1:30 PM, square-off 3:20 PM</Bullet>
-              <Bullet color="text-green-400">Max 2 positions, SL on Fyers exchange</Bullet>
-              <Bullet color="text-green-400">VIX-adjusted SL: 2.0x - 3.5x ATR based on volatility</Bullet>
+              <Bullet color="text-green-400">Max 2 positions, SL mandatory on Fyers exchange</Bullet>
+              <Bullet color="text-green-400">VIX-adjusted SL: 2.0x - 3.5x ATR (4 tiers)</Bullet>
+              <Bullet color="text-green-400">SL failure → trade cancelled + emergency exit</Bullet>
             </ul>
           </div>
 
@@ -92,9 +112,9 @@ export default function AboutPage() {
             <div className="flex items-center gap-2 mb-2">
               <Sunrise size={14} className="text-amber-400" />
               <h3 className="text-xs font-semibold text-amber-400 uppercase tracking-wide">
-                BTST -- Buy Today Sell Tomorrow
+                BTST — Buy Today Sell Tomorrow
               </h3>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">P2</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">DYNAMIC</span>
             </div>
             <ul className="space-y-1.5">
               <Bullet color="text-amber-400">Uses daily (1d) and hourly (1h) timeframes</Bullet>
@@ -102,24 +122,7 @@ export default function AboutPage() {
               <Bullet color="text-amber-400">Entry: 2:00 PM - 3:15 PM</Bullet>
               <Bullet color="text-amber-400">Target: +2%, SL: -1.5%, max hold: 2 days</Bullet>
               <Bullet color="text-amber-400">Dynamic capital from Fyers at 2 PM</Bullet>
-            </ul>
-          </div>
-
-          {/* Options Intraday */}
-          <div className="bg-dark-800/50 rounded-lg p-4 border border-dark-600">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 size={14} className="text-violet-400" />
-              <h3 className="text-xs font-semibold text-violet-400 uppercase tracking-wide">
-                Options Intraday
-              </h3>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 font-bold">P3</span>
-            </div>
-            <ul className="space-y-1.5">
-              <Bullet color="text-violet-400">Strategies: Bear call/put spreads, Bull put/call spreads</Bullet>
-              <Bullet color="text-violet-400">Capital: remainder after equity (min ₹15K)</Bullet>
-              <Bullet color="text-violet-400">BUY legs placed first for spread margin</Bullet>
-              <Bullet color="text-violet-400">Orders 10:00 AM - 2:00 PM, square-off 3:00 PM</Bullet>
-              <Bullet color="text-violet-400">Underlyings: NIFTY, BANKNIFTY</Bullet>
+              <Bullet color="text-amber-400">SL failure → position exits immediately (no overnight without SL)</Bullet>
             </ul>
           </div>
         </div>
