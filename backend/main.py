@@ -244,18 +244,15 @@ def auto_connect_fyers():
                 regime_name = regime.get("regime", "neutral")
 
                 # ══════════════════════════════════════════════════════════
-                # CAPITAL ALLOCATION — OPTIONS PRIMARY, EQUITY SECONDARY
+                # DYNAMIC CAPITAL ALLOCATION — PERFORMANCE-BASED
                 #
-                # DATA (Mar 18-27 review):
-                #   Options paper: +₹13,526 from 17 trades (₹795/trade)
-                #   Equity live:   -₹12,118 from 75 trades (LOSING)
-                #
-                # Options is the REAL money maker. Equity is secondary.
-                # Spread margin fix (BUY first) makes Options live viable.
-                # BTST: dynamic at 2 PM from Fyers free margin.
+                # Checks last 3 days: which engine made money?
+                # Allocates MORE to the winner, LESS to the loser.
+                # VIX modifier: high VIX favors Options, low VIX favors Equity.
+                # Both losing? Reduce exposure, hold more cash.
                 # ══════════════════════════════════════════════════════════
 
-                # Check if NFO segment is enabled (retry 3 times)
+                # Check NFO segment
                 nfo_enabled = False
                 for _nfo_try in range(3):
                     nfo_enabled = fyers_client.is_nfo_enabled()
@@ -263,24 +260,75 @@ def auto_connect_fyers():
                         break
                     time.sleep(5)
 
-                # Options FIRST — spread margin ~₹20K/spread, not ₹1.13L
-                # Each spread uses ~₹20K margin. 2 spreads = ₹40K. Reserve ₹50K for safety.
+                # Get rolling 3-day performance
+                opt_pnl_3d = 0
+                eq_pnl_3d = 0
+                try:
+                    from services.trade_logger import get_all_trades
+                    recent = get_all_trades(days=3)
+                    for t in recent:
+                        src = t.get("source", "")
+                        pnl = t.get("pnl", 0)
+                        if src in ("options_auto",):
+                            opt_pnl_3d += pnl
+                        elif src in ("auto",):
+                            eq_pnl_3d += pnl
+                    _log(f"Rolling 3-day P&L: Options ₹{opt_pnl_3d:,.0f} | Equity ₹{eq_pnl_3d:,.0f}")
+                except Exception:
+                    _log("Could not fetch rolling P&L — using default allocation")
+
+                # Calculate allocation based on performance + VIX
                 opt_capital = 0
                 eq_capital = int(available)
 
-                if nfo_enabled and available >= 60000:
-                    # Options: 50% or ₹50K max (for 2 spreads with buffer)
-                    opt_capital = min(int(available * 0.50), 50000)
-                    eq_capital = int(available - opt_capital)
-                elif nfo_enabled and available >= 40000:
-                    # Tight: Options ₹25K (1 spread), rest to equity
-                    opt_capital = 25000
-                    eq_capital = int(available - opt_capital)
-                # If NFO not enabled or < ₹40K: all to equity
+                if available < 40000 or not nfo_enabled:
+                    # Too little to split OR NFO not enabled → all to equity
+                    opt_capital = 0
+                    eq_capital = int(available)
+                    if not nfo_enabled:
+                        _log("NFO: NOT ENABLED — all to equity")
+                else:
+                    # Base split from performance
+                    if opt_pnl_3d > 0 and eq_pnl_3d <= 0:
+                        # Options winning, equity losing → heavy options
+                        opt_pct = 0.65
+                    elif eq_pnl_3d > 0 and opt_pnl_3d <= 0:
+                        # Equity winning, options losing → heavy equity
+                        opt_pct = 0.30
+                    elif opt_pnl_3d > 0 and eq_pnl_3d > 0:
+                        # Both winning → split by expectancy ratio
+                        total = abs(opt_pnl_3d) + abs(eq_pnl_3d)
+                        opt_pct = max(0.30, min(0.65, opt_pnl_3d / total)) if total > 0 else 0.50
+                    elif opt_pnl_3d < 0 and eq_pnl_3d < 0:
+                        # Both losing → conservative, hold more cash
+                        opt_pct = 0.35
+                        # Reduce total allocation by 20% (hold cash)
+                        available = int(available * 0.80)
+                        _log(f"Both engines losing — reduced allocation to ₹{available:,} (20% cash reserve)")
+                    else:
+                        # No data yet → default 50/50
+                        opt_pct = 0.50
 
-                _log(f"Capital allocation: Options ₹{opt_capital:,} (PRIMARY) | Equity ₹{eq_capital:,} | BTST dynamic at 2 PM")
-                if not nfo_enabled:
-                    _log("NFO: NOT ENABLED — Options paper only, equity gets 100%")
+                    # VIX modifier: high VIX boosts options (higher premiums)
+                    if vix > 22:
+                        opt_pct = min(0.65, opt_pct + 0.10)
+                        _log(f"VIX {vix:.1f} > 22 — boosting options allocation +10%")
+                    elif vix < 15:
+                        opt_pct = max(0.25, opt_pct - 0.10)
+                        _log(f"VIX {vix:.1f} < 15 — boosting equity allocation +10%")
+
+                    # Apply allocation (cap options at ₹50K for spread margin safety)
+                    opt_capital = min(int(available * opt_pct), 50000)
+                    eq_capital = int(available - opt_capital)
+
+                    # Minimums: at least ₹15K for options (1 spread), ₹20K for equity
+                    if opt_capital < 15000:
+                        opt_capital = 0
+                        eq_capital = int(available)
+                    if eq_capital < 20000:
+                        eq_capital = 0
+
+                _log(f"Dynamic allocation: Options ₹{opt_capital:,} ({opt_capital*100//(available or 1)}%) | Equity ₹{eq_capital:,} ({eq_capital*100//(available or 1)}%) | BTST dynamic at 2 PM")
 
                 # BTST Live: deferred start at 1:50 PM (10 min before entry window)
                 # No capital reserved upfront. Equity gets 100%. BTST uses available funds at 2 PM.
