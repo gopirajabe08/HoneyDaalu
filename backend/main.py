@@ -192,7 +192,8 @@ def auto_connect_fyers():
                     pass
             # Also delete stale state files to prevent re-restore
             import os as _os
-            for _sf in ['.auto_trader_state.json', '.options_auto_trader_state.json', '.btst_trader_state.json']:
+            for _sf in ['.auto_trader_state.json', '.options_auto_trader_state.json', '.btst_trader_state.json',
+                        '.paper_trader_state.json', '.options_paper_trader_state.json', '.btst_paper_trader_state.json']:
                 _sf_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), _sf)
                 if _os.path.exists(_sf_path):
                     try:
