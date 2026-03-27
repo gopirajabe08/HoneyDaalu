@@ -1131,18 +1131,19 @@ def strategy_stats(source: str = Query(None, description="Filter: 'live' for aut
 @app.get("/api/trades/history")
 def trade_history(
     days: int = Query(30, description="Number of days to fetch"),
-    source: str = Query(None, description="Filter: 'live' (auto+swing), 'paper', or None for all"),
+    source: str = Query(None, description="Filter: 'live' (auto+swing), 'paper', 'btst', 'btst_paper', or None for all"),
 ):
     """Get all trades from the last N days, with estimated brokerage per trade."""
     from services.trade_logger import get_all_trades
     trades = get_all_trades(days)
-    if source in ("auto", "paper", "swing", "swing_paper",
-                   "options_auto", "options_paper", "options_swing", "options_swing_paper",
-                   "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper",
-                   "btst_auto", "btst_paper"):
+    valid_sources = {"auto", "paper", "swing", "swing_paper",
+                     "options_auto", "options_paper", "options_swing", "options_swing_paper",
+                     "futures_auto", "futures_paper", "futures_swing", "futures_swing_paper",
+                     "btst", "btst_auto", "btst_paper"}
+    if source in valid_sources:
         trades = [t for t in trades if t.get("source") == source]
     elif source == "live":
-        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing", "btst_auto")]
+        trades = [t for t in trades if t.get("source") in ("auto", "swing", "options_auto", "options_swing", "futures_auto", "futures_swing", "btst", "btst_auto")]
     elif source == "all_paper":
         trades = [t for t in trades if t.get("source") in ("paper", "swing_paper", "options_paper", "options_swing_paper", "futures_paper", "futures_swing_paper", "btst_paper")]
     # Add brokerage estimate to each trade
