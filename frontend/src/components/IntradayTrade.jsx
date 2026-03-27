@@ -7,7 +7,7 @@ import { strategies } from '../data/mockData'
 import {
   startAutoTrading, stopAutoTrading, getAutoStatus,
   startPaperTrading, stopPaperTrading, getPaperStatus,
-  getPositions, getEquityRegime,
+  getPositions, getEquityRegime, getTradeHistory,
   startAutoTradingRegime, startPaperTradingRegime,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
@@ -57,6 +57,21 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
   const pollStatus = useCallback(async () => {
     try {
       const data = isLive ? await getAutoStatus() : await getPaperStatus()
+      // If engine trade_history is empty, fetch from trade logger (survives restart)
+      if ((!data.trade_history || data.trade_history.length === 0) && !isLive) {
+        try {
+          const histRes = await getTradeHistory(1, 'paper')
+          const hist = Array.isArray(histRes) ? histRes : (histRes?.trades || [])
+          if (hist.length > 0) data.trade_history = hist
+        } catch {}
+      }
+      if ((!data.trade_history || data.trade_history.length === 0) && isLive) {
+        try {
+          const histRes = await getTradeHistory(1, 'auto')
+          const hist = Array.isArray(histRes) ? histRes : (histRes?.trades || [])
+          if (hist.length > 0) data.trade_history = hist
+        } catch {}
+      }
       setStatus(data)
       // For live mode, also fetch Fyers positions as source of truth
       if (isLive) {
@@ -64,7 +79,6 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
           const posRes = await getPositions()
           const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
           const intraday = posArr.filter(p => (p.productType === 'INTRADAY' || p.productType === 'BO') && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
-          // Filter to equity only: exclude options (CE/PE) and futures (FUT)
           const equityOnly = intraday.filter(p => {
             const sym = (p.symbol || '').toUpperCase()
             return !sym.includes('CE') && !sym.includes('PE') && !sym.includes('FUT')

@@ -6,7 +6,7 @@ import {
 import {
   startBTST, stopBTST, getBTSTStatus, startBTSTRegime,
   startBTSTPaper, stopBTSTPaper, getBTSTPaperStatus, startBTSTPaperRegime,
-  getEquityRegime, getPositions,
+  getEquityRegime, getPositions, getTradeHistory,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
 import DailyStrategyStats from './DailyStrategyStats'
@@ -57,13 +57,21 @@ export default function BTSTPage({ capital, setCapital }) {
   const pollStatus = useCallback(async () => {
     try {
       const data = await config.status()
+      // If engine trade_history is empty, fetch from trade logger (survives restart)
+      if (!data.trade_history || data.trade_history.length === 0) {
+        try {
+          const src = config.isLive ? 'btst' : 'btst_paper'
+          const histRes = await getTradeHistory(1, src)
+          const hist = Array.isArray(histRes) ? histRes : (histRes?.trades || [])
+          if (hist.length > 0) data.trade_history = hist
+        } catch {}
+      }
       setStatus(data)
       // For live mode, fetch Fyers CNC positions as source of truth
       if (config.isLive) {
         try {
           const posRes = await getPositions()
           const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
-          // Filter to CNC product type only (BTST = delivery)
           const cncOnly = posArr.filter(p => {
             const prod = (p.productType || '').toUpperCase()
             return prod === 'CNC' && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0)

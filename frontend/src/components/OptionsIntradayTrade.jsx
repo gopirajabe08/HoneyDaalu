@@ -7,7 +7,7 @@ import { optionsStrategies } from '../data/mockData'
 import {
   startOptionsAutoTrading, stopOptionsAutoTrading, getOptionsAutoStatus,
   startOptionsPaperTrading, stopOptionsPaperTrading, getOptionsPaperStatus,
-  getMarketRegime, getPositions,
+  getMarketRegime, getPositions, getTradeHistory,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
 import DailyStrategyStats from './DailyStrategyStats'
@@ -43,6 +43,15 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
   const pollStatus = useCallback(async () => {
     try {
       const data = isLive ? await getOptionsAutoStatus() : await getOptionsPaperStatus()
+      // If engine trade_history is empty, fetch from trade logger (survives restart)
+      if (!data.trade_history || data.trade_history.length === 0) {
+        try {
+          const src = isLive ? 'options_auto' : 'options_paper'
+          const histRes = await getTradeHistory(1, src)
+          const hist = Array.isArray(histRes) ? histRes : (histRes?.trades || [])
+          if (hist.length > 0) data.trade_history = hist
+        } catch {}
+      }
       setStatus(data)
       // For live mode, fetch Fyers positions as source of truth
       if (isLive) {
@@ -50,7 +59,6 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
           const posRes = await getPositions()
           const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
           const intraday = posArr.filter(p => (p.productType === 'INTRADAY' || p.productType === 'BO') && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
-          // Filter to options only: symbols containing CE or PE
           const optionsOnly = intraday.filter(p => {
             const sym = (p.symbol || '').toUpperCase()
             return sym.includes('CE') || sym.includes('PE')
