@@ -560,6 +560,113 @@ def auto_connect_fyers():
         except Exception:
             pass
 
+        # ── Intelligence Report — full system analysis via Telegram ──
+        try:
+            report_lines = []
+            today_str = now_ist().strftime("%b %d")
+
+            # 1. Capital allocation decision
+            eq_cap = getattr(auto_trader, '_capital', 0)
+            opt_cap = getattr(options_auto_trader, '_capital', 0)
+            btst_cap = getattr(btst_trader, '_capital', 0)
+            report_lines.append(f"<b>📊 System Intelligence — {today_str}</b>")
+            report_lines.append("")
+            report_lines.append(f"<b>Capital Split:</b>")
+            report_lines.append(f"  Options: ₹{opt_cap:,.0f} | Equity: ₹{eq_cap:,.0f} | BTST: ₹{btst_cap:,.0f}")
+
+            # 2. Regime & strategies used
+            try:
+                from services.equity_regime import detect_equity_regime
+                regime = detect_equity_regime()
+                regime_name = regime.get("regime", "?").replace("_", " ")
+                strat_ids = regime.get("strategy_ids", [])
+                vix_now = regime.get("components", {}).get("vix", 0)
+                report_lines.append(f"  Regime: {regime_name} | VIX: {vix_now:.1f}")
+                report_lines.append(f"  Strategies: {', '.join(strat_ids)}")
+            except Exception:
+                pass
+
+            # 3. Engine performance
+            report_lines.append("")
+            report_lines.append("<b>Engine Results:</b>")
+
+            # Equity
+            eq_scans = getattr(auto_trader, '_scan_count', 0)
+            eq_orders = getattr(auto_trader, '_order_count', 0)
+            eq_history = getattr(auto_trader, '_trade_history', [])
+            eq_pnl = sum(t.get("pnl", 0) for t in eq_history)
+            eq_wins = sum(1 for t in eq_history if t.get("pnl", 0) >= 0)
+            eq_losses = len(eq_history) - eq_wins
+            report_lines.append(f"  Equity: {eq_scans} scans → {eq_orders} orders → {len(eq_history)} trades")
+            if eq_history:
+                report_lines.append(f"    P&L: ₹{eq_pnl:,.0f} | W:{eq_wins} L:{eq_losses}")
+                for t in eq_history:
+                    report_lines.append(f"    • {t.get('symbol','?')} {t.get('signal_type','')} ₹{t.get('pnl',0):,.0f} ({t.get('exit_reason','?')}) [{t.get('strategy','?')}]")
+            else:
+                report_lines.append(f"    No trades (0 signals matched or market conditions too tight)")
+
+            # Options
+            opt_history = getattr(options_auto_trader, '_trade_history', [])
+            opt_pnl = sum(t.get("pnl", 0) for t in opt_history)
+            opt_scans = getattr(options_auto_trader, '_scan_count', 0)
+            report_lines.append(f"  Options: {opt_scans} scans → {len(opt_history)} spreads")
+            if opt_history:
+                opt_wins = sum(1 for t in opt_history if t.get("pnl", 0) >= 0)
+                report_lines.append(f"    P&L: ₹{opt_pnl:,.0f} | W:{opt_wins} L:{len(opt_history)-opt_wins}")
+                for t in opt_history:
+                    report_lines.append(f"    • {t.get('strategy','?')} {t.get('underlying','?')} ₹{t.get('pnl',0):,.0f} ({t.get('exit_reason','?')})")
+            else:
+                report_lines.append(f"    No spreads placed")
+
+            # BTST
+            btst_history = getattr(btst_trader, '_trade_history', [])
+            btst_active = [t for t in getattr(btst_trader, '_active_trades', []) if t.get("status") == "OPEN"]
+            btst_scans = getattr(btst_trader, '_scan_count', 0)
+            report_lines.append(f"  BTST: {btst_scans} scans → {len(btst_history)} closed, {len(btst_active)} holding overnight")
+            for t in btst_active:
+                report_lines.append(f"    🌙 {t.get('symbol','?')} holding | entry ₹{t.get('entry_price',0):,.0f} | SL ₹{t.get('stop_loss',0):,.0f}")
+
+            # 4. Issues detected
+            report_lines.append("")
+            report_lines.append("<b>System Health:</b>")
+            issues = []
+
+            if eq_scans > 0 and eq_orders == 0:
+                issues.append("Equity: scanned but 0 orders — signals too tight or margin issue")
+            if opt_scans > 0 and len(opt_history) == 0 and opt_cap > 0:
+                issues.append("Options: scanned but 0 spreads — check spread margin or signal quality")
+
+            # Check for SL failures in logs
+            eq_logs = getattr(auto_trader, '_logs', [])
+            sl_fails = sum(1 for l in eq_logs if isinstance(l, dict) and 'SL' in l.get('message', '') and 'FAIL' in l.get('message', ''))
+            if sl_fails > 0:
+                issues.append(f"⚠ {sl_fails} SL placement failures detected")
+
+            # Check Fyers disconnects
+            fyers_disconnects = sum(1 for l in eq_logs if isinstance(l, dict) and 'disconnected' in l.get('message', '').lower())
+            if fyers_disconnects > 0:
+                issues.append(f"Fyers disconnected {fyers_disconnects} time(s) during the day")
+
+            if not issues:
+                report_lines.append("  ✅ No issues detected")
+            else:
+                for issue in issues:
+                    report_lines.append(f"  ⚠ {issue}")
+
+            # 5. Tomorrow suggestion
+            report_lines.append("")
+            total_live = eq_pnl + opt_pnl
+            if total_live > 0:
+                report_lines.append(f"<b>Tomorrow:</b> Winning day (+₹{total_live:,.0f}). Keep same allocation.")
+            elif total_live > -500:
+                report_lines.append(f"<b>Tomorrow:</b> Small loss (₹{total_live:,.0f}). Dynamic allocator will adjust.")
+            else:
+                report_lines.append(f"<b>Tomorrow:</b> Loss day (₹{total_live:,.0f}). System will reduce allocation + hold cash reserve.")
+
+            telegram_notify.send("\n".join(report_lines))
+        except Exception as e:
+            print(f"[AutoShutdown] Intelligence report error: {e}", flush=True)
+
         print("[AutoShutdown] Server shutting down. Trading day complete.", flush=True)
 
         # Graceful shutdown
