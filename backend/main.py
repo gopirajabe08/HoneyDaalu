@@ -175,16 +175,38 @@ def auto_connect_fyers():
                         continue
                 _log("Market is OPEN — starting live engines")
 
+            # ── STOP stale engines restored from old state files ──
+            # State files may have running=True from yesterday → engines auto-restore
+            # with wrong capital. Kill them so we can restart with correct allocation.
+            for _stale_name, _stale_stop in [
+                ("Equity Live", auto_trader.stop),
+                ("Options Live", options_auto_trader.stop),
+                ("BTST Live", btst_trader.stop),
+            ]:
+                try:
+                    if getattr(auto_trader if 'Equity' in _stale_name else
+                               options_auto_trader if 'Options' in _stale_name else
+                               btst_trader, '_running', False):
+                        _stale_stop()
+                        _log(f"{_stale_name}: stopped stale state — will restart with fresh capital")
+                except Exception:
+                    pass
+
             # ── Live engines: Equity Intraday + Options Intraday ONLY ──
             # Futures Live and all Swing Live stay paper-only until proven profitable.
-            # A2: Verify Fyers is truly connected (retry up to 5 times)
+            # A2: Verify Fyers is truly connected (retry up to 5 times, re-login if needed)
             for _fyers_check in range(5):
                 if fyers_client.is_authenticated():
                     break
-                _log(f"Fyers not ready — retry {_fyers_check+1}/5...")
-                time.sleep(10)
+                _log(f"Fyers not authenticated — re-login attempt {_fyers_check+1}/5...")
+                try:
+                    fyers_client.headless_login()
+                    time.sleep(3)
+                except Exception:
+                    pass
+                time.sleep(5)
             else:
-                _log("Fyers not connected after 5 retries — skipping live engines")
+                _log("Fyers not connected after 5 re-login attempts — skipping live engines")
                 return
 
             try:
@@ -206,8 +228,14 @@ def auto_connect_fyers():
                 vix = regime.get("components", {}).get("vix", 15)
                 regime_name = regime.get("regime", "neutral")
 
-                # Check if NFO segment is enabled before allocating to Options
-                nfo_enabled = fyers_client.is_nfo_enabled()
+                # Check if NFO segment is enabled (retry 3 times — Fyers can be flaky)
+                nfo_enabled = False
+                for _nfo_try in range(3):
+                    nfo_enabled = fyers_client.is_nfo_enabled()
+                    if nfo_enabled:
+                        break
+                    _log(f"NFO check attempt {_nfo_try+1}/3 — not detected yet, retrying...")
+                    time.sleep(5)
                 if nfo_enabled:
                     _log("NFO segment: ENABLED")
                 else:
