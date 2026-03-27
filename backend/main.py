@@ -244,18 +244,15 @@ def auto_connect_fyers():
                 regime_name = regime.get("regime", "neutral")
 
                 # ══════════════════════════════════════════════════════════
-                # CAPITAL ALLOCATION — PRIORITY-BASED WITH REAL MARGIN
+                # CAPITAL ALLOCATION — OPTIONS PRIMARY, EQUITY SECONDARY
                 #
-                # LESSON (Mar 27): Fyers has ONE margin pool. Options spread
-                # BUY legs locked ₹87K margin, starving Equity and BTST.
+                # DATA (Mar 18-27 review):
+                #   Options paper: +₹13,526 from 17 trades (₹795/trade)
+                #   Equity live:   -₹12,118 from 75 trades (LOSING)
                 #
-                # FIX: Priority order with reserved amounts:
-                #   1. Equity Intraday: FIRST priority (proven +₹815)
-                #   2. BTST: dynamic at 2 PM from whatever is free
-                #   3. Options: LAST, gets remainder, BUY-leg-first for spread margin
-                #
-                # Spread margin fix: BUY leg placed first, then SELL leg.
-                # Fyers recognizes spread → margin ~₹20K instead of ₹1.13L.
+                # Options is the REAL money maker. Equity is secondary.
+                # Spread margin fix (BUY first) makes Options live viable.
+                # BTST: dynamic at 2 PM from Fyers free margin.
                 # ══════════════════════════════════════════════════════════
 
                 # Check if NFO segment is enabled (retry 3 times)
@@ -266,22 +263,24 @@ def auto_connect_fyers():
                         break
                     time.sleep(5)
 
-                # Equity: reserve ₹80K or 80% of capital (whichever is less)
-                eq_capital = min(int(available * 0.80), 80000)
-                if available < 50000:
-                    eq_capital = int(available)  # Too little to split — all to equity
-
-                # Options: gets remainder, only if NFO enabled and enough left
+                # Options FIRST — spread margin ~₹20K/spread, not ₹1.13L
+                # Each spread uses ~₹20K margin. 2 spreads = ₹40K. Reserve ₹50K for safety.
                 opt_capital = 0
-                if nfo_enabled and available > 60000:
-                    opt_capital = int(available - eq_capital)
-                    if opt_capital < 15000:
-                        opt_capital = 0
-                        eq_capital = int(available)  # Not enough for options, give all to equity
+                eq_capital = int(available)
 
-                _log(f"Capital allocation: Equity ₹{eq_capital:,} | Options ₹{opt_capital:,} | BTST dynamic at 2 PM")
+                if nfo_enabled and available >= 60000:
+                    # Options: 50% or ₹50K max (for 2 spreads with buffer)
+                    opt_capital = min(int(available * 0.50), 50000)
+                    eq_capital = int(available - opt_capital)
+                elif nfo_enabled and available >= 40000:
+                    # Tight: Options ₹25K (1 spread), rest to equity
+                    opt_capital = 25000
+                    eq_capital = int(available - opt_capital)
+                # If NFO not enabled or < ₹40K: all to equity
+
+                _log(f"Capital allocation: Options ₹{opt_capital:,} (PRIMARY) | Equity ₹{eq_capital:,} | BTST dynamic at 2 PM")
                 if not nfo_enabled:
-                    _log("NFO: NOT ENABLED — Options paper only")
+                    _log("NFO: NOT ENABLED — Options paper only, equity gets 100%")
 
                 # BTST Live: deferred start at 1:50 PM (10 min before entry window)
                 # No capital reserved upfront. Equity gets 100%. BTST uses available funds at 2 PM.
@@ -351,9 +350,9 @@ def auto_connect_fyers():
                 _log("═" * 50)
                 _log(f"AUTO-START COMPLETE")
                 _log(f"  Regime: {regime_name} | VIX: {vix:.1f}")
-                _log(f"  Equity Live:  ₹{eq_capital:,} | Max 2 positions (PRIORITY 1)")
-                _log(f"  Options Live: {opt_status} (PRIORITY 3)")
-                _log(f"  BTST Live:    Scheduled 1:50 PM (PRIORITY 2)")
+                _log(f"  Options Live: {opt_status} (PRIMARY — ₹795/trade on paper)")
+                _log(f"  Equity Live:  ₹{eq_capital:,} | {len(regime.get('strategies', []))} strategies")
+                _log(f"  BTST Live:    Scheduled 1:50 PM (dynamic capital)")
                 _log(f"  Paper engines running")
                 _log(f"  Auto-shutdown: 3:45 PM")
                 _log("═" * 50)
@@ -361,12 +360,12 @@ def auto_connect_fyers():
                 # Telegram: morning brief
                 try:
                     engines = []
-                    if eq_capital >= 20000:
-                        engines.append(f"Equity Live: ₹{eq_capital:,} (priority)")
                     if nfo_enabled and opt_capital >= 15000:
-                        engines.append(f"Options Live: ₹{opt_capital:,}")
+                        engines.append(f"Options Live: ₹{opt_capital:,} (primary)")
                     else:
-                        engines.append("Options Live: disabled")
+                        engines.append("Options: paper only")
+                    if eq_capital >= 20000:
+                        engines.append(f"Equity Live: ₹{eq_capital:,}")
                     engines.append("BTST Live: 1:50 PM")
                     telegram_notify.morning_brief(available, regime_name, vix, engines)
                 except Exception:
