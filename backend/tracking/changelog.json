@@ -14350,6 +14350,61 @@
       },
       "timestamp": "2026-03-25T23:59:46.902928+05:30",
       "author": "auto_tuner_v2"
+    },
+    {
+      "id": "AUTO-BOOST-0327",
+      "date": "2026-03-27",
+      "type": "AUTO_TUNE",
+      "parameter": "strategy_conviction_boosts",
+      "before": {
+        "play8_rsi_divergence": 1.4,
+        "play6_bb_contra": 1.1,
+        "play4_supertrend": 0.8,
+        "play10_momentum_rank": 1.0
+      },
+      "after": {
+        "play8_rsi_divergence": 1.4,
+        "play6_bb_contra": 1.1,
+        "play4_supertrend": 0.8,
+        "play10_momentum_rank": 0.5
+      },
+      "reason": "Rolling 4-day expectancy ranking: play8_rsi_divergence=\u20b9-33.15/trade, play6_bb_contra=\u20b9-168.43/trade, play4_supertrend=\u20b9-259.28/trade, play10_momentum_rank=\u20b9-460.65/trade",
+      "data_backing": {
+        "play6_bb_contra": {
+          "trades": 25,
+          "wr": 36.0,
+          "exp": -168.43
+        },
+        "play8_rsi_divergence": {
+          "trades": 14,
+          "wr": 42.9,
+          "exp": -33.15
+        },
+        "play4_supertrend": {
+          "trades": 37,
+          "wr": 27.0,
+          "exp": -259.28
+        },
+        "play10_momentum_rank": {
+          "trades": 4,
+          "wr": 25.0,
+          "exp": -460.65
+        }
+      },
+      "timestamp": "2026-03-27T15:15:00.423126+05:30",
+      "author": "auto_tuner_v2"
+    },
+    {
+      "id": "AUTO-ROLLBACK-0327",
+      "date": "2026-03-27",
+      "type": "AUTO_ROLLBACK",
+      "parameter": "all_changes_rolled_back",
+      "reason": "Post-fix QA failed \u2014 all changes reverted to pre-tune values",
+      "actions_rolled_back": [
+        "boost_play10_momentum_rank"
+      ],
+      "timestamp": "2026-03-27T15:15:00.944718+05:30",
+      "author": "auto_tuner_v2"
     }
   ]
 }

@@ -178,19 +178,32 @@ def auto_connect_fyers():
             # ── STOP stale engines restored from old state files ──
             # State files may have running=True from yesterday → engines auto-restore
             # with wrong capital. Kill them so we can restart with correct allocation.
-            for _stale_name, _stale_stop in [
-                ("Equity Live", auto_trader.stop),
-                ("Options Live", options_auto_trader.stop),
-                ("BTST Live", btst_trader.stop),
-            ]:
+            _stale_engines = [
+                ("Equity Live", auto_trader),
+                ("Options Live", options_auto_trader),
+                ("BTST Live", btst_trader),
+            ]
+            for _stale_name, _stale_engine in _stale_engines:
                 try:
-                    if getattr(auto_trader if 'Equity' in _stale_name else
-                               options_auto_trader if 'Options' in _stale_name else
-                               btst_trader, '_running', False):
-                        _stale_stop()
+                    if getattr(_stale_engine, '_running', False):
+                        _stale_engine.stop()
                         _log(f"{_stale_name}: stopped stale state — will restart with fresh capital")
                 except Exception:
                     pass
+            # Also delete stale state files to prevent re-restore
+            import os as _os
+            for _sf in ['.auto_trader_state.json', '.options_auto_trader_state.json', '.btst_trader_state.json']:
+                _sf_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), _sf)
+                if _os.path.exists(_sf_path):
+                    try:
+                        import json as _json
+                        with open(_sf_path) as _f:
+                            _sd = _json.load(_f)
+                        if _sd.get('date') != now_ist().strftime('%Y-%m-%d'):
+                            _os.remove(_sf_path)
+                            _log(f"Deleted stale state file: {_sf} (from {_sd.get('date')})")
+                    except Exception:
+                        pass
 
             # ── Live engines: Equity Intraday + Options Intraday ONLY ──
             # Futures Live and all Swing Live stay paper-only until proven profitable.
@@ -228,62 +241,20 @@ def auto_connect_fyers():
                 vix = regime.get("components", {}).get("vix", 15)
                 regime_name = regime.get("regime", "neutral")
 
-                # Check if NFO segment is enabled (retry 3 times — Fyers can be flaky)
-                nfo_enabled = False
-                for _nfo_try in range(3):
-                    nfo_enabled = fyers_client.is_nfo_enabled()
-                    if nfo_enabled:
-                        break
-                    _log(f"NFO check attempt {_nfo_try+1}/3 — not detected yet, retrying...")
-                    time.sleep(5)
-                if nfo_enabled:
-                    _log("NFO segment: ENABLED")
-                else:
-                    _log("NFO segment: NOT ENABLED — all capital goes to Equity")
-
-                # C11: Delete Options Live state file if NFO not enabled — prevent auto-restore
-                if not nfo_enabled:
-                    try:
-                        import os
-                        opt_state = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.options_auto_trader_state.json')
-                        if os.path.exists(opt_state):
-                            os.remove(opt_state)
-                            _log("Deleted Options Live state file (NFO not enabled)")
-                    except:
-                        pass
-
-                # Capital split — Equity is PROVEN (play8 +₹815 on Mar 25), Options is NEW.
-                # Equity gets priority. Options gets remainder for validation.
-                if not nfo_enabled:
-                    opt_capital = 0
-                    eq_capital = int(available)
-                elif available < 100000:
-                    # < 1L: Equity 65%, Options 35% — don't kill proven engine for unproven
-                    eq_capital = int(available * 0.65)
-                    opt_capital = int(available * 0.35)
-                elif vix > 20:
-                    # High VIX: Equity 50%, Options 50% — options benefit from high premium
-                    eq_capital = int(available * 0.50)
-                    opt_capital = int(available * 0.50)
-                else:
-                    # Normal VIX: Equity 60%, Options 40%
-                    eq_capital = int(available * 0.60)
-                    opt_capital = int(available * 0.40)
-
-                # Start Options Live (only if NFO enabled)
-                if nfo_enabled and opt_capital >= 20000:
-                    try:
-                        opt_underlyings = ["BANKNIFTY"]
-                        if opt_capital >= 40000:
-                            opt_underlyings = ["NIFTY", "BANKNIFTY"]
-                        r = options_auto_trader.start(capital=opt_capital, underlyings=opt_underlyings)
-                        if not r.get("error"):
-                            _log(f"Options Live: ₹{opt_capital:,} | {opt_underlyings}")
-                        else:
-                            _log(f"Options Live error: {r.get('error')}")
-                    except Exception as e:
-                        _log(f"Options Live FAILED: {e}")
-                        traceback.print_exc()
+                # ══════════════════════════════════════════════════════════
+                # CAPITAL ALLOCATION — REAL MARGIN, NOT THEORETICAL SPLITS
+                #
+                # LESSON LEARNED (Mar 27): Options ate ₹87K margin on two
+                # naked BUY legs. Equity and BTST got zero. Fyers has ONE
+                # margin pool. Code-level splits are fiction.
+                #
+                # RULE: Equity gets 100% of available capital.
+                # Options Live: DISABLED until spread orders work.
+                # BTST: uses whatever margin is free at 2 PM (dynamic).
+                # ══════════════════════════════════════════════════════════
+                eq_capital = int(available)
+                _log(f"Equity Live gets 100% of capital: ₹{eq_capital:,}")
+                _log("Options Live: DISABLED — single-leg orders cause margin lockup. Paper only until spread API fixed.")
 
                 # BTST Live: deferred start at 1:50 PM (10 min before entry window)
                 # No capital reserved upfront. Equity gets 100%. BTST uses available funds at 2 PM.
@@ -331,9 +302,9 @@ def auto_connect_fyers():
                 _log(f"AUTO-START COMPLETE")
                 _log(f"  Regime: {regime_name} | VIX: {vix:.1f}")
                 _log(f"  Equity Live:  ₹{eq_capital:,} | Max 2 positions")
-                _log(f"  Options Live: {'₹'+str(opt_capital) if nfo_enabled else 'DISABLED (NFO pending)'}")
+                _log(f"  Options Live: DISABLED (paper only — spread orders not ready)")
                 _log(f"  BTST Live:    Scheduled 1:50 PM (dynamic capital)")
-                _log(f"  Paper engines: 7 running")
+                _log(f"  Paper engines running")
                 _log(f"  Auto-shutdown: 3:45 PM")
                 _log("═" * 50)
 
@@ -342,10 +313,8 @@ def auto_connect_fyers():
                     engines = []
                     if eq_capital >= 20000:
                         engines.append(f"Equity Live: ₹{eq_capital:,}")
-                    if nfo_enabled and opt_capital >= 20000:
-                        engines.append(f"Options Live: ₹{opt_capital:,}")
+                    engines.append("Options Live: PAPER ONLY")
                     engines.append("BTST Live: Scheduled 1:50 PM")
-                    engines.append("Paper engines running")
                     telegram_notify.morning_brief(available, regime_name, vix, engines)
                 except Exception:
                     pass

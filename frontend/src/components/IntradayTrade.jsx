@@ -64,7 +64,12 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
           const posRes = await getPositions()
           const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
           const intraday = posArr.filter(p => (p.productType === 'INTRADAY' || p.productType === 'BO') && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
-          setFyersPositions(intraday)
+          // Filter to equity only: exclude options (CE/PE) and futures (FUT)
+          const equityOnly = intraday.filter(p => {
+            const sym = (p.symbol || '').toUpperCase()
+            return !sym.includes('CE') && !sym.includes('PE') && !sym.includes('FUT')
+          })
+          setFyersPositions(equityOnly)
         } catch {}
       }
     } catch {}

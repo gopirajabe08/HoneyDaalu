@@ -129,8 +129,21 @@ export default function OptionsIntradayTrade({ mode, capital, setCapital }) {
   }
 
   const logs = status?.logs ?? []
-  const activeTrades = status?.active_positions ?? []
-  const tradeHistory = status?.trade_history ?? []
+  // Filter to options only: include positions where any leg symbol contains CE or PE
+  const isOptionsPosition = (t) => {
+    // Check legs array (options engine uses legs with strike/type)
+    if (t.legs && t.legs.length > 0) {
+      return t.legs.some(leg => {
+        const sym = (leg.symbol || leg.tradingsymbol || '').toUpperCase()
+        return sym.includes('CE') || sym.includes('PE')
+      })
+    }
+    // Check direct symbol
+    const sym = (t.symbol || t.underlying || '').toUpperCase()
+    return sym.includes('CE') || sym.includes('PE')
+  }
+  const activeTrades = (status?.active_positions ?? []).filter(isOptionsPosition)
+  const tradeHistory = (status?.trade_history ?? []).filter(isOptionsPosition)
   const orderCutoff = status?.order_cutoff_passed ?? false
   const squaredOff = status?.squared_off ?? false
   const totalPnl = status?.total_pnl ?? 0

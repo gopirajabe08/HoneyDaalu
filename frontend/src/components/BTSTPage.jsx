@@ -106,8 +106,16 @@ export default function BTSTPage({ capital, setCapital }) {
     setLoading(false)
   }
 
-  const positions = status?.active_trades || []
-  const history = status?.trade_history || []
+  // Filter to CNC (BTST) positions only — exclude INTRADAY/BO product types
+  const isCNCPosition = (t) => {
+    // If productType is available, check for CNC
+    if (t.productType) return t.productType === 'CNC'
+    // BTST engine positions are CNC by definition, but also exclude options/futures symbols
+    const sym = (t.symbol || '').toUpperCase()
+    return !sym.includes('CE') && !sym.includes('PE') && !sym.includes('FUT')
+  }
+  const positions = (status?.active_trades || []).filter(isCNCPosition)
+  const history = (status?.trade_history || []).filter(isCNCPosition)
   const logs = status?.logs || []
   const totalPnl = status?.total_pnl ?? 0
 
