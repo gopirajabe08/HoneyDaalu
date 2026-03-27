@@ -1,28 +1,35 @@
 import React, { useState, useEffect } from 'react'
+import { getAuthToken } from '../services/api/base'
 
 const API = 'http://localhost:8001'
+
+function authFetch(url) {
+  const token = getAuthToken()
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
+  return fetch(url, { headers }).then(r => r.json()).catch(() => null)
+}
 
 export default function SystemBrain() {
   const [data, setData] = useState(null)
 
   useEffect(() => {
     fetchData()
-    const id = setInterval(fetchData, 30000) // refresh every 30s
+    const id = setInterval(fetchData, 30000)
     return () => clearInterval(id)
   }, [])
 
   async function fetchData() {
     try {
       const [eqRegime, futRegime, optRegime, eqStatus, optStatus, futStatus, eqLive, optLive, monitor] = await Promise.all([
-        fetch(`${API}/api/equity/regime`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/futures/regime`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/options/regime`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/paper/status`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/options/paper/status`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/futures/paper/status`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/auto/status`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/options/auto/status`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/monitor/log`).then(r => r.json()).catch(() => null),
+        authFetch(`${API}/api/equity/regime`),
+        authFetch(`${API}/api/futures/regime`),
+        authFetch(`${API}/api/options/regime`),
+        authFetch(`${API}/api/paper/status`),
+        authFetch(`${API}/api/options/paper/status`),
+        authFetch(`${API}/api/futures/paper/status`),
+        authFetch(`${API}/api/auto/status`),
+        authFetch(`${API}/api/options/auto/status`),
+        authFetch(`${API}/api/monitor/log`),
       ])
       setData({ eqRegime, futRegime, optRegime, eqStatus, optStatus, futStatus, eqLive, optLive, monitor })
     } catch {}
