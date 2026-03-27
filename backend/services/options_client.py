@@ -351,17 +351,22 @@ def place_spread_orders(legs: list[dict], product_type: str = "INTRADAY", use_li
     Each leg: {"symbol": str, "qty": int, "side": int (1=Buy, -1=Sell), "price": float (optional)}
     Returns combined result with all order IDs.
 
-    When use_limit=True and leg contains a "price" field, uses Limit orders
-    (order_type=1) instead of Market orders to avoid bid-ask slippage on options.
-    Falls back to Market (order_type=2) when no price is available.
+    CRITICAL: BUY legs are placed FIRST, then SELL legs.
+    This ensures Fyers recognizes the spread and applies spread margin (~₹20K)
+    instead of naked option margin (~₹1.13L). Without this ordering,
+    SELL legs get rejected for margin shortfall.
 
     If a leg fails after previous legs succeeded, attempts to rollback
     (reverse) the already-placed legs to avoid unhedged exposure.
     """
+    # Reorder: BUY legs first (side=1), then SELL legs (side=-1)
+    # This is critical for spread margin recognition on Fyers
+    ordered_legs = sorted(legs, key=lambda l: l.get("side", 0), reverse=True)
+
     results = []
     succeeded_legs = []
 
-    for i, leg in enumerate(legs):
+    for i, leg in enumerate(ordered_legs):
         # Use limit order when price is available and use_limit is True
         leg_price = leg.get("price", 0)
         if use_limit and leg_price and leg_price > 0:
@@ -370,6 +375,31 @@ def place_spread_orders(legs: list[dict], product_type: str = "INTRADAY", use_li
         else:
             order_type = 2  # Market
             limit_price = 0
+
+        # Before SELL leg: verify margin is available (BUY leg should have established spread)
+        if leg["side"] == -1 and succeeded_legs:
+            try:
+                from services.fyers_client import get_funds
+                funds = get_funds()
+                avail = 0
+                for f_item in funds.get("fund_limit", []):
+                    if f_item.get("id") == 10:
+                        avail = f_item.get("equityAmount", 0)
+                if avail < 5000:  # Minimum margin buffer
+                    logger.warning(f"[OptionsClient] Margin too low (₹{avail:,.0f}) for SELL leg — aborting spread")
+                    # Rollback BUY legs
+                    for prev_leg in succeeded_legs:
+                        reverse_side = -1 if prev_leg["side"] == 1 else 1
+                        place_option_order(symbol=prev_leg["symbol"], qty=prev_leg["qty"],
+                                           side=reverse_side, product_type=product_type)
+                    return {"error": f"Margin insufficient for SELL leg (₹{avail:,.0f} available)", "results": results}
+            except Exception:
+                pass  # Proceed if funds check fails
+
+        import time as _time
+        # Small delay between legs to let Fyers recognize the spread
+        if i > 0:
+            _time.sleep(2)
 
         result = place_option_order(
             symbol=leg["symbol"],

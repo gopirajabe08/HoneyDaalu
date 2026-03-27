@@ -242,19 +242,44 @@ def auto_connect_fyers():
                 regime_name = regime.get("regime", "neutral")
 
                 # ══════════════════════════════════════════════════════════
-                # CAPITAL ALLOCATION — REAL MARGIN, NOT THEORETICAL SPLITS
+                # CAPITAL ALLOCATION — PRIORITY-BASED WITH REAL MARGIN
                 #
-                # LESSON LEARNED (Mar 27): Options ate ₹87K margin on two
-                # naked BUY legs. Equity and BTST got zero. Fyers has ONE
-                # margin pool. Code-level splits are fiction.
+                # LESSON (Mar 27): Fyers has ONE margin pool. Options spread
+                # BUY legs locked ₹87K margin, starving Equity and BTST.
                 #
-                # RULE: Equity gets 100% of available capital.
-                # Options Live: DISABLED until spread orders work.
-                # BTST: uses whatever margin is free at 2 PM (dynamic).
+                # FIX: Priority order with reserved amounts:
+                #   1. Equity Intraday: FIRST priority (proven +₹815)
+                #   2. BTST: dynamic at 2 PM from whatever is free
+                #   3. Options: LAST, gets remainder, BUY-leg-first for spread margin
+                #
+                # Spread margin fix: BUY leg placed first, then SELL leg.
+                # Fyers recognizes spread → margin ~₹20K instead of ₹1.13L.
                 # ══════════════════════════════════════════════════════════
-                eq_capital = int(available)
-                _log(f"Equity Live gets 100% of capital: ₹{eq_capital:,}")
-                _log("Options Live: DISABLED — single-leg orders cause margin lockup. Paper only until spread API fixed.")
+
+                # Check if NFO segment is enabled (retry 3 times)
+                nfo_enabled = False
+                for _nfo_try in range(3):
+                    nfo_enabled = fyers_client.is_nfo_enabled()
+                    if nfo_enabled:
+                        break
+                    time.sleep(5)
+
+                # Equity: reserve ₹80K or 80% of capital (whichever is less)
+                eq_capital = min(int(available * 0.80), 80000)
+                if available < 50000:
+                    eq_capital = int(available)  # Too little to split — all to equity
+
+                # Options: gets remainder, only if NFO enabled and enough left
+                opt_capital = 0
+                if nfo_enabled and available > 60000:
+                    opt_capital = int(available - eq_capital)
+                    if opt_capital < 15000:
+                        opt_capital = 0
+                        eq_capital = int(available)  # Not enough for options, give all to equity
+
+                _log(f"Capital allocation: Equity ₹{eq_capital:,} | Options ₹{opt_capital:,} | BTST dynamic at 2 PM")
+                if not nfo_enabled:
+                    _log("NFO: NOT ENABLED — Options paper only")
 
                 # BTST Live: deferred start at 1:50 PM (10 min before entry window)
                 # No capital reserved upfront. Equity gets 100%. BTST uses available funds at 2 PM.
@@ -285,7 +310,7 @@ def auto_connect_fyers():
                 threading.Thread(target=_start_btst_deferred, daemon=True, name="BTSTDeferredStart").start()
                 _log("BTST Live: scheduled for 1:50 PM (deferred start)")
 
-                # Start Equity Live — gets 100% of equity capital
+                # Start Equity Live — FIRST priority
                 if eq_capital >= 20000:
                     try:
                         strategies = regime.get("strategies", [])
@@ -298,12 +323,35 @@ def auto_connect_fyers():
                         _log(f"Equity Live FAILED: {e}")
                         traceback.print_exc()
 
+                # Start Options Live — LAST priority, spread margin fix active
+                # BUY legs placed first → Fyers recognizes spread → reduced margin
+                opt_status = "DISABLED (NFO not enabled)"
+                if nfo_enabled and opt_capital >= 15000:
+                    try:
+                        opt_underlyings = ["BANKNIFTY"]
+                        if opt_capital >= 30000:
+                            opt_underlyings = ["NIFTY", "BANKNIFTY"]
+                        r = options_auto_trader.start(capital=opt_capital, underlyings=opt_underlyings)
+                        if not r.get("error"):
+                            opt_status = f"₹{opt_capital:,} | {opt_underlyings}"
+                            _log(f"Options Live: {opt_status}")
+                        else:
+                            opt_status = f"ERROR: {r.get('error')}"
+                            _log(f"Options Live error: {r.get('error')}")
+                    except Exception as e:
+                        opt_status = f"FAILED: {e}"
+                        _log(f"Options Live FAILED: {e}")
+                elif not nfo_enabled:
+                    opt_status = "DISABLED (NFO not enabled)"
+                else:
+                    opt_status = f"DISABLED (₹{opt_capital:,} too low, need ₹15K+)"
+
                 _log("═" * 50)
                 _log(f"AUTO-START COMPLETE")
                 _log(f"  Regime: {regime_name} | VIX: {vix:.1f}")
-                _log(f"  Equity Live:  ₹{eq_capital:,} | Max 2 positions")
-                _log(f"  Options Live: DISABLED (paper only — spread orders not ready)")
-                _log(f"  BTST Live:    Scheduled 1:50 PM (dynamic capital)")
+                _log(f"  Equity Live:  ₹{eq_capital:,} | Max 2 positions (PRIORITY 1)")
+                _log(f"  Options Live: {opt_status} (PRIORITY 3)")
+                _log(f"  BTST Live:    Scheduled 1:50 PM (PRIORITY 2)")
                 _log(f"  Paper engines running")
                 _log(f"  Auto-shutdown: 3:45 PM")
                 _log("═" * 50)
@@ -312,9 +360,12 @@ def auto_connect_fyers():
                 try:
                     engines = []
                     if eq_capital >= 20000:
-                        engines.append(f"Equity Live: ₹{eq_capital:,}")
-                    engines.append("Options Live: PAPER ONLY")
-                    engines.append("BTST Live: Scheduled 1:50 PM")
+                        engines.append(f"Equity Live: ₹{eq_capital:,} (priority)")
+                    if nfo_enabled and opt_capital >= 15000:
+                        engines.append(f"Options Live: ₹{opt_capital:,}")
+                    else:
+                        engines.append("Options Live: disabled")
+                    engines.append("BTST Live: 1:50 PM")
                     telegram_notify.morning_brief(available, regime_name, vix, engines)
                 except Exception:
                     pass
