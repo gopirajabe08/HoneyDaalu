@@ -105,12 +105,12 @@ export default function Header({ fyersStatus }) {
   const formatINR = (v) => `\u20B9${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
   return (
-    <header className="flex items-center justify-between px-6 py-4">
+    <header className="flex items-center justify-between px-6 py-4 theme-transition" style={{ backgroundColor: 'var(--header-bg)' }}>
       {/* Left - Brand */}
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-bold">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-400">Intra</span>
-          <span className="text-white">Trading</span>
+          <span className="text-transparent bg-clip-text bg-gradient-accent">Intra</span>
+          <span style={{ color: 'var(--text-primary)' }}>Trading</span>
         </h1>
       </div>
 
@@ -123,8 +123,9 @@ export default function Header({ fyersStatus }) {
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${
                 marketStatus.is_open
                   ? 'bg-green-500/10 text-green-400'
-                  : 'bg-dark-700 text-gray-400 border border-dark-500'
+                  : ''
               }`}
+              style={!marketStatus.is_open ? { backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' } : undefined}
             >
               <div className={`w-2 h-2 rounded-full ${marketStatus.is_open ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
               {marketStatus.message}
@@ -132,20 +133,23 @@ export default function Header({ fyersStatus }) {
             </button>
 
             {showHolidays && upcomingHolidays.length > 0 && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 bg-dark-700 border border-dark-500 rounded-xl shadow-xl p-3 min-w-[240px]">
+              <div
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 rounded-xl shadow-xl p-3 min-w-[240px]"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+              >
                 {!marketStatus.is_open && nextTradingDay && (
-                  <div className="flex items-center gap-2 text-xs text-green-400 mb-2 pb-2 border-b border-dark-500">
+                  <div className="flex items-center gap-2 text-xs text-green-400 mb-2 pb-2" style={{ borderBottom: '1px solid var(--border)' }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
                     Next trading day: {nextTradingDay}
                   </div>
                 )}
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <p className="text-[10px] uppercase tracking-wider mb-1.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
                   <CalendarOff size={10} /> Upcoming Holidays
                 </p>
                 {upcomingHolidays.map((h, i) => (
                   <div key={i} className="flex items-center justify-between gap-3 py-1 text-xs">
-                    <span className="text-gray-300">{h.name}</span>
-                    <span className="text-gray-500 text-[10px] whitespace-nowrap">{h.label}</span>
+                    <span style={{ color: 'var(--text-primary)' }}>{h.name}</span>
+                    <span className="text-[10px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{h.label}</span>
                   </div>
                 ))}
               </div>
@@ -153,10 +157,10 @@ export default function Header({ fyersStatus }) {
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 text-gray-400">
+        <div className="flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
           <Clock size={13} />
           <span className="text-xs tabular-nums font-mono">{time}</span>
-          <span className="text-[10px] text-gray-500">IST</span>
+          <span className="text-[10px]" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>IST</span>
         </div>
       </div>
 
@@ -166,35 +170,42 @@ export default function Header({ fyersStatus }) {
           <>
             {/* Balance display */}
             {funds && (
-              <div className="flex items-center gap-3 bg-dark-700 border border-dark-500 rounded-xl px-3 py-2">
+              <div
+                className="flex items-center gap-3 rounded-xl px-3 py-2"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+              >
                 <Wallet size={14} className="text-yellow-400" />
                 <div className="flex items-center gap-4 text-[10px]">
                   <div>
-                    <span className="text-gray-500">Available </span>
-                    <span className="text-green-400 font-semibold">{formatINR(available)}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Available </span>
+                    <span style={{ color: 'var(--positive)' }} className="font-semibold">{formatINR(available)}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Used </span>
-                    <span className="text-orange-400 font-semibold">{formatINR(used)}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Used </span>
+                    <span style={{ color: 'var(--accent)' }} className="font-semibold">{formatINR(used)}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Total </span>
-                    <span className="text-white font-semibold">{formatINR(total)}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total </span>
+                    <span style={{ color: 'var(--text-primary)' }} className="font-semibold">{formatINR(total)}</span>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Profile badge + disconnect */}
-            <div className="flex items-center gap-2 bg-dark-700 border border-dark-500 rounded-xl px-3 py-2">
+            <div
+              className="flex items-center gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+            >
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white text-[10px] font-bold">
                 {profileName.charAt(0)}
               </div>
-              <span className="text-xs text-white font-medium">{profileName}</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{profileName}</span>
               <div className="w-2 h-2 rounded-full bg-green-400" />
               <button
                 onClick={() => { fyersLogout(); window.location.reload() }}
-                className="ml-1 text-gray-500 hover:text-red-400 transition-colors"
+                className="ml-1 hover:text-red-400 transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
                 title="Disconnect Fyers"
               >
                 <Link2Off size={14} />
@@ -222,7 +233,12 @@ export default function Header({ fyersStatus }) {
                     value={pasteUrl}
                     onChange={handleInputChange}
                     placeholder="Paste login URL here..."
-                    className="bg-dark-800 border border-dark-500 rounded-xl pl-3 pr-20 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 w-[280px]"
+                    className="rounded-xl pl-3 pr-20 py-2 text-xs focus:outline-none w-[280px]"
+                    style={{
+                      backgroundColor: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-primary)',
+                    }}
                   />
                   <button
                     onClick={handlePasteSubmit}
@@ -232,21 +248,21 @@ export default function Header({ fyersStatus }) {
                     <ClipboardPaste size={10} /> Connect
                   </button>
                 </div>
-                <button onClick={() => { setConnectStep('idle'); setPasteUrl(''); setConnectError('') }} className="text-gray-500 hover:text-red-400">
+                <button onClick={() => { setConnectStep('idle'); setPasteUrl(''); setConnectError('') }} className="hover:text-red-400" style={{ color: 'var(--text-secondary)' }}>
                   <X size={14} />
                 </button>
               </div>
             )}
 
             {connectStep === 'verifying' && (
-              <div className="flex items-center gap-2 text-xs text-gray-300">
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-primary)' }}>
                 <Loader2 size={14} className="text-green-400 animate-spin" />
                 Verifying...
               </div>
             )}
 
             {connectError && (
-              <span className="text-[10px] text-red-400 max-w-[200px] truncate">{connectError}</span>
+              <span className="text-[10px] max-w-[200px] truncate" style={{ color: 'var(--negative)' }}>{connectError}</span>
             )}
           </div>
         )}

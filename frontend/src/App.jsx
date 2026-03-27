@@ -16,8 +16,9 @@ import LoginPage from './components/LoginPage'
 // import ImprovementTracker from './components/ImprovementTracker'  // Disabled — auto-tune removed
 import { getFyersStatus, checkAuthStatus, logout } from './services/api'
 import { getAuthToken } from './services/api/base'
+import { ThemeProvider } from './contexts/ThemeContext'
 
-export default function App() {
+function AppContent() {
   const [activePage, setActivePage] = useState('dashboard')
   const [equityCapital, setEquityCapital] = useState(75000)
   const [optionsCapital, setOptionsCapital] = useState(25000)
@@ -85,8 +86,8 @@ export default function App() {
   // Show nothing while checking auth (prevents flash)
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
       </div>
     )
   }
@@ -134,7 +135,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900 text-white">
+    <div className="min-h-screen theme-transition" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <Sidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleLogout} />
 
       <div className="ml-[72px]">
@@ -147,5 +148,13 @@ export default function App() {
 
       {/* ImprovementTracker disabled — auto-tune removed */}
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }

@@ -12,6 +12,7 @@ import {
   TrendingDown,
   Sunrise,
 } from 'lucide-react'
+import ThemeSwitcher from './ThemeSwitcher'
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
@@ -28,10 +29,13 @@ const navItems = [
 
 export default function Sidebar({ activePage, onNavigate, onLogout }) {
   return (
-    <aside className="fixed left-0 top-0 h-full w-[72px] bg-gradient-sidebar border-r border-dark-600 flex flex-col items-center py-6 z-50">
+    <aside
+      className="fixed left-0 top-0 h-full w-[72px] bg-gradient-sidebar flex flex-col items-center py-6 z-50 theme-transition"
+      style={{ borderRight: '1px solid var(--border)' }}
+    >
       {/* Logo */}
       <div className="mb-8">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+        <div className="w-10 h-10 rounded-xl bg-gradient-accent flex items-center justify-center text-white font-bold text-lg">
           IT
         </div>
       </div>
@@ -42,30 +46,59 @@ export default function Sidebar({ activePage, onNavigate, onLogout }) {
           <div key={i} className="relative group">
             <button
               onClick={() => onNavigate(item.page)}
-              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200
-                ${activePage === item.page
-                  ? 'bg-gradient-to-br from-orange-500/20 to-pink-500/20 text-orange-400'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-dark-600'
-                }`}
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                activePage === item.page ? '' : 'hover:opacity-80'
+              }`}
+              style={
+                activePage === item.page
+                  ? { background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }
+                  : { color: 'var(--text-secondary)' }
+              }
+              onMouseEnter={(e) => {
+                if (activePage !== item.page) {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activePage !== item.page) {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = 'var(--text-secondary)'
+                }
+              }}
             >
               <item.icon size={20} />
             </button>
-            <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg bg-dark-600 border border-dark-500 text-white text-xs font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-lg">
+            <span
+              className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-lg"
+              style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+            >
               {item.label}
             </span>
           </div>
         ))}
       </nav>
 
+      {/* Theme Switcher */}
+      <div className="mb-4">
+        <ThemeSwitcher compact />
+      </div>
+
       {/* Logout */}
       <div className="relative group">
         <button
           onClick={onLogout}
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-dark-600 transition-all duration-200"
+          className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 hover:text-red-400"
+          style={{ color: 'var(--text-secondary)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
         >
           <LogOut size={20} />
         </button>
-        <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg bg-dark-600 border border-dark-500 text-white text-xs font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-lg">
+        <span
+          className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-lg"
+          style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+        >
           Logout
         </span>
       </div>
