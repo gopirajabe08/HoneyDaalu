@@ -1858,6 +1858,10 @@ class AutoTrader:
                         continue
 
                     fyers_sym = pos.get("symbol", "")
+                    # Skip options/futures — equity engine only counts equity positions
+                    if "CE" in fyers_sym or "PE" in fyers_sym or "FUT" in fyers_sym:
+                        continue
+
                     plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
                     open_symbols.add(plain)
                     open_positions.append(pos)
