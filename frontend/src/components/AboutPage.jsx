@@ -50,7 +50,7 @@ function CapitalAllocationLive() {
       try {
         const token = getAuthToken()
         const headers = token ? { Authorization: `Bearer ${token}` } : {}
-        const API = 'http://localhost:8001'
+        const API = ''
         const [funds, eqStatus, optStatus, btstStatus, regime] = await Promise.all([
           fetch(`${API}/api/fyers/funds`, { headers }).then(r => r.json()).catch(() => null),
           fetch(`${API}/api/auto/status`, { headers }).then(r => r.json()).catch(() => null),

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Brain, TrendingUp, TrendingDown, Minus, Activity } from 'lucide-react'
 import { getAuthToken } from '../services/api/base'
 
-const API = 'http://localhost:8001'
+const API = ''
 
 function authFetch(url) {
   const token = getAuthToken()

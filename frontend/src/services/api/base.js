@@ -2,7 +2,8 @@
  * Shared API base URL, fetch helper, and auth utilities.
  */
 
-export const API_BASE = 'http://localhost:8001/api'
+// Use relative URL — works on both localhost (via Vite proxy) and cloud (via Nginx proxy)
+export const API_BASE = '/api'
 
 /**
  * Get the stored auth token from localStorage.
