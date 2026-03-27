@@ -6,7 +6,7 @@ import {
 import {
   startBTST, stopBTST, getBTSTStatus, startBTSTRegime,
   startBTSTPaper, stopBTSTPaper, getBTSTPaperStatus, startBTSTPaperRegime,
-  getEquityRegime,
+  getEquityRegime, getPositions,
 } from '../services/api'
 import CapitalInput from './CapitalInput'
 import DailyStrategyStats from './DailyStrategyStats'
@@ -37,6 +37,7 @@ export default function BTSTPage({ capital, setCapital }) {
   const [status, setStatus] = useState(null)
   const [autoMode, setAutoMode] = useState(true)
   const [regime, setRegime] = useState(null)
+  const [fyersPositions, setFyersPositions] = useState([])
   const pollRef = useRef(null)
   const logEndRef = useRef(null)
 
@@ -57,19 +58,33 @@ export default function BTSTPage({ capital, setCapital }) {
     try {
       const data = await config.status()
       setStatus(data)
+      // For live mode, fetch Fyers CNC positions as source of truth
+      if (config.isLive) {
+        try {
+          const posRes = await getPositions()
+          const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
+          // Filter to CNC product type only (BTST = delivery)
+          const cncOnly = posArr.filter(p => {
+            const prod = (p.productType || '').toUpperCase()
+            return prod === 'CNC' && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0)
+          })
+          setFyersPositions(cncOnly)
+        } catch {}
+      }
     } catch {}
   }, [activeTab])
 
   useEffect(() => { pollStatus() }, [pollStatus])
 
+  // Always poll in live mode (CNC positions may exist even when engine stopped)
   useEffect(() => {
-    if (running) {
+    if (running || isLive) {
       pollRef.current = setInterval(pollStatus, POLL_INTERVAL)
     } else {
       clearInterval(pollRef.current)
     }
     return () => clearInterval(pollRef.current)
-  }, [running, pollStatus])
+  }, [running, isLive, pollStatus])
 
   // Auto-scroll logs
   useEffect(() => {
@@ -117,7 +132,10 @@ export default function BTSTPage({ capital, setCapital }) {
   const positions = (status?.active_trades || []).filter(isCNCPosition)
   const history = (status?.trade_history || []).filter(isCNCPosition)
   const logs = status?.logs || []
-  const totalPnl = status?.total_pnl ?? 0
+
+  // For live: use Fyers P&L (source of truth). For paper: use engine P&L.
+  const fyersTotalPnl = fyersPositions.reduce((s, p) => s + (p.pl || 0), 0)
+  const totalPnl = isLive && fyersPositions.length > 0 ? fyersTotalPnl : (status?.total_pnl ?? 0)
 
   // Win/loss from trade history
   const allClosed = history
@@ -367,6 +385,52 @@ export default function BTSTPage({ capital, setCapital }) {
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-center gap-2">
           <span className="text-red-400 text-xs font-semibold">DAILY LOSS LIMIT HIT</span>
           <span className="text-red-400/70 text-xs">-- No new orders today. Daily P&L: ₹{(status.daily_realized_pnl || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+        </div>
+      )}
+
+      {/* Fyers CNC Positions (Source of Truth) — Live only */}
+      {isLive && fyersPositions.length > 0 && (
+        <div className="bg-dark-700 rounded-xl p-4 border border-orange-500/30">
+          <h3 className="text-xs font-semibold text-orange-400 mb-3 flex items-center gap-2">
+            <Activity size={14} />
+            Fyers CNC Positions (Source of Truth)
+            <span className="text-[10px] text-gray-500 font-normal">{fyersPositions.length} position(s)</span>
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-500">
+                  {['Symbol', 'Net Qty', 'Buy Avg', 'Sell Avg', 'LTP', 'P&L', 'Status'].map(h => (
+                    <th key={h} className="text-[10px] text-gray-500 font-medium text-left py-2 px-2">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {fyersPositions.map((p, i) => {
+                  const pnl = p.pl || 0
+                  const sym = (p.symbol || '').replace('NSE:', '').replace('-EQ', '')
+                  const netQty = p.netQty || 0
+                  return (
+                    <tr key={i} className="border-b border-dark-600/50 hover:bg-dark-600/30">
+                      <td className="py-2 px-2 text-xs font-medium text-white">{sym}</td>
+                      <td className="py-2 px-2 text-xs">{netQty}</td>
+                      <td className="py-2 px-2 text-xs">₹{(p.buyAvg || 0).toFixed(2)}</td>
+                      <td className="py-2 px-2 text-xs">₹{(p.sellAvg || 0).toFixed(2)}</td>
+                      <td className="py-2 px-2 text-xs">₹{(p.ltp || 0).toFixed(2)}</td>
+                      <td className={`py-2 px-2 text-xs font-semibold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {pnl >= 0 ? '+' : ''}₹{pnl.toFixed(2)}
+                      </td>
+                      <td className="py-2 px-2 text-xs">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${netQty !== 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                          {netQty !== 0 ? 'HOLDING' : 'CLOSED'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
