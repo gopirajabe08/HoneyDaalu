@@ -7,8 +7,6 @@ import EquityPage from './components/EquityPage'
 import PositionsPage from './components/PositionsPage'
 import TradeLog from './components/TradeLog'
 import SettingsPage from './components/SettingsPage'
-import BacktestPage from './components/BacktestPage'
-import AlgoSpecialistView from './components/AlgoSpecialistView'
 import AboutPage from './components/AboutPage'
 import DailyPnL from './components/DailyPnL'
 import OptionsPage from './components/OptionsPage'
@@ -42,9 +40,6 @@ export default function App() {
       case 'equity':
         return <EquityPage capital={equityCapital} setCapital={setEquityCapital} />
 
-      case 'backtest':
-        return <BacktestPage capital={equityCapital} />
-
       case 'positions':
         return <PositionsPage fyersConnected={fyersStatus?.connected} />
 
@@ -56,9 +51,6 @@ export default function App() {
 
       case 'settings':
         return <SettingsPage />
-
-      case 'specialists':
-        return <AlgoSpecialistView />
 
       case 'about':
         return <AboutPage />
