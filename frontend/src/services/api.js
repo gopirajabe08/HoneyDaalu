@@ -5,6 +5,7 @@
  * continue to work unchanged.
  */
 
+export * from './api/auth'
 export * from './api/market'
 export * from './api/fyers'
 export * from './api/trading'

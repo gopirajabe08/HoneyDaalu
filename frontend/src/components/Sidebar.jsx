@@ -26,7 +26,7 @@ const navItems = [
   { icon: Info, label: 'About', page: 'about' },
 ]
 
-export default function Sidebar({ activePage, onNavigate }) {
+export default function Sidebar({ activePage, onNavigate, onLogout }) {
   return (
     <aside className="fixed left-0 top-0 h-full w-[72px] bg-gradient-sidebar border-r border-dark-600 flex flex-col items-center py-6 z-50">
       {/* Logo */}
@@ -60,6 +60,7 @@ export default function Sidebar({ activePage, onNavigate }) {
       {/* Logout */}
       <div className="relative group">
         <button
+          onClick={onLogout}
           className="w-11 h-11 rounded-xl flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-dark-600 transition-all duration-200"
         >
           <LogOut size={20} />

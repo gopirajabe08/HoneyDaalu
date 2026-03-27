@@ -6,9 +6,9 @@ import os
 # Add backend dir to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
@@ -31,6 +31,7 @@ from services.futures_swing_trader import futures_swing_trader
 from services.futures_swing_paper_trader import futures_swing_paper_trader
 from services.backtester import run_backtest_api
 from services import telegram_notify
+from services.auth import request_otp, verify_otp, verify_token
 from services.strategy_tracker import (
     get_daily_report, get_recent_reports, get_strategy_registry,
     get_changelog, generate_report_from_api,
@@ -523,11 +524,103 @@ def auto_connect_fyers():
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Auth Middleware — protect all /api/* routes except /api/auth/*
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Paths that don't require authentication
+AUTH_EXEMPT_PREFIXES = ("/api/auth/", "/docs", "/openapi.json", "/redoc")
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """JWT auth check for all /api/* routes except /api/auth/*."""
+    path = request.url.path
+
+    # Root path — no auth needed
+    if path == "/":
+        return await call_next(request)
+
+    # Auth endpoints — no auth needed
+    if any(path.startswith(prefix) for prefix in AUTH_EXEMPT_PREFIXES):
+        return await call_next(request)
+
+    # OPTIONS (CORS preflight) — no auth needed
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    # All /api/* routes require auth
+    if path.startswith("/api/"):
+        auth_header = request.headers.get("authorization", "")
+
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Authentication required", "code": "NO_TOKEN"},
+            )
+
+        token = auth_header[7:]  # Strip "Bearer "
+        result = verify_token(token)
+
+        if not result.get("valid"):
+            return JSONResponse(
+                status_code=401,
+                content={"error": result.get("error", "Invalid token"), "code": "INVALID_TOKEN"},
+            )
+
+        # Attach email to request state for downstream use
+        request.state.user_email = result["email"]
+
+    return await call_next(request)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Auth Endpoints
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class OTPRequest(BaseModel):
+    email: str
+
+
+class OTPVerify(BaseModel):
+    email: str
+    otp: str
+
+
+@app.post("/api/auth/request-otp")
+def auth_request_otp(req: OTPRequest):
+    """Send a 6-digit OTP to the configured Telegram chat."""
+    return request_otp(req.email)
+
+
+@app.post("/api/auth/verify-otp")
+def auth_verify_otp(req: OTPVerify):
+    """Verify OTP and return a JWT token."""
+    return verify_otp(req.email, req.otp)
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request):
+    """Check if the current token is valid."""
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return {"authenticated": False}
+
+    token = auth_header[7:]
+    result = verify_token(token)
+
+    if result.get("valid"):
+        return {"authenticated": True, "email": result["email"]}
+
+    return {"authenticated": False, "error": result.get("error", "Invalid token")}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

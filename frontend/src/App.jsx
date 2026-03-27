@@ -12,8 +12,10 @@ import DailyPnL from './components/DailyPnL'
 import OptionsPage from './components/OptionsPage'
 import FuturesPage from './components/FuturesPage'
 import BTSTPage from './components/BTSTPage'
+import LoginPage from './components/LoginPage'
 // import ImprovementTracker from './components/ImprovementTracker'  // Disabled — auto-tune removed
-import { getFyersStatus } from './services/api'
+import { getFyersStatus, checkAuthStatus, logout } from './services/api'
+import { getAuthToken } from './services/api/base'
 
 export default function App() {
   const [activePage, setActivePage] = useState('dashboard')
@@ -23,14 +25,76 @@ export default function App() {
   const [btstCapital, setBtstCapital] = useState(100000)
   const [fyersStatus, setFyersStatus] = useState({ connected: false, configured: false })
 
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
+
+  // Check auth on mount
+  useEffect(() => {
+    async function checkAuth() {
+      const token = getAuthToken()
+      if (!token) {
+        setIsAuthenticated(false)
+        setAuthChecked(true)
+        return
+      }
+
+      try {
+        const result = await checkAuthStatus()
+        setIsAuthenticated(result.authenticated === true)
+      } catch {
+        setIsAuthenticated(false)
+      }
+      setAuthChecked(true)
+    }
+
+    checkAuth()
+  }, [])
+
+  // Listen for auth:logout events (fired by API interceptor on 401)
+  useEffect(() => {
+    function handleLogout() {
+      setIsAuthenticated(false)
+    }
+
+    window.addEventListener('auth:logout', handleLogout)
+    return () => window.removeEventListener('auth:logout', handleLogout)
+  }, [])
+
   // Scroll to top on page navigation
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [activePage])
 
   useEffect(() => {
-    getFyersStatus().then(setFyersStatus).catch(() => {})
-  }, [])
+    if (isAuthenticated) {
+      getFyersStatus().then(setFyersStatus).catch(() => {})
+    }
+  }, [isAuthenticated])
+
+  function handleLoginSuccess(email) {
+    setIsAuthenticated(true)
+  }
+
+  function handleLogout() {
+    logout()
+    setIsAuthenticated(false)
+    setActivePage('dashboard')
+  }
+
+  // Show nothing while checking auth (prevents flash)
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />
+  }
 
   function renderPage() {
     switch (activePage) {
@@ -71,7 +135,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-dark-900 text-white">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleLogout} />
 
       <div className="ml-[72px]">
         <Header fyersStatus={fyersStatus} />
