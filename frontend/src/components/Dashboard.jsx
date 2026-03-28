@@ -13,8 +13,8 @@ import {
 } from '../services/api'
 import { formatINRCompact } from '../utils/formatters'
 import DailyStrategyStats from './DailyStrategyStats'
-// import TodayImprovements from './TodayImprovements'  // Disabled — auto-tune removed
 import SystemBrain from './SystemBrain'
+import RecentPerformance from './RecentPerformance'
 
 const inr2 = (v) => `${Math.abs(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -215,6 +215,9 @@ export default function Dashboard({ fyersStatus }) {
 
       {/* System Brain — real-time decision-making */}
       <SystemBrain />
+
+      {/* Recent Performance — always shows, works offline (reads from saved tracking files) */}
+      <RecentPerformance />
 
       {/* Refresh bar */}
       <div className="flex items-center justify-between">
