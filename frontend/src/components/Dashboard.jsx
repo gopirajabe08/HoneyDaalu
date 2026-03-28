@@ -14,6 +14,7 @@ import {
 import { formatINRCompact } from '../utils/formatters'
 import DailyStrategyStats from './DailyStrategyStats'
 import SystemBrain from './SystemBrain'
+import SystemHealth from './SystemHealth'
 import RecentPerformance from './RecentPerformance'
 
 const inr2 = (v) => `${Math.abs(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -215,6 +216,9 @@ export default function Dashboard({ fyersStatus }) {
 
       {/* System Brain — real-time decision-making */}
       <SystemBrain />
+
+      {/* System Health — real-time, auto-refreshes every 30s */}
+      <SystemHealth />
 
       {/* Recent Performance — always shows, works offline (reads from saved tracking files) */}
       <RecentPerformance />
