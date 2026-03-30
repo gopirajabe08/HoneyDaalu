@@ -620,6 +620,26 @@ def _round_to_tick(price: float, tick: float = 0.05) -> float:
     return round(math.floor(price / tick) * tick, 2)
 
 
+# SEBI: max 10 orders/second. Track timestamps to enforce.
+_order_timestamps: list[float] = []
+_ORDER_RATE_LIMIT = 8  # stay under 10/sec with safety margin
+
+
+def _enforce_order_rate_limit():
+    """Block if we're approaching 10 orders/second (SEBI limit from April 1, 2026)."""
+    import time
+    now = time.time()
+    # Remove timestamps older than 1 second
+    while _order_timestamps and now - _order_timestamps[0] > 1.0:
+        _order_timestamps.pop(0)
+    if len(_order_timestamps) >= _ORDER_RATE_LIMIT:
+        sleep_time = 1.0 - (now - _order_timestamps[0])
+        if sleep_time > 0:
+            logger.info(f"[RateLimit] Throttling order — sleeping {sleep_time:.2f}s")
+            time.sleep(sleep_time)
+    _order_timestamps.append(time.time())
+
+
 def _place_order_with_tick_retry(fyers, data: dict, max_retries: int = 2) -> dict:
     """
     Place an order via Fyers, retrying with corrected tick-size rounding
@@ -633,6 +653,7 @@ def _place_order_with_tick_retry(fyers, data: dict, max_retries: int = 2) -> dic
     last_response = {}
     for attempt in range(max_retries + 1):
         try:
+            _enforce_order_rate_limit()
             response = fyers.place_order(data=data)
             if response.get("s") == "ok" or "id" in response:
                 return response

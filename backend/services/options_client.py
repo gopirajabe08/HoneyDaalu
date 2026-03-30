@@ -344,6 +344,8 @@ def place_option_order(
     }
 
     try:
+        from services.fyers_client import _enforce_order_rate_limit
+        _enforce_order_rate_limit()
         response = fyers.place_order(data=data)
         if response.get("s") == "ok" or "id" in response:
             return response
