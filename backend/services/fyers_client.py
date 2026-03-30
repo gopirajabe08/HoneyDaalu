@@ -233,8 +233,19 @@ def headless_login() -> dict:
 
         logger.info(f"Auth code extracted: {auth_code[:20]}...")
         # Step 5: Exchange auth_code for final access token
+        # Fyers v3: data.auth may already be the access token (sub=access_token in JWT)
+        # Try SDK exchange first, if it fails, use data.auth directly as access token
         result = generate_token(auth_code)
-        logger.info(f"Token exchange result: {result}")
+        if "error" in result:
+            logger.info("SDK token exchange failed, using data.auth as direct access token")
+            full_token = f"{FYERS_APP_ID}:{auth_code}"
+            _set_token(full_token)
+            # Verify the token works
+            test = _fyers_instance.get_profile()
+            if test.get("s") == "ok" or test.get("code") == 200:
+                return {"status": "ok", "message": "Authenticated successfully (v3 direct)"}
+            else:
+                return {"error": f"Direct token also failed: {test}"}
         return result
 
     except Exception as e:
