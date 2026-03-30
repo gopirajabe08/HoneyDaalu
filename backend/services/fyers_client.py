@@ -216,12 +216,17 @@ def headless_login() -> dict:
             },
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        url_str = r4.json().get("Url", "")
-        if not url_str:
-            return {"error": f"No auth URL in response: {r4.json()}"}
-        auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
+        r4_json = r4.json()
+        # Fyers API v3: try new format (data.auth) first, then legacy (Url)
+        auth_code = None
+        if r4_json.get("data", {}).get("auth"):
+            auth_code = r4_json["data"]["auth"]
+        else:
+            url_str = r4_json.get("Url", "")
+            if url_str:
+                auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
         if not auth_code:
-            return {"error": f"No auth_code in redirect URL: {url_str}"}
+            return {"error": f"No auth_code in response: {r4_json}"}
 
         # Step 5: Exchange auth_code for final access token
         return generate_token(auth_code)
