@@ -75,12 +75,22 @@ def auto_connect_fyers():
             profile = fyers_client.get_profile()
             name = profile.get("data", {}).get("name", "Unknown")
             print(f"[Startup] Fyers connected: {name} (attempt {attempt})", flush=True)
+            try:
+                from services import telegram_notify
+                telegram_notify.send(f"✅ <b>Fyers Login OK</b>\n{name}\nAttempt {attempt}/3")
+            except Exception:
+                pass
             break
         else:
             print(f"[Startup] Login attempt {attempt}/3 — not authenticated yet, retrying...", flush=True)
             _time.sleep(5)
     else:
         print("[Startup] WARNING: Fyers login failed after 3 attempts — live engines will not start", flush=True)
+        try:
+            from services import telegram_notify
+            telegram_notify.send("🚨 <b>ALERT: Fyers Login FAILED</b>\n3 attempts exhausted.\nHeadless login broken — check immediately!\nNo live trading today until fixed.")
+        except Exception:
+            pass
 
     # Start market monitor daemon
     from services.market_monitor import start_monitor
@@ -222,6 +232,11 @@ def auto_connect_fyers():
                 time.sleep(5)
             else:
                 _log("Fyers not connected after 5 re-login attempts — skipping live engines")
+                try:
+                    from services import telegram_notify
+                    telegram_notify.send("🚨 <b>ALERT: Fyers Disconnected Mid-Day</b>\n5 re-login attempts failed.\nLive engines stopped. Check immediately!")
+                except Exception:
+                    pass
                 return
 
             try:
