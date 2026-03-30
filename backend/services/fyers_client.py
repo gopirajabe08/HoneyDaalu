@@ -293,13 +293,19 @@ def headless_login() -> dict:
             return result
         logger.warning(f"SDK failed: {result}")
 
-        # 5b: Direct validate-authcode with full app_id hash
-        logger.info("Step 5b: trying validate-authcode (full app_id hash)...")
+        # 5b: validate-authcode with redirect_uri included
+        logger.info("Step 5b: validate-authcode with redirect_uri...")
         app_id_hash_full = hashlib.sha256(f"{FYERS_APP_ID}:{FYERS_SECRET_KEY}".encode()).hexdigest()
         try:
             r5 = req.post(
                 "https://api-t1.fyers.in/api/v3/validate-authcode",
-                json={"grant_type": "authorization_code", "appIdHash": app_id_hash_full, "code": auth_code},
+                json={
+                    "grant_type": "authorization_code",
+                    "appIdHash": app_id_hash_full,
+                    "code": auth_code,
+                    "redirect_uri": FYERS_REDIRECT_URI,
+                    "code_verifier": "",
+                },
             )
             r5_json = r5.json()
             logger.info(f"5b result: {r5_json}")
@@ -309,13 +315,16 @@ def headless_login() -> dict:
         except Exception as e:
             logger.error(f"5b exception: {e}")
 
-        # 5c: validate-authcode with base app_id hash (without -100)
-        logger.info("Step 5c: trying validate-authcode (base app_id hash)...")
-        app_id_hash_base = hashlib.sha256(f"{app_id_base}:{FYERS_SECRET_KEY}".encode()).hexdigest()
+        # 5c: Try validate-authcode on the SAME session (with cookies from login)
+        logger.info("Step 5c: validate-authcode on login session with cookies...")
         try:
-            r5c = req.post(
+            r5c = s.post(
                 "https://api-t1.fyers.in/api/v3/validate-authcode",
-                json={"grant_type": "authorization_code", "appIdHash": app_id_hash_base, "code": auth_code},
+                json={
+                    "grant_type": "authorization_code",
+                    "appIdHash": app_id_hash_full,
+                    "code": auth_code,
+                },
             )
             r5c_json = r5c.json()
             logger.info(f"5c result: {r5c_json}")
