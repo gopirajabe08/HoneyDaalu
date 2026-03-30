@@ -256,43 +256,22 @@ def headless_login() -> dict:
 
         logger.info(f"Auth code extracted (first 20): {auth_code[:20]}...")
 
-        # Step 5: The v3 data.auth JWT has sub=access_token — it IS the token.
-        # Try using it directly with different formats against the profile API.
-        import requests as raw_req
-        profile_url = "https://api-t1.fyers.in/api/v3/profile"
-        token_formats = [
-            f"{FYERS_APP_ID}:{auth_code}",
-            auth_code,
-            f"{app_id_short}:{auth_code}",
-        ]
-        for fmt in token_formats:
-            test = raw_req.get(profile_url, headers={"Authorization": f"{fmt}"})
-            logger.info(f"Profile test with format '{fmt[:30]}...' → {test.status_code}: {test.json().get('s')}")
-            if test.json().get("s") == "ok":
-                _set_token(fmt)
-                return {"status": "ok", "message": "Authenticated successfully (v3 direct token)"}
+        # Step 5: v3 data.auth JWT (sub=access_token) is the access token itself.
+        # Pass JUST the JWT to _set_token — FyersModel adds "client_id:" prefix automatically.
+        # Previous bug: we passed "APP_ID:jwt" which became "APP_ID:APP_ID:jwt" (double prefix).
+        _set_token(auth_code)
+        test = _fyers_instance.get_profile()
+        logger.info(f"Direct token profile test: {test}")
+        if test.get("s") == "ok" or test.get("code") == 200:
+            return {"status": "ok", "message": "Authenticated successfully"}
 
-        # If direct use fails, try SDK and validate-authcode as fallback
+        # If direct use fails, try SDK validate-authcode exchange as fallback
+        logger.warning(f"Direct token failed: {test}, trying validate-authcode")
         result = generate_token(auth_code)
         if "error" not in result:
             return result
 
-        app_id_hash = hashlib.sha256(f"{FYERS_APP_ID}:{FYERS_SECRET_KEY}".encode()).hexdigest()
-        r5 = raw_req.post(
-            "https://api-t1.fyers.in/api/v3/validate-authcode",
-            json={
-                "grant_type": "authorization_code",
-                "appIdHash": app_id_hash,
-                "code": auth_code,
-            },
-        )
-        r5_json = r5.json()
-        logger.info(f"validate-authcode response: {r5_json}")
-        if r5_json.get("s") == "ok" and "access_token" in r5_json:
-            _set_token(r5_json["access_token"])
-            return {"status": "ok", "message": "Authenticated successfully (v3 validate-authcode)"}
-
-        return {"error": f"All methods failed. Last profile tests and validate-authcode: {r5_json}"}
+        return {"error": f"All methods failed. Direct: {test}, SDK: {result}"}
 
     except Exception as e:
         logger.error(f"Headless login failed: {e}")
