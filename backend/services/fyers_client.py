@@ -215,63 +215,63 @@ def headless_login() -> dict:
         if not access_token:
             return {"error": f"No access_token from PIN step: {r3.json()}"}
 
-        # Step 4: Get auth_code via v3 token endpoint
-        # v2 endpoint is deprecated (410). v3 returns data.auth JWT.
-        app_id_short = FYERS_APP_ID.split("-")[0] if "-" in FYERS_APP_ID else FYERS_APP_ID
-        r4 = s.post(
-            "https://api-t1.fyers.in/api/v3/token",
-            json={
-                "fyers_id": fy_id,
-                "app_id": app_id_short,
-                "redirect_uri": FYERS_REDIRECT_URI,
-                "appType": "100",
-                "code_challenge": "",
-                "state": "abcdefg",
-                "scope": "",
-                "nonce": "",
-                "response_type": "code",
-                "create_cookie": True,
-            },
-            headers={"Authorization": f"Bearer {access_token}"},
+        # Step 4: Get auth_code by calling generate-authcode URL with Bearer token
+        # This simulates what happens in a browser after login.
+        authcode_url = (
+            f"https://api-t1.fyers.in/api/v3/generate-authcode"
+            f"?client_id={FYERS_APP_ID}"
+            f"&redirect_uri={FYERS_REDIRECT_URI}"
+            f"&response_type=code"
+            f"&state=abcdefg"
         )
-        r4_json = r4.json()
-        logger.info(f"Step 4 raw response (status={r4.status_code}): {r4_json}")
+        r4 = s.get(
+            authcode_url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            allow_redirects=False,
+        )
+        logger.info(f"Step 4 generate-authcode (status={r4.status_code}): headers={dict(r4.headers)}")
 
-        # Extract auth_code from response
         auth_code = None
 
-        # Primary: v2 returns Url with auth_code as query parameter (HTTP 308)
-        url_str = r4_json.get("Url", "")
-        if url_str:
-            auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
+        # Check Location header for redirect with auth_code
+        location = r4.headers.get("Location", "")
+        if location:
+            auth_code = parse_qs(urlparse(location).query).get("auth_code", [None])[0]
+            logger.info(f"Auth code from redirect Location: {auth_code[:20] if auth_code else 'None'}...")
 
-        # Fallback: v3 format — data.authorization_code or data.auth
+        # Check response body as fallback
         if not auth_code:
-            auth_code = r4_json.get("data", {}).get("authorization_code")
-        if not auth_code:
-            auth_code = r4_json.get("data", {}).get("auth")
+            try:
+                r4_json = r4.json()
+                logger.info(f"Step 4 body: {r4_json}")
+                url_str = r4_json.get("Url", "")
+                if url_str:
+                    auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
+                if not auth_code:
+                    auth_code = r4_json.get("data", {}).get("authorization_code")
+                if not auth_code:
+                    auth_code = r4_json.get("data", {}).get("auth")
+            except Exception:
+                logger.info(f"Step 4 raw text: {r4.text[:500]}")
 
         if not auth_code:
-            return {"error": f"No auth_code in response: {r4_json}"}
+            return {"error": f"No auth_code found. Status={r4.status_code}, Location={location}, Body={r4.text[:300]}"}
 
-        logger.info(f"Auth code extracted (first 20): {auth_code[:20]}...")
+        logger.info(f"Auth code extracted: {auth_code[:20]}...")
 
-        # Step 5: v3 data.auth JWT (sub=access_token) is the access token itself.
-        # Pass JUST the JWT to _set_token — FyersModel adds "client_id:" prefix automatically.
-        # Previous bug: we passed "APP_ID:jwt" which became "APP_ID:APP_ID:jwt" (double prefix).
-        _set_token(auth_code)
-        test = _fyers_instance.get_profile()
-        logger.info(f"Direct token profile test: {test}")
-        if test.get("s") == "ok" or test.get("code") == 200:
-            return {"status": "ok", "message": "Authenticated successfully"}
-
-        # If direct use fails, try SDK validate-authcode exchange as fallback
-        logger.warning(f"Direct token failed: {test}, trying validate-authcode")
+        # Step 5: Exchange auth_code for access token
         result = generate_token(auth_code)
         if "error" not in result:
             return result
 
-        return {"error": f"All methods failed. Direct: {test}, SDK: {result}"}
+        # Fallback: try using auth as direct token
+        logger.warning(f"SDK exchange failed: {result}, trying as direct token")
+        _set_token(auth_code)
+        test = _fyers_instance.get_profile()
+        if test.get("s") == "ok" or test.get("code") == 200:
+            return {"status": "ok", "message": "Authenticated successfully"}
+
+        return {"error": f"All methods failed. SDK: {result}, Direct: {test}"}
 
     except Exception as e:
         logger.error(f"Headless login failed: {e}")
