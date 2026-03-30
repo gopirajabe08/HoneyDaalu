@@ -217,10 +217,13 @@ def headless_login() -> dict:
             headers={"Authorization": f"Bearer {access_token}"},
         )
         r4_json = r4.json()
+        logger.info(f"Step 4 raw response: {r4_json}")
         # Fyers API v3: try new format (data.auth) first, then legacy (Url)
         auth_code = None
         if r4_json.get("data", {}).get("auth"):
             auth_code = r4_json["data"]["auth"]
+        elif r4_json.get("data", {}).get("authorization_code"):
+            auth_code = r4_json["data"]["authorization_code"]
         else:
             url_str = r4_json.get("Url", "")
             if url_str:
@@ -228,8 +231,11 @@ def headless_login() -> dict:
         if not auth_code:
             return {"error": f"No auth_code in response: {r4_json}"}
 
+        logger.info(f"Auth code extracted: {auth_code[:20]}...")
         # Step 5: Exchange auth_code for final access token
-        return generate_token(auth_code)
+        result = generate_token(auth_code)
+        logger.info(f"Token exchange result: {result}")
+        return result
 
     except Exception as e:
         logger.error(f"Headless login failed: {e}")
