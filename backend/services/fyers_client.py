@@ -225,8 +225,6 @@ def headless_login() -> dict:
         logger.info("Step 3 verify_pin_v2: OK (got vagator token)")
 
         # Step 4: POST to /api/v3/token to get auth_code
-        # This is the critical step — must be POST with Bearer vagator token
-        # Response is 308 with JSON body containing "Url" field with auth_code param
         token_payload = {
             "fyers_id": fy_id,
             "app_id": app_id_base,
@@ -239,43 +237,64 @@ def headless_login() -> dict:
             "response_type": "code",
             "create_cookie": True,
         }
+
+        # Try with allow_redirects=False first to capture 308 redirect
         r4 = s.post(
             "https://api-t1.fyers.in/api/v3/token",
             json=token_payload,
             headers={"Authorization": f"Bearer {vagator_token}"},
+            allow_redirects=False,
         )
-        logger.info(f"Step 4 /api/v3/token (status={r4.status_code})")
+        logger.info(f"Step 4a no-redirect (status={r4.status_code}, Location={r4.headers.get('Location', 'none')})")
 
         auth_code = None
 
-        # Primary: parse auth_code from "Url" field in JSON response (308 redirect)
-        try:
-            r4_json = r4.json()
-            url_str = r4_json.get("Url", "")
-            if url_str:
-                auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
-                if auth_code:
-                    logger.info(f"Step 4: auth_code from Url field: {auth_code[:30]}...")
-        except Exception:
-            pass
-
-        # Fallback: check Location header (some API versions redirect)
-        if not auth_code:
+        # Check Location header for 308 redirect
+        if r4.status_code in (301, 302, 307, 308):
             location = r4.headers.get("Location", "")
             if location:
                 auth_code = parse_qs(urlparse(location).query).get("auth_code", [None])[0]
-                if auth_code:
-                    logger.info(f"Step 4: auth_code from Location header: {auth_code[:30]}...")
 
-        # Fallback: use data.auth from v3 response (Fyers changed format — no more Url field)
+        # Check Url in JSON body
         if not auth_code:
             try:
                 r4_json = r4.json()
-                auth_code = r4_json.get("data", {}).get("authorization_code")
-                if not auth_code:
-                    auth_code = r4_json.get("data", {}).get("auth")
-                    if auth_code:
-                        logger.info(f"Step 4: using data.auth as auth_code: {auth_code[:30]}...")
+                url_str = r4_json.get("Url", "")
+                if url_str:
+                    auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
+            except Exception:
+                pass
+
+        # If we got data.auth, try using it as Bearer for a SECOND token call
+        if not auth_code:
+            try:
+                r4_json = r4.json()
+                data_auth = r4_json.get("data", {}).get("auth")
+                if data_auth:
+                    logger.info("Step 4b: using data.auth as Bearer for second token call...")
+                    r4b = s.post(
+                        "https://api-t1.fyers.in/api/v3/token",
+                        json=token_payload,
+                        headers={"Authorization": f"Bearer {data_auth}"},
+                        allow_redirects=False,
+                    )
+                    logger.info(f"Step 4b (status={r4b.status_code}): {r4b.text[:300]}")
+                    try:
+                        r4b_json = r4b.json()
+                        url_str = r4b_json.get("Url", "")
+                        if url_str:
+                            auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
+                        if not auth_code and r4b.status_code in (301, 302, 307, 308):
+                            location = r4b.headers.get("Location", "")
+                            if location:
+                                auth_code = parse_qs(urlparse(location).query).get("auth_code", [None])[0]
+                    except Exception:
+                        pass
+
+                    # Last resort: use data.auth from original response
+                    if not auth_code:
+                        auth_code = data_auth
+                        logger.info(f"Step 4: falling back to data.auth: {auth_code[:30]}...")
             except Exception:
                 pass
 
