@@ -238,14 +238,29 @@ def headless_login() -> dict:
             "create_cookie": True,
         }
 
-        # Try with allow_redirects=False first to capture 308 redirect
+        # Try form-encoded data (some OAuth endpoints need this instead of JSON)
         r4 = s.post(
             "https://api-t1.fyers.in/api/v3/token",
-            json=token_payload,
+            data=token_payload,
             headers={"Authorization": f"Bearer {vagator_token}"},
             allow_redirects=False,
         )
-        logger.info(f"Step 4a no-redirect (status={r4.status_code}, Location={r4.headers.get('Location', 'none')})")
+        logger.info(f"Step 4 form-encoded (status={r4.status_code}): {r4.text[:300]}")
+
+        # If form-encoded didn't work differently, try JSON
+        if r4.status_code != 308:
+            try:
+                r4_test = r4.json()
+                if not r4_test.get("Url"):
+                    r4 = s.post(
+                        "https://api-t1.fyers.in/api/v3/token",
+                        json=token_payload,
+                        headers={"Authorization": f"Bearer {vagator_token}"},
+                        allow_redirects=False,
+                    )
+                    logger.info(f"Step 4 json (status={r4.status_code})")
+            except Exception:
+                pass
 
         auth_code = None
 
