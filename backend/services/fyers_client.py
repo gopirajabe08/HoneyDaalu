@@ -345,6 +345,7 @@ def place_order(
     product_type: str = "INTRADAY",
     limit_price: float = 0,
     stop_price: float = 0,
+    order_tag: str = "equity_intraday",
 ) -> dict:
     """
     Place an order on Fyers.
@@ -388,6 +389,7 @@ def place_order(
         "validity": "DAY",
         "disclosedQty": 0,
         "offlineOrder": False,
+        "orderTag": order_tag,
     }
 
     return _place_order_with_tick_retry(fyers, data)

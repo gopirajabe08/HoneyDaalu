@@ -102,8 +102,13 @@ def get_nearest_expiry(underlying: str, preference: str = "weekly") -> tuple[str
     """
     Get nearest expiry date string in YYMMDD format.
     For weekly: next Thursday. For monthly: last Thursday of month.
+    SEBI removed weekly expiries for BANKNIFTY — force monthly.
     """
     today = datetime.now(IST).date()
+
+    # SEBI: only NIFTY retains weekly expiry. BANKNIFTY is monthly only.
+    if underlying == "BANKNIFTY" and preference == "weekly":
+        preference = "monthly"
 
     if preference == "weekly":
         # Find next Thursday (weekday=3)
@@ -317,6 +322,7 @@ def place_option_order(
     order_type: int = 2,  # 2=Market
     product_type: str = "INTRADAY",
     limit_price: float = 0,
+    order_tag: str = "options_intraday",
 ) -> dict:
     """Place an order for an option contract via Fyers."""
     fyers = get_fyers()
@@ -334,6 +340,7 @@ def place_option_order(
         "validity": "DAY",
         "disclosedQty": 0,
         "offlineOrder": False,
+        "orderTag": order_tag,
     }
 
     try:
@@ -385,8 +392,17 @@ def place_spread_orders(legs: list[dict], product_type: str = "INTRADAY", use_li
                 for f_item in funds.get("fund_limit", []):
                     if f_item.get("id") == 10:
                         avail = f_item.get("equityAmount", 0)
-                if avail < 5000:  # Minimum margin buffer
-                    logger.warning(f"[OptionsClient] Margin too low (₹{avail:,.0f}) for SELL leg — aborting spread")
+                # Expiry days need higher margin (SEBI: +2% ELM on short options)
+                from datetime import datetime as _dt
+                _today = _dt.now().date()
+                try:
+                    _, _exp = get_nearest_expiry("NIFTY", "weekly")
+                    _is_expiry = (_today == _exp)
+                except Exception:
+                    _is_expiry = False
+                _margin_buffer = 25000 if _is_expiry else 5000
+                if avail < _margin_buffer:  # Minimum margin buffer
+                    logger.warning(f"[OptionsClient] Margin too low (₹{avail:,.0f} < ₹{_margin_buffer:,}) for SELL leg — aborting spread")
                     # Rollback BUY legs
                     for prev_leg in succeeded_legs:
                         reverse_side = -1 if prev_leg["side"] == 1 else 1
