@@ -215,12 +215,11 @@ def headless_login() -> dict:
         if not access_token:
             return {"error": f"No access_token from PIN step: {r3.json()}"}
 
-        # Step 4: Get auth_code via v2 token endpoint (returns 308 with Url)
-        # The v2 endpoint returns a redirect URL with auth_code as query param.
-        # The v3 endpoint returns data.auth which is NOT a valid auth_code.
+        # Step 4: Get auth_code via v3 token endpoint
+        # v2 endpoint is deprecated (410). v3 returns data.auth JWT.
         app_id_short = FYERS_APP_ID.split("-")[0] if "-" in FYERS_APP_ID else FYERS_APP_ID
         r4 = s.post(
-            "https://api.fyers.in/api/v2/token",
+            "https://api-t1.fyers.in/api/v3/token",
             json={
                 "fyers_id": fy_id,
                 "app_id": app_id_short,
