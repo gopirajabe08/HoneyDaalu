@@ -233,20 +233,37 @@ def headless_login() -> dict:
 
         logger.info(f"Auth code extracted: {auth_code[:20]}...")
         # Step 5: Exchange auth_code for final access token
-        # Fyers v3: data.auth may already be the access token (sub=access_token in JWT)
-        # Try SDK exchange first, if it fails, use data.auth directly as access token
+        # Try SDK first, then direct API call, then use as raw token
         result = generate_token(auth_code)
-        if "error" in result:
-            logger.info("SDK token exchange failed, using data.auth as direct access token")
-            full_token = f"{FYERS_APP_ID}:{auth_code}"
-            _set_token(full_token)
-            # Verify the token works
-            test = _fyers_instance.get_profile()
-            if test.get("s") == "ok" or test.get("code") == 200:
-                return {"status": "ok", "message": "Authenticated successfully (v3 direct)"}
-            else:
-                return {"error": f"Direct token also failed: {test}"}
-        return result
+        if "error" not in result:
+            return result
+
+        # SDK failed — try direct validate-authcode API call
+        logger.info("SDK exchange failed, trying direct API call")
+        import hashlib as _hl
+        app_id_hash = _hl.sha256(f"{FYERS_APP_ID}:{FYERS_SECRET_KEY}".encode()).hexdigest()
+        r5 = req.post(
+            "https://api-t1.fyers.in/api/v3/validate-authcode",
+            json={
+                "grant_type": "authorization_code",
+                "appIdHash": app_id_hash,
+                "code": auth_code,
+            },
+        )
+        r5_json = r5.json()
+        logger.info(f"Direct validate-authcode response: {r5_json}")
+        if r5_json.get("s") == "ok" and "access_token" in r5_json:
+            _set_token(r5_json["access_token"])
+            return {"status": "ok", "message": "Authenticated successfully (v3 direct API)"}
+
+        # Last resort: use data.auth as the access token directly
+        logger.info("Direct API also failed, trying raw token")
+        full_token = f"{FYERS_APP_ID}:{auth_code}"
+        _set_token(full_token)
+        test = _fyers_instance.get_profile()
+        if test.get("s") == "ok" or test.get("code") == 200:
+            return {"status": "ok", "message": "Authenticated successfully (v3 raw token)"}
+        return {"error": f"All methods failed. validate-authcode: {r5_json}, raw token profile: {test}"}
 
     except Exception as e:
         logger.error(f"Headless login failed: {e}")
