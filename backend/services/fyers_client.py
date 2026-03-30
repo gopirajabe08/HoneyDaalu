@@ -224,162 +224,37 @@ def headless_login() -> dict:
             return {"error": f"Step 3 no access_token from PIN: {r3.json()}"}
         logger.info("Step 3 verify_pin_v2: OK (got vagator token)")
 
-        # Step 4: POST to /api/v3/token to get auth_code
-        token_payload = {
-            "fyers_id": fy_id,
-            "app_id": app_id_base,
-            "redirect_uri": FYERS_REDIRECT_URI,
-            "appType": app_type,
-            "code_challenge": "",
-            "state": "abcdefg",
-            "scope": "",
-            "nonce": "",
-            "response_type": "code",
-            "create_cookie": True,
-        }
-
-        # Try form-encoded data (some OAuth endpoints need this instead of JSON)
+        # Step 4: POST to /api/v3/token to get auth_code (returns 308 with Url)
         r4 = s.post(
             "https://api-t1.fyers.in/api/v3/token",
-            data=token_payload,
+            json={
+                "fyers_id": fy_id,
+                "app_id": app_id_base,
+                "redirect_uri": FYERS_REDIRECT_URI,
+                "appType": app_type,
+                "code_challenge": "",
+                "state": "abcdefg",
+                "scope": "",
+                "nonce": "",
+                "response_type": "code",
+                "create_cookie": True,
+            },
             headers={"Authorization": f"Bearer {vagator_token}"},
-            allow_redirects=False,
         )
-        logger.info(f"Step 4 form-encoded (status={r4.status_code}): {r4.text[:300]}")
-
-        # If form-encoded didn't work differently, try JSON
-        if r4.status_code != 308:
-            try:
-                r4_test = r4.json()
-                if not r4_test.get("Url"):
-                    r4 = s.post(
-                        "https://api-t1.fyers.in/api/v3/token",
-                        json=token_payload,
-                        headers={"Authorization": f"Bearer {vagator_token}"},
-                        allow_redirects=False,
-                    )
-                    logger.info(f"Step 4 json (status={r4.status_code})")
-            except Exception:
-                pass
-
         auth_code = None
-
-        # Check Location header for 308 redirect
-        if r4.status_code in (301, 302, 307, 308):
-            location = r4.headers.get("Location", "")
-            if location:
-                auth_code = parse_qs(urlparse(location).query).get("auth_code", [None])[0]
-
-        # Check Url in JSON body
+        try:
+            r4_json = r4.json()
+            url_str = r4_json.get("Url", "")
+            if url_str:
+                auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
+        except Exception:
+            pass
         if not auth_code:
-            try:
-                r4_json = r4.json()
-                url_str = r4_json.get("Url", "")
-                if url_str:
-                    auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
-            except Exception:
-                pass
-
-        # If we got data.auth, try using it as Bearer for a SECOND token call
-        if not auth_code:
-            try:
-                r4_json = r4.json()
-                data_auth = r4_json.get("data", {}).get("auth")
-                if data_auth:
-                    logger.info("Step 4b: using data.auth as Bearer for second token call...")
-                    r4b = s.post(
-                        "https://api-t1.fyers.in/api/v3/token",
-                        json=token_payload,
-                        headers={"Authorization": f"Bearer {data_auth}"},
-                        allow_redirects=False,
-                    )
-                    logger.info(f"Step 4b (status={r4b.status_code}): {r4b.text[:300]}")
-                    try:
-                        r4b_json = r4b.json()
-                        url_str = r4b_json.get("Url", "")
-                        if url_str:
-                            auth_code = parse_qs(urlparse(url_str).query).get("auth_code", [None])[0]
-                        if not auth_code and r4b.status_code in (301, 302, 307, 308):
-                            location = r4b.headers.get("Location", "")
-                            if location:
-                                auth_code = parse_qs(urlparse(location).query).get("auth_code", [None])[0]
-                    except Exception:
-                        pass
-
-                    # Last resort: use data.auth from original response
-                    if not auth_code:
-                        auth_code = data_auth
-                        logger.info(f"Step 4: falling back to data.auth: {auth_code[:30]}...")
-            except Exception:
-                pass
-
-        if not auth_code:
-            return {"error": f"Step 4 no auth_code. Status={r4.status_code}, Body={r4.text[:500]}"}
+            return {"error": f"Step 4 no auth_code: {r4.text[:300]}"}
+        logger.info("Step 4: auth_code obtained")
 
         # Step 5: Exchange auth_code for access token
-        # Try multiple approaches since Fyers v3 changed response format
-
-        # 5a: SDK generate_token
-        logger.info("Step 5a: trying SDK generate_token...")
-        result = generate_token(auth_code)
-        if "error" not in result:
-            logger.info("Headless login: SUCCESS via SDK")
-            return result
-        logger.warning(f"SDK failed: {result}")
-
-        # 5b: validate-authcode with redirect_uri included
-        logger.info("Step 5b: validate-authcode with redirect_uri...")
-        app_id_hash_full = hashlib.sha256(f"{FYERS_APP_ID}:{FYERS_SECRET_KEY}".encode()).hexdigest()
-        try:
-            r5 = req.post(
-                "https://api-t1.fyers.in/api/v3/validate-authcode",
-                json={
-                    "grant_type": "authorization_code",
-                    "appIdHash": app_id_hash_full,
-                    "code": auth_code,
-                    "redirect_uri": FYERS_REDIRECT_URI,
-                    "code_verifier": "",
-                },
-            )
-            r5_json = r5.json()
-            logger.info(f"5b result: {r5_json}")
-            if r5_json.get("access_token"):
-                _set_token(r5_json["access_token"])
-                return {"status": "ok", "message": "Authenticated successfully"}
-        except Exception as e:
-            logger.error(f"5b exception: {e}")
-
-        # 5c: Try validate-authcode on the SAME session (with cookies from login)
-        logger.info("Step 5c: validate-authcode on login session with cookies...")
-        try:
-            r5c = s.post(
-                "https://api-t1.fyers.in/api/v3/validate-authcode",
-                json={
-                    "grant_type": "authorization_code",
-                    "appIdHash": app_id_hash_full,
-                    "code": auth_code,
-                },
-            )
-            r5c_json = r5c.json()
-            logger.info(f"5c result: {r5c_json}")
-            if r5c_json.get("access_token"):
-                _set_token(r5c_json["access_token"])
-                return {"status": "ok", "message": "Authenticated successfully"}
-        except Exception as e:
-            logger.error(f"5c exception: {e}")
-
-        # 5d: Use data.auth directly as access token (it has sub=access_token)
-        logger.info("Step 5d: trying data.auth as direct access token...")
-        _set_token(auth_code)
-        try:
-            test = _fyers_instance.get_profile()
-            logger.info(f"5d profile result: {test}")
-            if test.get("s") == "ok":
-                return {"status": "ok", "message": "Authenticated successfully (direct token)"}
-        except Exception as e:
-            logger.error(f"5d exception: {e}")
-
-        return {"error": "All 4 exchange methods failed. Check Fyers app config and secret key."}
+        return generate_token(auth_code)
 
     except Exception as e:
         logger.error(f"Headless login failed: {e}")
