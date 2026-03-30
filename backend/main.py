@@ -45,6 +45,16 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="IntraTrading Scanner", version="1.0.0")
 
 
+@app.on_event("shutdown")
+def notify_shutdown():
+    """Send Telegram alert when server stops (manual stop, crash, or systemctl stop)."""
+    try:
+        from services import telegram_notify
+        telegram_notify.send("⚠️ <b>System Stopped</b>\nBackend process exited. Will auto-start at 9:00 AM next trading day.")
+    except Exception:
+        pass
+
+
 @app.on_event("startup")
 def auto_connect_fyers():
     """Auto-connect Fyers on server startup — fresh TOTP login daily."""
@@ -683,6 +693,12 @@ def auto_connect_fyers():
             print(f"[AutoShutdown] Intelligence report error: {e}", flush=True)
 
         print("[AutoShutdown] Server shutting down. Trading day complete.", flush=True)
+        try:
+            from services import telegram_notify
+            telegram_notify.send("🔴 <b>System Shutdown</b>\nTrading day complete. Auto-start at 9:00 AM tomorrow.")
+            import time as _t; _t.sleep(2)  # let message send before exit
+        except Exception:
+            pass
 
         # Graceful shutdown
         import os, signal
