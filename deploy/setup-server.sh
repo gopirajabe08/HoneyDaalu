@@ -167,10 +167,12 @@ sudo ln -sf /etc/nginx/sites-available/intratrading /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl restart nginx
 
-# ── Cron: Auto-start backend at 9:00 AM IST (Mon-Fri) ──
+# ── Cron: Auto-start backend at 9:00 AM IST (Mon-Fri, skips NSE holidays) ──
 # AWS uses UTC. IST = UTC+5:30. So 9:00 AM IST = 3:30 AM UTC.
+# The start script checks NSE_HOLIDAYS from backend/config.py before starting.
+chmod +x /opt/intratrading/app/deploy/start-if-trading-day.sh
 sudo -u intratrading crontab -l 2>/dev/null | grep -v intratrading > /tmp/crontab_clean || true
-echo "30 3 * * 1-5 sudo systemctl start intratrading-backend" >> /tmp/crontab_clean
+echo "30 3 * * 1-5 /opt/intratrading/app/deploy/start-if-trading-day.sh" >> /tmp/crontab_clean
 sudo -u intratrading crontab /tmp/crontab_clean
 rm /tmp/crontab_clean
 
