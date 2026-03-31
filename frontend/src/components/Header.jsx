@@ -24,8 +24,8 @@ export default function Header({ fyersStatus }) {
   // Fetch funds when connected
   useEffect(() => {
     if (fyersStatus?.connected) {
-      getFyersFunds().then(setFunds).catch(() => {})
-      const iv = setInterval(() => { getFyersFunds().then(setFunds).catch(() => {}) }, 30000)
+      getFyersFunds().then(setFunds).catch(() => setFunds(null))
+      const iv = setInterval(() => { getFyersFunds().then(setFunds).catch(() => setFunds(null)) }, 30000)
       return () => clearInterval(iv)
     }
   }, [fyersStatus?.connected])

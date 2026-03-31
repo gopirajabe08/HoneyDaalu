@@ -68,9 +68,14 @@ function AppContent() {
   }, [activePage])
 
   useEffect(() => {
-    if (isAuthenticated) {
-      getFyersStatus().then(setFyersStatus).catch(() => {})
-    }
+    if (!isAuthenticated) return
+    const fetchStatus = () =>
+      getFyersStatus()
+        .then(setFyersStatus)
+        .catch(() => setFyersStatus({ connected: false, configured: false }))
+    fetchStatus()
+    const iv = setInterval(fetchStatus, 30000)
+    return () => clearInterval(iv)
   }, [isAuthenticated])
 
   function handleLoginSuccess(email) {
