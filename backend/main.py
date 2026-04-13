@@ -119,6 +119,24 @@ def auto_connect_broker():
         except Exception:
             pass
 
+    # Verify market data works before starting engines
+    try:
+        import yfinance as yf
+        test = yf.Ticker("RELIANCE.NS")
+        test_data = test.history(period="5d", interval="15m")
+        if test_data is not None and len(test_data) > 10:
+            print(f"[Startup] Market data: OK ({len(test_data)} candles for RELIANCE)", flush=True)
+        else:
+            print("[Startup] WARNING: Market data check failed — yfinance may need upgrade", flush=True)
+            try:
+                import subprocess
+                subprocess.run(["pip", "install", "--upgrade", "yfinance", "-q"], capture_output=True, timeout=30)
+                print("[Startup] yfinance upgraded — retrying...", flush=True)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[Startup] WARNING: Market data check error: {e}", flush=True)
+
     # Start market monitor daemon
     from services.market_monitor import start_monitor
     start_monitor()

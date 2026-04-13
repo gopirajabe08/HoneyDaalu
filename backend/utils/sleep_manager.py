@@ -33,10 +33,13 @@ class SleepManager:
         return self._sleep_mode
 
     def prevent_sleep(self):
-        """Enable sleep prevention.
+        """Enable sleep prevention (macOS only, no-op on Linux)."""
+        import platform
+        if platform.system() == "Linux":
+            self._sleep_mode = "linux"
+            logger.info(f"[{self.name}] Linux server — no sleep prevention needed")
+            return
 
-        Tries pmset first (works with lid closed), falls back to caffeinate.
-        """
         self.allow_sleep()  # Clean up any previous state
 
         # Try pmset (requires setup_sleep_prevention.sh)

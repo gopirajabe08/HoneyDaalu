@@ -115,6 +115,13 @@ def detect_regime(underlying: str = "NIFTY") -> dict:
         }
     """
     vix = get_india_vix()
+    if vix is None:
+        # Fallback: try NSE API for VIX
+        try:
+            from services.equity_regime import _get_vix
+            vix = _get_vix()
+        except Exception:
+            vix = 15.0  # Safe default
     nifty_trend = _get_nifty_trend()
     intraday = _get_intraday_direction()
 

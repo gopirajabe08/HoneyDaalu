@@ -129,13 +129,18 @@ def _api_get(endpoint: str, params: dict = None) -> dict:
 
 
 def _api_post(endpoint: str, data: dict = None) -> dict:
-    """Make authenticated POST request to CubePlus API."""
+    """Make authenticated POST request to CubePlus API (form-encoded)."""
     session = _get_session()
     if session is None:
         return {"error": "Not authenticated"}
     try:
         url = f"{BASE_URL}{endpoint}"
-        resp = session.post(url, json=data, timeout=15)
+        # CubePlus expects form-encoded POST (not JSON) for order endpoints
+        headers = {
+            "Authorization": f"Bearer {TRADEJINI_API_KEY}:{_access_token}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        resp = req.post(url, headers=headers, data=data, timeout=15)
         if resp.status_code == 401:
             _clear_token()
             return {"error": "Session expired — please re-authenticate"}
@@ -527,7 +532,7 @@ def place_order(
     if order_type in (1, 3) and limit_price > 0:
         order_data["limitPrice"] = round(limit_price, 2)
     if order_type in (3, 4) and stop_price > 0:
-        order_data["stopPrice"] = round(stop_price, 2)
+        order_data["trigPrice"] = round(stop_price, 2)
 
     return _place_order_with_tick_retry(order_data)
 
@@ -696,7 +701,7 @@ def _place_raw_order(data: dict) -> dict:
         "productType": PRODUCT_TYPE_MAP.get(data.get("productType", "INTRADAY"), "MIS"),
         "quantity": data.get("qty", 0),
         "price": data.get("limitPrice", 0),
-        "triggerPrice": data.get("stopPrice", 0),
+        "triggerPrice": data.get("trigPrice", 0),
         "validity": data.get("validity", "DAY"),
         "disclosedQty": data.get("disclosedQty", 0),
         "orderTag": data.get("orderTag", ""),
@@ -720,8 +725,8 @@ def modify_order(order_id: str, **kwargs) -> dict:
         data["quantity"] = kwargs["qty"]
     if "limitPrice" in kwargs:
         data["price"] = kwargs["limitPrice"]
-    if "stopPrice" in kwargs:
-        data["triggerPrice"] = kwargs["stopPrice"]
+    if "trigPrice" in kwargs:
+        data["triggerPrice"] = kwargs["trigPrice"]
     if "type" in kwargs:
         data["orderType"] = ORDER_TYPE_MAP.get(kwargs["type"], kwargs["type"])
 
@@ -956,8 +961,8 @@ def _place_order_with_tick_retry(order_data: dict, max_retries: int = 2) -> dict
             if tick_match:
                 tick = float(tick_match.group(1))
                 logger.info(f"Tick correction (attempt {attempt+1}): tick={tick}")
-                if order_data.get("stopPrice", 0) > 0:
-                    order_data["stopPrice"] = _round_to_tick(order_data["stopPrice"], tick)
+                if order_data.get("trigPrice", 0) > 0:
+                    order_data["trigPrice"] = _round_to_tick(order_data["trigPrice"], tick)
                 if order_data.get("limitPrice", 0) > 0:
                     order_data["limitPrice"] = _round_to_tick(order_data["limitPrice"], tick)
                 continue
