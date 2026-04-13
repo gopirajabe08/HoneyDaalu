@@ -85,56 +85,37 @@ def _check_and_fix_broker():
 
 
 def _check_and_fix_engines():
-    """Check all engines. Restart any that stopped unexpectedly."""
-    engines = [
-        ("Equity Intraday Paper", "/api/paper/status", "/api/paper/start-auto", {"capital": 75000}),
-        ("Equity Swing Paper", "/api/swing-paper/status", "/api/swing-paper/start-auto", {"capital": 75000}),
-        ("Options Intraday Paper", "/api/options/paper/status", "/api/options/paper/start", {"capital": 25000, "underlyings": ["NIFTY", "BANKNIFTY"]}),
-        ("Options Swing Paper", "/api/options/swing-paper/status", "/api/options/swing-paper/start", {"capital": 25000, "underlyings": ["NIFTY", "BANKNIFTY"]}),
-        ("Futures Intraday Paper", "/api/futures/paper/status", "/api/futures/paper/start-auto", {"capital": 100000}),
-        ("Futures Swing Paper", "/api/futures/swing-paper/status", "/api/futures/swing-paper/start-auto", {"capital": 100000}),
-    ]
+    """Check all engines directly via singletons (no HTTP calls needed)."""
+    try:
+        from services.auto_trader import auto_trader
+        from services.paper_trader import paper_trader
+        from services.options_auto_trader import options_auto_trader
+        from services.options_paper_trader import options_paper_trader
 
-    # Also check live engines
-    live_engines = [
-        ("Equity Intraday Live", "/api/auto/status", "/api/auto/start-auto", {"capital": 25000}),
-        ("Options Intraday Live", "/api/options/auto/status", "/api/options/auto/start", {"capital": 25000, "underlyings": ["BANKNIFTY"]}),
-    ]
+        engines = [
+            ("Equity Live", auto_trader),
+            ("Equity Paper", paper_trader),
+            ("Options Live", options_auto_trader),
+            ("Options Paper", options_paper_trader),
+        ]
 
-    now = _now()
-    for name, status_ep, restart_ep, restart_data in engines + live_engines:
-        try:
-            d = _api_get(status_ep)
-            if d is None:
-                _log("ERROR", f"{name}: API unreachable")
-                continue
+        for name, engine in engines:
+            try:
+                running = getattr(engine, '_running', False)
+                scans = getattr(engine, '_scan_count', 0)
+                orders = getattr(engine, '_order_count', 0)
+                pnl = getattr(engine, '_total_pnl', 0)
+                active = len([t for t in getattr(engine, '_active_trades', getattr(engine, '_active_positions', [])) if t.get("status") == "OPEN"])
 
-            running = d.get("is_running", False)
-            squared_off = d.get("squared_off", False)
-            scans = d.get("scan_count", 0)
-            orders = d.get("order_count", 0)
-            active = len(d.get("active_trades", d.get("active_positions", [])))
-            pnl = d.get("total_pnl", 0)
-
-            if running:
-                _log("OK", f"{name}: S:{scans} O:{orders} A:{active} P&L:₹{pnl:,.0f}")
-            elif squared_off:
-                _log("OK", f"{name}: squared off")
-            else:
-                # Engine stopped but not squared off — try restart
-                if restart_ep and now.hour < 15:  # Don't restart after 3 PM
-                    _log("ACTION", f"{name}: stopped unexpectedly — restarting...")
-                    result = _api_post(restart_ep, restart_data)
-                    if result and not result.get("error"):
-                        _log("ACTION", f"{name}: restarted successfully")
-                    else:
-                        error = result.get("error", "unknown") if result else "no response"
-                        _log("WARN", f"{name}: restart failed — {error}")
+                if running:
+                    _log("OK", f"{name}: S:{scans} O:{orders} A:{active} P&L:₹{pnl:,.0f}")
                 else:
-                    _log("WARN", f"{name}: stopped (past restart window)")
+                    _log("INFO", f"{name}: not running")
+            except Exception as e:
+                _log("ERROR", f"{name}: {e}")
 
-        except Exception as e:
-            _log("ERROR", f"{name}: {e}")
+    except Exception as e:
+        _log("ERROR", f"Engine check failed: {e}")
 
 
 def _check_signal_health():
