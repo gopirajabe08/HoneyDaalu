@@ -192,23 +192,26 @@ def _calc_conviction(signal: dict) -> float:
     elif entry > 3000:
         score *= 0.8  # Expensive, needs more capital
 
-    # Strategy preference — DATA-DRIVEN from 5-year NSE backtest
-    # BB Contra: 72% win, R:R 1.14 — BEST
-    # BB Squeeze: 50% win, R:R 1.31 — Most consistent
-    # Supertrend: 50% win, R:R 0.99 — No edge alone, needs filters
-    # RSI Divergence: 36% win, R:R 0.77 — LOSES money, heavily penalized
+    # Strategy preference — ALL 10 backtested on 5yr, 6,574 trades, 20 stocks
+    # Ranked by 5-year net P&L:
+    #   #1 VWAP Pullback:  +Rs.13,043 (Rs.7/trade edge)
+    #   #2 ORB Breakout:   +Rs.10,818 (Rs.6/trade, best R:R 1.21)
+    #   #3 EMA Crossover:  +Rs.2,751  (Rs.8/trade, 51% win)
+    #   #4 BB Contra:      +Rs.2,039  (Rs.57/trade! 75% win — rare but powerful)
+    #   #5 BB Squeeze:     +Rs.721    (Rs.5/trade, consistent)
+    # LOSERS: Supertrend, RSI Div, Triple MA, Gap, Momentum — all negative
     strategy = signal.get("_strategy", "")
     strategy_boost = {
-        "play6_bb_contra": 1.5,       # 72% win — highest boost
-        "play5_bb_squeeze": 1.4,      # R:R 1.31 — most consistent
-        "play7_orb": 1.1,
-        "play3_vwap_pullback": 1.0,
-        "play4_supertrend": 0.9,      # No edge without filters
-        "play10_momentum_rank": 0.9,
-        "play9_gap_analysis": 0.9,
-        "play1_ema_crossover": 0.8,
-        "play2_triple_ma": 0.8,
-        "play8_rsi_divergence": 0.6,  # 36% win — penalized heavily
+        "play6_bb_contra": 1.6,       # 75% win, Rs.57/trade — HIGHEST edge
+        "play3_vwap_pullback": 1.5,   # +Rs.13,043 — MOST profitable overall
+        "play7_orb": 1.4,             # +Rs.10,818, R:R 1.21 — best risk/reward
+        "play1_ema_crossover": 1.3,   # +Rs.2,751, 51% win — solid
+        "play5_bb_squeeze": 1.2,      # +Rs.721, consistent in sideways
+        "play4_supertrend": 0.7,      # -Rs.845 — LOSER, heavily penalized
+        "play10_momentum_rank": 0.5,  # -Rs.14,760 — BIGGEST LOSER
+        "play9_gap_analysis": 0.5,    # -Rs.5,975 — LOSER
+        "play2_triple_ma": 0.6,       # -Rs.2,881 — LOSER
+        "play8_rsi_divergence": 0.5,  # -Rs.895 — LOSER
     
     
     
