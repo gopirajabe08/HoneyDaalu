@@ -43,20 +43,27 @@ else
     log "No frontend changes — skipping build"
 fi
 
-# ── Restart backend ONLY if it's currently running ──
-# Don't start it outside market hours — the cron handles that
-if systemctl is-active --quiet honeydaalu-backend; then
-    log "Backend is running — restarting with new code..."
+# ── Restart backend ONLY during market hours (9:00-15:45 IST) ──
+HOUR=$(TZ="Asia/Kolkata" date +%H)
+MIN=$(TZ="Asia/Kolkata" date +%M)
+IST_TIME="${HOUR}${MIN}"
+
+if [ "$IST_TIME" -ge "0900" ] && [ "$IST_TIME" -le "1545" ] && systemctl is-active --quiet honeydaalu-backend; then
+    log "Market hours + backend running — restarting with new code..."
     sudo systemctl restart honeydaalu-backend
     sleep 3
     if systemctl is-active --quiet honeydaalu-backend; then
         log "Backend restarted successfully"
     else
         log "ERROR: Backend failed to start after deploy!"
-        log "Check: journalctl -u honeydaalu-backend -n 50"
     fi
 else
-    log "Backend is not running (market closed) — code updated, will start at 9:00 AM"
+    log "Outside market hours — code updated, NO restart. Next start at 9:00 AM."
+    # Stop the service if it's running after hours (shouldn't be)
+    if systemctl is-active --quiet honeydaalu-backend && [ "$IST_TIME" -gt "1545" ]; then
+        log "Stopping backend (after market hours)..."
+        sudo systemctl stop honeydaalu-backend
+    fi
 fi
 
 log "═══ Deploy complete ═══"
