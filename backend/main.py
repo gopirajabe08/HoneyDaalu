@@ -97,7 +97,7 @@ def auto_connect_broker():
             print(f"[Startup] Broker connected: {name} (attempt {attempt})", flush=True)
             try:
                 from services import telegram_notify
-                telegram_notify.send(f"✅ <b>Broker Login OK</b>\n{name}\nAttempt {attempt}/3")
+                telegram_notify.send(f"✅ <b>TradeJini Login SUCCESS</b>\n{name}\nAttempt {attempt}/3")
             except Exception:
                 pass
             break
@@ -108,7 +108,7 @@ def auto_connect_broker():
         print("[Startup] WARNING: Broker login failed after 3 attempts — live engines will not start", flush=True)
         try:
             from services import telegram_notify
-            telegram_notify.send("🚨 <b>ALERT: Broker Login FAILED</b>\n3 attempts exhausted.\nHeadless login broken — check immediately!\nNo live trading today until fixed.")
+            telegram_notify.send("🚨 <b>TradeJini Login FAILED</b>\n3 attempts exhausted.\nCheck immediately!\nNo live trading today until fixed.")
         except Exception:
             pass
 
