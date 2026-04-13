@@ -59,9 +59,15 @@ def notify_shutdown():
         pass
 
 
+_startup_done = False
+
 @app.on_event("startup")
 def auto_connect_broker():
     """Auto-connect broker on server startup — fresh TOTP login daily."""
+    global _startup_done
+    if _startup_done:
+        return
+    _startup_done = True
     # C10: Auto-setup sleep prevention
     try:
         import subprocess
