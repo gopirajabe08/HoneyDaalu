@@ -59,9 +59,9 @@ INTRADAY_MARKET_CLOSE_HOUR, INTRADAY_MARKET_CLOSE_MIN = 15, 30 # 3:30 PM — mar
 
 # ── Intraday Position Limits ─────────────────────────────────────────────────
 
-INTRADAY_CAPITAL_PER_POSITION = 40000  # ~₹40K per slot (accounts for margin blocked by entry + SL + target orders on broker)
+INTRADAY_CAPITAL_PER_POSITION = 12000  # ~₹12K per slot (Phase 1: ₹25K capital = 2 positions)
 INTRADAY_MIN_POSITIONS = 1
-INTRADAY_MAX_POSITIONS_CAP = 2        # Safety cap for ₹1L capital level
+INTRADAY_MAX_POSITIONS_CAP = 2        # Max 2 positions (₹12K × 2 = ₹24K of ₹25K used)
 INTRADAY_PAPER_MAX_POSITIONS = 10     # paper: more positions for testing
 INTRADAY_POSITION_CHECK_INTERVAL = 20  # seconds between LTP checks (reduced from 60s for faster reaction)
 
