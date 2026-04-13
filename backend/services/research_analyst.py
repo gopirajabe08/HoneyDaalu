@@ -109,9 +109,14 @@ def _fetch_excluded_today(today_str: str) -> list[str]:
     url = _NSE_CORP_ACTIONS_URL.format(from_date=nse_date, to_date=nse_date)
     logger.debug(f"[ResearchAnalyst] Fetching: {url}")
 
-    req = Request(url, headers=_HEADERS)
-    with urlopen(req, timeout=15) as resp:
-        raw = resp.read().decode("utf-8")
+    # NSE requires session cookies — must hit homepage first
+    import requests as _req
+    s = _req.Session()
+    s.headers.update(_HEADERS)
+    s.get("https://www.nseindia.com", timeout=10)
+    resp = s.get(url, timeout=15)
+    resp.raise_for_status()
+    raw = resp.text
 
     data = json.loads(raw)
 
