@@ -57,13 +57,26 @@ def _send_async(text: str):
         logger.warning(f"[Telegram] Send failed: {e}")
 
 
+_last_messages: dict[str, float] = {}
+_dedup_lock = threading.Lock()
+
 def send(text: str):
-    """Send a Telegram message (non-blocking). Rate-limited."""
+    """Send a Telegram message (non-blocking). Rate-limited + deduped."""
     if not _enabled:
         return
     if _is_rate_limited():
         logger.warning("[Telegram] Rate limited — skipping message")
         return
+    # Dedup: skip if same message sent in last 60 seconds
+    now = _time_mod.time()
+    with _dedup_lock:
+        last_sent = _last_messages.get(text, 0)
+        if now - last_sent < 60:
+            return
+        _last_messages[text] = now
+        # Prune old entries
+        cutoff = now - 120
+        _last_messages.update({k: v for k, v in _last_messages.items() if v > cutoff})
     threading.Thread(target=_send_async, args=(text,), daemon=True).start()
 
 
