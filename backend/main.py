@@ -430,7 +430,7 @@ def auto_connect_broker():
                 _log(f"  Regime: {regime_name} | VIX: {vix:.1f}")
                 _log(f"  Options Live: {opt_status} (PRIMARY — ₹795/trade on paper)")
                 _log(f"  Equity Live:  ₹{eq_capital:,} | {len(regime.get('strategies', []))} strategies")
-                _log(f"  BTST Live:    Scheduled 1:50 PM (dynamic capital)")
+                _log(f"  BTST Live:    DISABLED (Phase 1)")
                 _log(f"  Paper engines running")
                 _log(f"  Auto-shutdown: 3:45 PM")
                 _log("═" * 50)
