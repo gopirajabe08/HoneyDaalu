@@ -110,12 +110,14 @@ def auto_connect_broker():
             pass
 
     # Verify market data works before starting engines
+    _market_data_ok = False
     try:
         import yfinance as yf
         test = yf.Ticker("RELIANCE.NS")
         test_data = test.history(period="5d", interval="15m")
         if test_data is not None and len(test_data) > 10:
             print(f"[Startup] Market data: OK ({len(test_data)} candles for RELIANCE)", flush=True)
+            _market_data_ok = True
         else:
             print("[Startup] WARNING: Market data check failed — yfinance may need upgrade", flush=True)
             try:
@@ -126,6 +128,48 @@ def auto_connect_broker():
                 pass
     except Exception as e:
         print(f"[Startup] WARNING: Market data check error: {e}", flush=True)
+
+    # ── Pre-market system health check ──────────────────────────────────────
+    # Verify: broker connected, data flowing, strategies loadable, funds visible.
+    # Send a Telegram summary so we know the system is ready before market opens.
+    try:
+        _broker_ok = broker_client.is_authenticated()
+        _strat_count = 0
+        try:
+            from strategies import STRATEGY_MAP
+            _strat_count = len(STRATEGY_MAP)
+        except Exception:
+            pass
+        _funds_avail = 0
+        _funds_ok = False
+        try:
+            _fdata = broker_client.get_funds()
+            for _fi in _fdata.get("fund_limit", []):
+                if _fi.get("id") == 10:
+                    _funds_avail = _fi.get("equityAmount", 0)
+                    _funds_ok = True
+                    break
+        except Exception:
+            pass
+
+        _checks = {
+            "Broker": "OK" if _broker_ok else "FAIL",
+            "Market data": "OK" if _market_data_ok else "WARN",
+            "Strategies": f"{_strat_count} loaded" if _strat_count > 0 else "FAIL",
+            "Funds": f"₹{_funds_avail:,.0f} available" if _funds_ok else "WARN",
+        }
+        _all_ok = _broker_ok and _strat_count > 0
+
+        _check_lines = "\n".join(f"  {'✅' if v not in ('FAIL','WARN') else ('🚨' if v=='FAIL' else '⚠️')} {k}: {v}" for k, v in _checks.items())
+        _audit_msg = (
+            f"{'🟢' if _all_ok else '🔴'} <b>Pre-Market Audit</b>\n\n"
+            f"{_check_lines}\n\n"
+            f"{'System READY — all checks passed.' if _all_ok else 'WARNING: One or more checks failed!'}"
+        )
+        telegram_notify.send(_audit_msg)
+        print(f"[Startup] Pre-market audit: {'PASS' if _all_ok else 'WARN'}", flush=True)
+    except Exception as _pma_err:
+        print(f"[Startup] Pre-market audit error: {_pma_err}", flush=True)
 
     # Start market monitor daemon
     from services.market_monitor import start_monitor
@@ -581,9 +625,97 @@ def auto_connect_broker():
             charges = round(trades * 65, 2) if trades > 0 else 0
             net_pnl = round(total_pnl - charges, 2)
             btst_open = len([t for t in getattr(btst_trader, '_active_trades', []) if t.get("status") == "OPEN"])
-            telegram_notify.day_end(total_pnl, charges, net_pnl, trades, wins, losses, capital, btst_open)
+
+            # Build strategy-level breakdown for day_end notification
+            _strat_map = {}
+            _all_hist = (
+                list(getattr(auto_trader, '_trade_history', []))
+                + list(getattr(options_auto_trader, '_trade_history', []))
+            )
+            for _t in _all_hist:
+                _k = _t.get("strategy", "unknown") or "unknown"
+                if _k not in _strat_map:
+                    _strat_map[_k] = {"name": _k, "trades": 0, "wins": 0, "pnl": 0.0}
+                _strat_map[_k]["trades"] += 1
+                _strat_map[_k]["pnl"] += _t.get("pnl", 0)
+                if _t.get("pnl", 0) >= 0:
+                    _strat_map[_k]["wins"] += 1
+            _strategy_breakdown = sorted(_strat_map.values(), key=lambda x: x["pnl"], reverse=True)
+
+            # Best and worst individual trade
+            _best = max(_all_hist, key=lambda x: x.get("pnl", 0), default=None)
+            _worst = min(_all_hist, key=lambda x: x.get("pnl", 0), default=None)
+
+            # Live vs paper P&L
+            _live_pnl = (
+                getattr(auto_trader, '_total_pnl', 0)
+                + getattr(options_auto_trader, '_total_pnl', 0)
+            )
+            _paper_pnl_traders = [
+                getattr(paper_trader, '_total_pnl', None),
+                getattr(options_paper_trader, '_total_pnl', None),
+            ]
+            _paper_pnl = sum(v for v in _paper_pnl_traders if v is not None)
+
+            telegram_notify.day_end(
+                total_pnl, charges, net_pnl, trades, wins, losses, capital, btst_open,
+                strategy_breakdown=_strategy_breakdown if _strategy_breakdown else None,
+                best_trade=_best,
+                worst_trade=_worst,
+                live_pnl=_live_pnl,
+                paper_pnl=_paper_pnl,
+            )
         except Exception:
             pass
+
+        # ── Post-market reconciliation: broker orderbook vs our trade log ──────
+        # Count how many broker-confirmed trades we have vs what we tracked internally.
+        # Mismatches = orders that went to broker but weren't logged (or vice versa).
+        try:
+            from services.broker_client import get_tradebook as _recon_trades
+            _recon_tb = _recon_trades()
+            _broker_order_ids = set()
+            for _ro in _recon_tb.get("tradeBook", []):
+                _oid = str(_ro.get("orderId", "") or _ro.get("id", ""))
+                if _oid:
+                    _broker_order_ids.add(_oid)
+
+            _internal_order_ids = set()
+            for _it in (
+                list(getattr(auto_trader, '_trade_history', []))
+                + list(getattr(options_auto_trader, '_trade_history', []))
+                + list(getattr(btst_trader, '_trade_history', []))
+            ):
+                _oid = str(_it.get("order_id", "") or "")
+                if _oid and _oid not in ("recovered", "unknown", ""):
+                    _internal_order_ids.add(_oid)
+
+            _broker_only = _broker_order_ids - _internal_order_ids  # on broker but not logged
+            _log_only = _internal_order_ids - _broker_order_ids     # logged but not on broker
+
+            _mismatch_count = len(_broker_only) + len(_log_only)
+            print(f"[AutoShutdown] Reconciliation: broker={len(_broker_order_ids)} trades | log={len(_internal_order_ids)} | mismatches={_mismatch_count}", flush=True)
+
+            if _mismatch_count > 0:
+                _recon_msg = (
+                    f"⚠️ <b>Post-Market Reconciliation</b>\n\n"
+                    f"Broker trades: {len(_broker_order_ids)}\n"
+                    f"Our log: {len(_internal_order_ids)}\n"
+                    f"Mismatches: {_mismatch_count}\n\n"
+                )
+                if _broker_only:
+                    _recon_msg += f"Broker-only (not in log): {', '.join(sorted(_broker_only)[:5])}\n"
+                if _log_only:
+                    _recon_msg += f"Log-only (not in broker): {', '.join(sorted(_log_only)[:5])}\n"
+                _recon_msg += "\nReview trade log manually!"
+                telegram_notify.send(_recon_msg)
+            else:
+                telegram_notify.send(
+                    f"✅ <b>Reconciliation OK</b>\n"
+                    f"Broker={len(_broker_order_ids)} | Log={len(_internal_order_ids)} | No mismatches"
+                )
+        except Exception as _recon_err:
+            print(f"[AutoShutdown] Reconciliation error: {_recon_err}", flush=True)
 
         # Run EOD analysis
         try:

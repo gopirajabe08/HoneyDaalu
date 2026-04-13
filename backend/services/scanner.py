@@ -2680,6 +2680,19 @@ def run_scan(strategy_key: str, timeframe: str, capital: float = 100000, max_wor
         dict with scan results.
     """
     symbols = get_nifty500_symbols()
+
+    # Exclude stocks with corporate actions today (dividends, splits, etc.)
+    # These exhibit abnormal gaps/behaviour that breaks technical signals.
+    try:
+        from services.research_analyst import get_excluded_stocks
+        _corp_excluded = set(get_excluded_stocks())
+        if _corp_excluded:
+            before_excl = len(symbols)
+            symbols = [s for s in symbols if s not in _corp_excluded]
+            logger.info(f"[Scanner] Corporate action filter: removed {before_excl - len(symbols)} stocks {sorted(_corp_excluded)}")
+    except Exception as _re:
+        logger.debug(f"[Scanner] Corporate action filter skipped: {_re}")
+
     start_time = time.time()
 
     # Block intraday scans outside market hours (1h/1d work anytime)

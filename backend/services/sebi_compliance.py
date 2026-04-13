@@ -16,9 +16,83 @@ This module manages strategy-to-algo-ID mapping and compliance tagging.
 """
 
 import logging
+import json
+import os
+import time
+import threading
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+# ── Audit Log ─────────────────────────────────────────────────────────────
+# Every order placed is written to a daily file: backend/tracking/audit/YYYY-MM-DD.jsonl
+# One JSON line per order (JSONL format — easy to tail/grep).
+
+_audit_lock = threading.Lock()
+
+
+def _audit_log_path() -> str:
+    """Return today's audit log file path, creating directory if needed."""
+    today = datetime.now(IST).strftime("%Y-%m-%d")
+    base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tracking", "audit")
+    os.makedirs(base, exist_ok=True)
+    return os.path.join(base, f"{today}.jsonl")
+
+
+def audit_order(order_data: dict, outcome: str = "placed", extra: str = ""):
+    """
+    Write an audit log entry for every order placed.
+
+    Args:
+        order_data: The order parameters dict sent to the broker.
+        outcome: 'placed', 'rejected', 'cancelled', 'filled', 'error'
+        extra: Optional context string (e.g. strategy, reason for rejection).
+    """
+    try:
+        entry = {
+            "ts": datetime.now(IST).isoformat(),
+            "outcome": outcome,
+            "symbol": order_data.get("symbol", ""),
+            "side": order_data.get("side", ""),
+            "qty": order_data.get("qty", order_data.get("quantity", "")),
+            "price": order_data.get("limitPrice", order_data.get("limit_price", order_data.get("entry_price", ""))),
+            "order_type": order_data.get("orderType", order_data.get("order_type", "")),
+            "product": order_data.get("productType", order_data.get("product_type", "")),
+            "tag": order_data.get("orderTag", order_data.get("order_tag", "")),
+            "strategy": order_data.get("strategy", ""),
+            "extra": extra,
+        }
+        line = json.dumps(entry, default=str)
+        path = _audit_log_path()
+        with _audit_lock:
+            with open(path, "a") as f:
+                f.write(line + "\n")
+    except Exception as e:
+        logger.warning(f"[SEBI] Audit log write failed: {e}")
+
+
+def verify_rate_limit_before_order() -> tuple[bool, str]:
+    """
+    Check current OPS before placing an order.
+
+    Returns:
+        (ok_to_proceed, reason) — if False, caller should not place the order.
+    """
+    stats = get_ops_stats()
+    current_ops = stats["current_ops"]
+    safety_limit = stats["safety_limit"]  # 8/sec
+
+    if current_ops >= safety_limit:
+        msg = f"Rate limit: {current_ops} orders/sec >= safety limit {safety_limit}/sec — hold order"
+        logger.warning(f"[SEBI] {msg}")
+        return False, msg
+
+    # Log the upcoming order event
+    log_order_event()
+    return True, "OK"
 
 # ── Strategy ID Registry ──────────────────────────────────────────────────
 # Maps internal strategy keys to exchange-provided Algo IDs.

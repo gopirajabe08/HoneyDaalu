@@ -111,13 +111,50 @@ def half_day_summary(total_pnl: float, open_count: int, closed_count: int, wins:
 
 def day_end(total_pnl: float, charges: float, net_pnl: float,
             trades: int, wins: int, losses: int, capital: float,
-            btst_open: int = 0):
-    """Day-end summary — final scorecard. Replaces squareoff_complete + day_summary + system_shutdown."""
+            btst_open: int = 0,
+            strategy_breakdown: list = None,
+            best_trade: dict = None,
+            worst_trade: dict = None,
+            live_pnl: float = None,
+            paper_pnl: float = None):
+    """Day-end summary — final scorecard with strategy breakdown and live/paper comparison."""
     today = datetime.now(IST).strftime("%b %d")
     emoji = "🟢" if net_pnl >= 0 else "🔴"
     wr = round(wins * 100 / (wins + losses)) if (wins + losses) > 0 else 0
 
     btst_line = f"\nBTST overnight: {btst_open} position(s)" if btst_open > 0 else ""
+
+    # Strategy breakdown section
+    strat_lines = ""
+    if strategy_breakdown:
+        strat_lines = "\n\n<b>By Strategy:</b>"
+        for s in strategy_breakdown:
+            s_pnl = s.get("pnl", 0)
+            s_trades = s.get("trades", 0)
+            s_wins = s.get("wins", 0)
+            s_wr = round(s_wins * 100 / s_trades) if s_trades > 0 else 0
+            s_emoji = "▲" if s_pnl >= 0 else "▼"
+            strat_lines += (
+                f"\n  {s_emoji} {s.get('name', '?')}: "
+                f"{'+'if s_pnl>=0 else ''}₹{s_pnl:.0f} | "
+                f"{s_trades}T {s_wr}%W"
+            )
+
+    # Best / worst trade
+    trade_lines = ""
+    if best_trade and best_trade.get("pnl", 0) != 0:
+        trade_lines += f"\n🏆 Best: {best_trade.get('symbol','?')} +₹{best_trade['pnl']:.0f}"
+    if worst_trade and worst_trade.get("pnl", 0) != 0:
+        trade_lines += f"\n💀 Worst: {worst_trade.get('symbol','?')} ₹{worst_trade['pnl']:.0f}"
+
+    # Live vs paper comparison
+    compare_line = ""
+    if live_pnl is not None and paper_pnl is not None:
+        compare_line = (
+            f"\n\n<b>Live vs Paper:</b>\n"
+            f"  Live:  {'+'if live_pnl>=0 else ''}₹{live_pnl:.0f}\n"
+            f"  Paper: {'+'if paper_pnl>=0 else ''}₹{paper_pnl:.0f}"
+        )
 
     send(
         f"{emoji} <b>Day Complete — {today}</b>\n\n"
@@ -126,6 +163,9 @@ def day_end(total_pnl: float, charges: float, net_pnl: float,
         f"<b>Net P&L: {'+'if net_pnl>=0 else ''}₹{net_pnl:.2f}</b>\n\n"
         f"Trades: {trades} | Win rate: {wr}%\n"
         f"Capital: ₹{capital:,.0f}"
+        f"{trade_lines}"
+        f"{strat_lines}"
+        f"{compare_line}"
         f"{btst_line}\n\n"
         f"All intraday squared off. Server off. 🌙"
     )

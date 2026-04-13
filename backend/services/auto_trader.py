@@ -1034,17 +1034,28 @@ class AutoTrader:
             pass  # Funds check failed, proceed cautiously
 
         # Price validation: skip if LTP has moved >0.5% from signal entry
+        # Also check bid-ask spread: skip if spread > 1% (illiquid, high hidden cost)
         try:
             quotes_res = get_quotes([symbol])
             if "d" in quotes_res and quotes_res["d"]:
-                current_ltp = quotes_res["d"][0].get("v", {}).get("lp", 0)
+                quote_v = quotes_res["d"][0].get("v", {})
+                current_ltp = quote_v.get("lp", 0)
                 if current_ltp > 0 and entry_price > 0:
                     price_diff_pct = abs(current_ltp - entry_price) / entry_price
                     if price_diff_pct > 0.005:
                         self._log("SKIP", f"{symbol} — Price moved too far from signal: LTP=₹{current_ltp:.2f} vs Entry=₹{entry_price:.2f} ({price_diff_pct*100:.2f}% drift)")
                         return False
+
+                # Bid-ask spread check — skip if spread > 1%
+                bid = quote_v.get("bid_price", quote_v.get("bp", 0))
+                ask = quote_v.get("ask_price", quote_v.get("ap", quote_v.get("op", 0)))
+                if bid > 0 and ask > 0 and ask > bid:
+                    spread_pct = (ask - bid) / bid * 100
+                    if spread_pct > 1.0:
+                        self._log("SKIP", f"{symbol} — Bid-ask spread too wide: {spread_pct:.2f}% (bid=₹{bid:.2f} ask=₹{ask:.2f}) — skipping to avoid hidden cost")
+                        return False
         except Exception as e:
-            self._log("WARN", f"{symbol} — LTP check failed ({e}), proceeding with order")
+            self._log("WARN", f"{symbol} — LTP/spread check failed ({e}), proceeding with order")
 
         try:
             result = place_bracket_order(
@@ -1093,16 +1104,30 @@ class AutoTrader:
                 # Get actual fill price from orderbook
                 actual_price = self._get_fill_price(order_id)
                 if actual_price and actual_price > 0:
+                    signal_price = signal.get("entry_price", 0)
+                    slippage_pct = 0.0
+                    if signal_price > 0:
+                        slippage_pct = round((actual_price - signal_price) / signal_price * 100, 4)
+                    self._log("ORDER", f"{symbol} — FILLED at ₹{actual_price} (signal ₹{signal_price}) | slippage {slippage_pct:+.3f}%")
+                    if abs(slippage_pct) > 0.3:
+                        self._log("WARN", f"{symbol} — HIGH SLIPPAGE: {slippage_pct:+.3f}% (fill ₹{actual_price} vs signal ₹{signal_price})")
                     entry_price = actual_price
-                    self._log("ORDER", f"{symbol} — FILLED at ₹{actual_price} (signal was ₹{signal.get('entry_price', 0)})")
 
             target_order_id = result.get("target_order_id", "")
+
+            # Calculate slippage (signal price vs actual fill price)
+            _signal_price = signal.get("entry_price", 0)
+            _slippage_pct = 0.0
+            if _signal_price > 0 and entry_price > 0:
+                _slippage_pct = round((entry_price - _signal_price) / _signal_price * 100, 4)
 
             trade = {
                 "symbol": symbol,
                 "signal_type": signal_type,
                 "side": side,
                 "entry_price": entry_price,
+                "signal_price": _signal_price,
+                "slippage_pct": _slippage_pct,
                 "stop_loss": stop_loss,
                 "target": target_price,
                 "quantity": qty,
@@ -1118,6 +1143,24 @@ class AutoTrader:
                 "status": "OPEN",
                 "pnl": 0.0,
             }
+
+            # SEBI audit log — record every order placed
+            try:
+                from services.sebi_compliance import audit_order
+                audit_order(
+                    order_data={
+                        "symbol": symbol,
+                        "side": signal_type,
+                        "qty": qty,
+                        "entry_price": _signal_price,
+                        "strategy": trade["strategy"],
+                        "order_tag": order_id,
+                    },
+                    outcome="placed",
+                    extra=f"fill=₹{entry_price} slippage={_slippage_pct:+.3f}%",
+                )
+            except Exception:
+                pass
 
             self._active_trades.append(trade)
             self._order_count += 1
@@ -1494,14 +1537,25 @@ class AutoTrader:
 
                 new_sl = current_sl
 
+                # ── Risk-based levels ──────────────────────────────────────────
+                # original_sl is stored at first pass so we always know 1R distance.
+                original_sl = trade.get("original_sl", current_sl)
+                risk = abs(entry - original_sl)  # 1x risk distance
+
                 if side == 1:  # BUY / LONG
                     profit_pct = (ltp - entry) / entry
+                    profit_abs = ltp - entry
+
                     if profit_pct >= 0.02:
-                        # Trail to lock 50% of profit
+                        # Trail to lock 50% of profit once 2% achieved
                         new_sl = round(entry + (ltp - entry) * 0.5, 2)
+                    elif risk > 0 and profit_abs >= risk:
+                        # Breakeven SL: profit reached 1x risk — move SL to entry (zero risk)
+                        new_sl = round(entry * 1.001, 2)  # tiny tick above entry
                     elif profit_pct >= 0.01:
-                        # Move to breakeven (tiny buffer above entry)
-                        new_sl = round(entry * 1.001, 2)
+                        # Fallback: move to breakeven at 1% if risk not calculable
+                        if risk == 0:
+                            new_sl = round(entry * 1.001, 2)
 
                     if new_sl > current_sl:
                         old_sl_id = trade.get("sl_order_id", "")
@@ -1518,7 +1572,7 @@ class AutoTrader:
                             if "error" not in sl_result:
                                 trade["stop_loss"] = new_sl
                                 trade["sl_order_id"] = sl_result.get("id", sl_result.get("order_id", ""))
-                                self._log("TRAIL", f"{symbol} — SL trailed: ₹{current_sl:.2f} → ₹{new_sl:.2f} (profit {profit_pct*100:.1f}%)")
+                                self._log("TRAIL", f"{symbol} — SL trailed: ₹{current_sl:.2f} → ₹{new_sl:.2f} (profit {profit_pct*100:.1f}% | risk=₹{risk:.2f})")
                                 self._save_state()
                                 # Telegram: only notify on breakeven move (risk-free = meaningful)
                                 if not trade.get("_breakeven_notified") and new_sl >= entry * 0.999:
@@ -1534,10 +1588,16 @@ class AutoTrader:
 
                 else:  # SELL / SHORT
                     profit_pct = (entry - ltp) / entry
+                    profit_abs = entry - ltp
+
                     if profit_pct >= 0.02:
                         new_sl = round(entry - (entry - ltp) * 0.5, 2)
+                    elif risk > 0 and profit_abs >= risk:
+                        # Breakeven SL: profit reached 1x risk — move SL to entry
+                        new_sl = round(entry * 0.999, 2)  # tiny tick below entry
                     elif profit_pct >= 0.01:
-                        new_sl = round(entry * 0.999, 2)
+                        if risk == 0:
+                            new_sl = round(entry * 0.999, 2)
 
                     if current_sl == 0 or new_sl < current_sl:
                         old_sl_id = trade.get("sl_order_id", "")
@@ -1554,7 +1614,7 @@ class AutoTrader:
                             if "error" not in sl_result:
                                 trade["stop_loss"] = new_sl
                                 trade["sl_order_id"] = sl_result.get("id", sl_result.get("order_id", ""))
-                                self._log("TRAIL", f"{symbol} — SL trailed: ₹{current_sl:.2f} → ₹{new_sl:.2f} (profit {profit_pct*100:.1f}%)")
+                                self._log("TRAIL", f"{symbol} — SL trailed: ₹{current_sl:.2f} → ₹{new_sl:.2f} (profit {profit_pct*100:.1f}% | risk=₹{risk:.2f})")
                                 self._save_state()
                                 # Telegram: only notify on breakeven move (risk-free = meaningful)
                                 if not trade.get("_breakeven_notified") and new_sl <= entry * 1.001:
