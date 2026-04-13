@@ -75,17 +75,7 @@ def auto_connect_broker():
         except Exception:
             pass
     lock.write_text(str(pid))
-    # C10: Auto-setup sleep prevention
-    try:
-        import subprocess
-        result = subprocess.run(["sudo", "-n", "pmset", "disablesleep", "1"], capture_output=True, timeout=5)
-        if result.returncode == 0:
-            print("[Startup] Sleep prevention: ENABLED (pmset)", flush=True)
-        else:
-            subprocess.Popen(["caffeinate", "-d", "-i", "-s"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("[Startup] Sleep prevention: ENABLED (caffeinate fallback)", flush=True)
-    except Exception:
-        print("[Startup] Sleep prevention: FAILED — Mac may sleep", flush=True)
+    # EC2 server runs 24/7 — no sleep prevention needed
 
     if not broker_client.is_configured():
         logger.warning("Broker credentials not configured in .env — skipping auto-connect")
