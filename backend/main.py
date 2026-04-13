@@ -40,6 +40,10 @@ from config import STRATEGY_TIMEFRAMES, SWING_STRATEGY_TIMEFRAMES
 
 import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="LuckyNavi", version="1.0.0")
