@@ -430,31 +430,28 @@ def get_profile() -> dict:
 
 
 def get_funds() -> dict:
-    """Get fund limits. Returns Fyers-compatible format."""
+    """Get fund limits. Returns normalized format for all engines."""
     result = _api_get("/api/oms/limits")
     if "error" in result:
         return result
 
-    # Normalize to Fyers fund_limit format
-    # Fyers uses: fund_limit[{id:10, equityAmount: X}] for available margin
-    data = result.get("data", result)
+    # TradeJini CubePlus returns: {d: {availMargin, marginUsed, totalCredits, ...}, s: "ok"}
+    data = result.get("d", result.get("data", result))
 
     available = 0
     used = 0
+    total = 0
     if isinstance(data, dict):
-        available = float(data.get("availableMargin", data.get("net", 0)))
-        used = float(data.get("utilisedMargin", data.get("utilized", 0)))
-    elif isinstance(data, list):
-        for item in data:
-            if item.get("id") == 10 or item.get("type") == "equity":
-                available = float(item.get("equityAmount", item.get("amount", 0)))
+        available = float(data.get("availMargin", data.get("availCash", 0)))
+        used = float(data.get("marginUsed", 0))
+        total = float(data.get("totalCredits", available + used))
 
     return {
         "s": "ok",
         "fund_limit": [
             {"id": 10, "title": "Available Balance", "equityAmount": available},
             {"id": 6, "title": "Used Margin", "equityAmount": used},
-            {"id": 1, "title": "Total Balance", "equityAmount": available + used},
+            {"id": 1, "title": "Total Balance", "equityAmount": total},
         ],
     }
 
