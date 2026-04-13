@@ -506,40 +506,28 @@ def place_order(
     order_tag = build_order_tag(order_tag)
     log_order_event()
 
-    # Format symbol for TradeJini
+    # Format symbol for TradeJini CubePlus
     broker_symbol = format_broker_symbol(symbol)
 
-    # Map product type and order type
-    tj_product = PRODUCT_TYPE_MAP.get(product_type, product_type)
-    tj_order_type = ORDER_TYPE_MAP.get(order_type, "MARKET")
-    tj_side = SIDE_MAP.get(side, "BUY" if side > 0 else "SELL")
-
-    # For SL-M: ensure limit price is set
-    effective_limit = limit_price
-    if order_type == 4 and effective_limit == 0 and stop_price > 0:
-        if side == -1:
-            effective_limit = _round_to_tick(stop_price - max(stop_price * 0.02, 1))
-        else:
-            effective_limit = _round_to_tick(stop_price + max(stop_price * 0.02, 1))
-
-    # Parse exchange token from broker_symbol (e.g., "2885_NSE")
-    parts = broker_symbol.split("_")
-    exchange_token = parts[0] if len(parts) >= 2 else broker_symbol
-    exchange = parts[1] if len(parts) >= 2 else "NSE"
+    # Map to CubePlus field values (lowercase)
+    side_map = {1: "buy", -1: "sell"}
+    type_map = {1: "limit", 2: "market", 3: "stoplimit", 4: "stopmarket"}
+    product_map = {"INTRADAY": "intraday", "CNC": "delivery", "MARGIN": "normal", "DELIVERY": "delivery", "MIS": "intraday"}
 
     order_data = {
-        "exchangeName": exchange,
-        "exchangeToken": exchange_token,
-        "transactionType": tj_side,
-        "orderType": tj_order_type,
-        "productType": tj_product,
-        "quantity": qty,
-        "price": effective_limit if order_type in (1, 3) else 0,
-        "triggerPrice": stop_price if order_type in (3, 4) else 0,
-        "validity": "DAY",
-        "disclosedQty": 0,
-        "orderTag": order_tag,
+        "symId": broker_symbol,
+        "qty": qty,
+        "side": side_map.get(side, "buy"),
+        "type": type_map.get(order_type, "market"),
+        "product": product_map.get(product_type.upper(), "intraday"),
+        "validity": "day",
+        "discQty": 0,
     }
+
+    if order_type in (1, 3) and limit_price > 0:
+        order_data["limitPrice"] = round(limit_price, 2)
+    if order_type in (3, 4) and stop_price > 0:
+        order_data["stopPrice"] = round(stop_price, 2)
 
     return _place_order_with_tick_retry(order_data)
 
@@ -968,10 +956,10 @@ def _place_order_with_tick_retry(order_data: dict, max_retries: int = 2) -> dict
             if tick_match:
                 tick = float(tick_match.group(1))
                 logger.info(f"Tick correction (attempt {attempt+1}): tick={tick}")
-                if order_data.get("triggerPrice", 0) > 0:
-                    order_data["triggerPrice"] = _round_to_tick(order_data["triggerPrice"], tick)
-                if order_data.get("price", 0) > 0:
-                    order_data["price"] = _round_to_tick(order_data["price"], tick)
+                if order_data.get("stopPrice", 0) > 0:
+                    order_data["stopPrice"] = _round_to_tick(order_data["stopPrice"], tick)
+                if order_data.get("limitPrice", 0) > 0:
+                    order_data["limitPrice"] = _round_to_tick(order_data["limitPrice"], tick)
                 continue
 
         return response
