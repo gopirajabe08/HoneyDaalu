@@ -3,10 +3,11 @@ import { Palette } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
 const THEMES = [
-  { id: 'dark', label: 'Dark', icon: '🌑' },
-  { id: 'light', label: 'Light', icon: '☀️' },
-  { id: 'midnight', label: 'Midnight', icon: '🌊' },
-  { id: 'aurora', label: 'Aurora', icon: '🔮' },
+  { id: 'cosmos', label: 'Cosmos', icon: '🌌' },
+  { id: 'ocean', label: 'Ocean', icon: '🌊' },
+  { id: 'forest', label: 'Forest', icon: '🌲' },
+  { id: 'sunset', label: 'Sunset', icon: '🌅' },
+  { id: 'crystal', label: 'Crystal', icon: '💎' },
 ]
 
 export default function ThemeSwitcher({ compact = false }) {

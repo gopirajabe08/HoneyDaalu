@@ -10,7 +10,7 @@ function StrategyCard({ strategy, isSelected, onSelect }) {
       onClick={() => onSelect(strategy.id)}
       className={`relative bg-dark-700 rounded-2xl p-4 border text-left transition-all duration-200 card-hover overflow-hidden
         ${isSelected
-          ? 'border-orange-500/50 glow-orange'
+          ? 'border-emerald-500/50 glow-emerald'
           : 'border-dark-500 hover:border-dark-400'
         }`}
     >

@@ -7,7 +7,7 @@
 
 export * from './api/auth'
 export * from './api/market'
-export * from './api/fyers'
+export * from './api/broker'
 export * from './api/trading'
 export * from './api/options'
 export * from './api/futures'

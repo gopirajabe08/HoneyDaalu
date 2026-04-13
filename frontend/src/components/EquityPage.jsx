@@ -12,7 +12,7 @@ const tabs = [
 
 const TAB_COLORS = {
   blue: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-  orange: 'bg-orange-500/20 text-orange-400 border border-orange-500/30',
+  orange: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
   teal: 'bg-teal-500/20 text-teal-400 border border-teal-500/30',
   emerald: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
 }
@@ -27,7 +27,7 @@ export default function EquityPage({ capital, setCapital }) {
       {/* Header + Tab bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Briefcase size={22} className="text-orange-400" />
+          <Briefcase size={22} className="text-emerald-400" />
           <div>
             <h2 className="text-lg font-semibold text-white">Equity Trading</h2>
             <p className="text-gray-500 text-xs">Nifty 500 stock strategies with intraday & swing modes</p>
@@ -58,7 +58,7 @@ export default function EquityPage({ capital, setCapital }) {
         <span className="text-dark-500">|</span>
         {current?.component === 'intraday' ? (
           <>
-            <span>Start at <span className="text-orange-400 font-semibold">10:15 AM</span></span>
+            <span>Start at <span className="text-emerald-400 font-semibold">10:15 AM</span></span>
             <span className="text-dark-500">|</span>
             <span>Capital: <span className="text-white">₹75K</span> (paper)</span>
             <span className="text-dark-500">|</span>
@@ -82,13 +82,13 @@ export default function EquityPage({ capital, setCapital }) {
       {/* Timing Reference */}
       {current?.component === 'intraday' ? (
         <div className="flex items-center gap-3 flex-wrap bg-dark-700/50 rounded-lg px-4 py-2 border border-dark-600 text-[10px] text-gray-500">
-          <span className="text-orange-400 font-semibold">Intraday</span>
+          <span className="text-emerald-400 font-semibold">Intraday</span>
           <span className="text-dark-500">|</span>
           <span>Regime: <span className="text-amber-400">Auto</span> (NIFTY + VIX + ADX picks strategies)</span>
           <span className="text-dark-500">|</span>
-          <span>Scan: <span className="text-orange-400">10:30 AM</span> + on-demand when slot opens</span>
+          <span>Scan: <span className="text-emerald-400">10:30 AM</span> + on-demand when slot opens</span>
           <span className="text-dark-500">|</span>
-          <span>Orders: <span className="text-orange-400">10:30 AM - 1:30 PM</span></span>
+          <span>Orders: <span className="text-emerald-400">10:30 AM - 1:30 PM</span></span>
           <span className="text-dark-500">|</span>
           <span>Max: <span className="text-white">2 orders/scan</span> (staggered)</span>
           <span className="text-dark-500">|</span>

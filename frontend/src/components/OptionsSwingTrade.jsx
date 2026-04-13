@@ -490,7 +490,7 @@ export default function OptionsSwingTrade({ mode, capital, setCapital }) {
                     <div className="mt-2 flex items-start gap-2 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">
                       <ShieldAlert size={10} className="text-red-400 flex-shrink-0 mt-0.5" />
                       <p className="text-[9px] text-red-400 leading-relaxed">
-                        Live mode places real options orders on Fyers. Real money at risk. Positions carry overnight.
+                        Live mode places real options orders on TradeJini. Real money at risk. Positions carry overnight.
                       </p>
                     </div>
                   )}
@@ -500,7 +500,7 @@ export default function OptionsSwingTrade({ mode, capital, setCapital }) {
               <div className="mt-3 flex items-start gap-2 px-1">
                 <AlertTriangle size={10} className="text-gray-600 flex-shrink-0 mt-0.5" />
                 <p className="text-[9px] text-gray-600 leading-relaxed">
-                  Swing mode &bull; Auto regime-based strategy &bull; Monthly expiry &bull; Positions carry overnight &bull; {isLive ? 'Real orders via Fyers' : 'No real orders'}
+                  Swing mode &bull; Auto regime-based strategy &bull; Monthly expiry &bull; Positions carry overnight &bull; {isLive ? 'Real orders via TradeJini' : 'No real orders'}
                 </p>
               </div>
             </div>
@@ -562,7 +562,7 @@ function Badge({ color, text }) {
     yellow: 'bg-yellow-500/10 text-yellow-400',
     amber: 'bg-amber-500/10 text-amber-400',
     red: 'bg-red-500/10 text-red-400',
-    orange: 'bg-orange-500/10 text-orange-400',
+    orange: 'bg-emerald-500/10 text-emerald-400',
   }
   return (
     <span className={`text-[9px] font-medium px-2 py-0.5 rounded-full ${colors[color]}`}>

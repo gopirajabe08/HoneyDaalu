@@ -125,7 +125,7 @@ function PositionSection({ group, positions, allClosed }) {
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${
-                      productType === 'INTRADAY' || productType === 'MARGIN' ? 'bg-orange-500/10 text-orange-400' :
+                      productType === 'INTRADAY' || productType === 'MARGIN' ? 'bg-emerald-500/10 text-emerald-400' :
                       productType === 'CNC' ? 'bg-emerald-500/10 text-emerald-400' :
                       productType === 'BO' ? 'bg-blue-500/10 text-blue-400' :
                       'bg-gray-500/10 text-gray-400'
@@ -154,14 +154,14 @@ function PositionSection({ group, positions, allClosed }) {
   )
 }
 
-export default function PositionsPage({ fyersConnected }) {
+export default function PositionsPage({ brokerConnected }) {
   const [tab, setTab] = useState('positions')
   const [positions, setPositions] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
   const [orderFilter, setOrderFilter] = useState('all') // 'all', 'Filled', 'Pending', 'Rejected', 'Cancelled'
 
-  useEffect(() => { if (fyersConnected) refresh() }, [fyersConnected])
+  useEffect(() => { if (brokerConnected) refresh() }, [brokerConnected])
 
   async function refresh() {
     setLoading(true)
@@ -195,11 +195,11 @@ export default function PositionsPage({ fyersConnected }) {
   const totalChargesEstimate = closedPositions.length * CHARGES_PER_POSITION
   const grandNetPnl = grandTotalPnl - totalChargesEstimate
 
-  if (!fyersConnected) {
+  if (!brokerConnected) {
     return (
       <div className="rounded-2xl border p-12 text-center" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
         <Briefcase size={32} className="mx-auto mb-3" style={{ color: 'var(--text-secondary)' }} />
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Connect your Fyers account to view positions</p>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Connect your TradeJini account to view positions</p>
       </div>
     )
   }
@@ -208,7 +208,7 @@ export default function PositionsPage({ fyersConnected }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Briefcase size={18} className="text-orange-400" />
+          <Briefcase size={18} className="text-emerald-400" />
           <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Positions & Orders</h2>
         </div>
         <button onClick={refresh} disabled={loading} className="flex items-center gap-1.5 text-xs hover:text-gray-300 rounded-lg border px-3 py-1.5 transition-colors" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
@@ -274,7 +274,7 @@ export default function PositionsPage({ fyersConnected }) {
             <div className="rounded-2xl border p-12 text-center" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
               <Briefcase size={28} className="mx-auto mb-3" style={{ color: 'var(--text-secondary)' }} />
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No positions today</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Positions will appear once trades are executed via Fyers</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Positions will appear once trades are executed via TradeJini</p>
             </div>
           ) : (
             <>

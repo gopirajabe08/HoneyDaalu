@@ -24,7 +24,7 @@ const TABS = [
 
 const TAB_COLORS = {
   blue: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-  orange: 'bg-orange-500/20 text-orange-400 border border-orange-500/30',
+  orange: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
   teal: 'bg-teal-500/20 text-teal-400 border border-teal-500/30',
   emerald: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
 }
@@ -42,7 +42,7 @@ const OI_SENTIMENT_COLORS = {
   long_buildup: 'text-green-400 bg-green-400/10',
   short_covering: 'text-emerald-400 bg-emerald-400/10',
   short_buildup: 'text-red-400 bg-red-400/10',
-  long_unwinding: 'text-orange-400 bg-orange-400/10',
+  long_unwinding: 'text-emerald-400 bg-emerald-400/10',
 }
 
 export default function FuturesPage({ capital, setCapital }) {
@@ -305,7 +305,7 @@ export default function FuturesPage({ capital, setCapital }) {
 
       {/* Strategy Selection + Capital */}
       {!running && (
-        <div className={`bg-dark-700 rounded-xl p-5 border ${isLive ? 'border-orange-500/20' : 'border-blue-500/20'}`}>
+        <div className={`bg-dark-700 rounded-xl p-5 border ${isLive ? 'border-emerald-500/20' : 'border-blue-500/20'}`}>
           {/* Auto / Manual Toggle */}
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-white">Strategy Selection</h3>
@@ -362,19 +362,19 @@ export default function FuturesPage({ capital, setCapital }) {
                   className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     checked
                       ? isLive
-                        ? 'border-orange-500/20 bg-orange-500/5'
+                        ? 'border-emerald-500/20 bg-emerald-500/5'
                         : 'border-blue-500/20 bg-blue-500/5'
                       : 'border-dark-500 bg-dark-800 hover:border-dark-400'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-semibold ${checked ? (isLive ? 'text-orange-400' : 'text-blue-400') : 'text-gray-400'}`}>
+                    <span className={`text-xs font-semibold ${checked ? (isLive ? 'text-emerald-400' : 'text-blue-400') : 'text-gray-400'}`}>
                       {s.name}
                     </span>
                     <div className={`w-4 h-4 rounded border flex items-center justify-center ${
                       checked
                         ? isLive
-                          ? 'bg-orange-500 border-orange-500'
+                          ? 'bg-emerald-500 border-emerald-500'
                           : 'bg-blue-500 border-blue-500'
                         : 'border-dark-400'
                     }`}>
@@ -424,7 +424,7 @@ export default function FuturesPage({ capital, setCapital }) {
               disabled={loading}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all ${
                 isLive
-                  ? 'bg-gradient-to-r from-orange-500 to-pink-500 text-white hover:shadow-lg hover:shadow-orange-500/25'
+                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-emerald-500/25'
                   : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25'
               }`}
             >

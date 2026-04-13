@@ -52,7 +52,7 @@ function CapitalAllocationLive() {
         const headers = token ? { Authorization: `Bearer ${token}` } : {}
         const API = ''
         const [funds, eqStatus, optStatus, btstStatus, regime] = await Promise.all([
-          fetch(`${API}/api/fyers/funds`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`${API}/api/broker/funds`, { headers }).then(r => r.json()).catch(() => null),
           fetch(`${API}/api/auto/status`, { headers }).then(r => r.json()).catch(() => null),
           fetch(`${API}/api/options/auto/status`, { headers }).then(r => r.json()).catch(() => null),
           fetch(`${API}/api/btst/status`, { headers }).then(r => r.json()).catch(() => null),
@@ -156,7 +156,7 @@ function CapitalAllocationLive() {
         <p>&#9679; Allocation based on rolling 3-day P&L — winner gets more capital</p>
         <p>&#9679; VIX {'>'} 22: options boosted +10% (higher premiums). VIX {'<'} 15: equity boosted +10%</p>
         <p>&#9679; Both engines losing: 20% cash reserve held back</p>
-        <p>&#9679; Available: ₹{(data.available || 0).toLocaleString('en-IN')} from Fyers</p>
+        <p>&#9679; Available: ₹{(data.available || 0).toLocaleString('en-IN')} from TradeJini</p>
       </div>
     </div>
   )
@@ -166,22 +166,22 @@ export default function AboutPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4 pb-12">
       {/* System Overview */}
-      <div className="bg-gradient-to-br from-orange-500/10 via-dark-700 to-pink-500/10 rounded-2xl border border-dark-500 p-6">
+      <div className="bg-gradient-to-br from-emerald-500/10 via-dark-700 to-cyan-500/10 rounded-2xl border border-dark-500 p-6">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
-            IT
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
+            LN
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">IntraTrading</h1>
+            <h1 className="text-xl font-bold text-white">LuckyNavi</h1>
             <p className="text-xs text-gray-500">Automated Algo Trading Platform</p>
           </div>
         </div>
         <p className="text-sm text-gray-400 leading-relaxed mt-2">
-          Scans Nifty 500 stocks using technical strategies. Executes trades on Fyers broker.
+          Scans Nifty 500 stocks using technical strategies. Executes trades on TradeJini broker.
         </p>
         <div className="flex gap-2 mt-3">
           {['Equity Intraday', 'Options Intraday', 'BTST'].map((e) => (
-            <span key={e} className="px-2.5 py-1 rounded-lg bg-dark-600 border border-dark-500 text-xs text-orange-400 font-medium">
+            <span key={e} className="px-2.5 py-1 rounded-lg bg-dark-600 border border-dark-500 text-xs text-emerald-400 font-medium">
               {e}
             </span>
           ))}
@@ -189,7 +189,7 @@ export default function AboutPage() {
       </div>
 
       {/* Live Engines */}
-      <Section icon={Zap} title="Live Engines" color="text-orange-400">
+      <Section icon={Zap} title="Live Engines" color="text-emerald-400">
         <div className="space-y-4">
           {/* Options Intraday — PRIMARY */}
           <div className="bg-dark-800/50 rounded-lg p-4 border border-dark-600">
@@ -223,7 +223,7 @@ export default function AboutPage() {
               <Bullet color="text-green-400">9 strategies — regime picks dynamically based on market conditions</Bullet>
               <Bullet color="text-green-400">Capital: 50% of available (remainder after Options)</Bullet>
               <Bullet color="text-green-400">Orders 10:30 AM - 1:30 PM, square-off 3:20 PM</Bullet>
-              <Bullet color="text-green-400">Max 2 positions, SL mandatory on Fyers exchange</Bullet>
+              <Bullet color="text-green-400">Max 2 positions, SL mandatory on TradeJini exchange</Bullet>
               <Bullet color="text-green-400">VIX-adjusted SL: 2.0x - 3.5x ATR (4 tiers)</Bullet>
               <Bullet color="text-green-400">SL failure → trade cancelled + emergency exit</Bullet>
             </ul>
@@ -243,7 +243,7 @@ export default function AboutPage() {
               <Bullet color="text-amber-400">Product: CNC (delivery), carries overnight</Bullet>
               <Bullet color="text-amber-400">Entry: 2:00 PM - 3:15 PM</Bullet>
               <Bullet color="text-amber-400">Target: +2%, SL: -1.5%, max hold: 2 days</Bullet>
-              <Bullet color="text-amber-400">Dynamic capital from Fyers at 2 PM</Bullet>
+              <Bullet color="text-amber-400">Dynamic capital from TradeJini at 2 PM</Bullet>
               <Bullet color="text-amber-400">SL failure → position exits immediately (no overnight without SL)</Bullet>
             </ul>
           </div>
@@ -270,15 +270,15 @@ export default function AboutPage() {
         <div className="space-y-2">
           <div className="flex items-start gap-3">
             <span className="text-[10px] font-bold text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0">ALERT</span>
-            <p className="text-xs text-gray-400">Flash crash, Fyers disconnect &gt;2min, margin warning</p>
+            <p className="text-xs text-gray-400">Flash crash, TradeJini disconnect &gt;2min, margin warning</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="text-[10px] font-bold text-orange-400 bg-orange-500/20 px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0">TRADE</span>
+            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0">TRADE</span>
             <p className="text-xs text-gray-400">Entry, exit, BTST position, breakeven SL</p>
           </div>
           <div className="flex items-start gap-3">
             <span className="text-[10px] font-bold text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0">SUMMARY</span>
-            <p className="text-xs text-gray-400">Morning brief, half-day, day-end with Fyers P&L</p>
+            <p className="text-xs text-gray-400">Morning brief, half-day, day-end with TradeJini P&L</p>
           </div>
           <p className="text-[10px] text-gray-600 mt-2">Rate limited: max 30 messages per 10 minutes</p>
         </div>
@@ -301,9 +301,9 @@ export default function AboutPage() {
           {[
             ['Backend', 'FastAPI + Python 3.12'],
             ['Frontend', 'React + Vite + Tailwind CSS'],
-            ['Broker', 'Fyers API v3 (TOTP auto-login)'],
-            ['Data', 'yfinance (charts) + Fyers (live LTP)'],
-            ['Hosting', 'AWS EC2 Mumbai (Elastic IP)'],
+            ['Broker', 'TradeJini CubePlus API (TOTP auto-login)'],
+            ['Data', 'yfinance (charts) + TradeJini (live LTP)'],
+            ['Hosting', 'Local deployment'],
             ['Notifications', 'Telegram Bot API'],
           ].map(([label, value]) => (
             <div key={label} className="flex items-baseline gap-2 text-xs py-0.5">
@@ -316,7 +316,7 @@ export default function AboutPage() {
 
       {/* Footer */}
       <p className="text-center text-[10px] text-gray-600 pt-2">
-        IntraTrading v4.0 &mdash; Built for consistent compounding
+        LuckyNavi v1.0 &mdash; Built for consistent compounding
       </p>
     </div>
   )

@@ -27,7 +27,7 @@ const Badge = ({ label, color }) => {
     red:    'bg-red-900/60 text-red-300 border-red-700',
     yellow: 'bg-yellow-900/60 text-yellow-300 border-yellow-700',
     blue:   'bg-blue-900/60 text-blue-300 border-blue-700',
-    orange: 'bg-orange-900/60 text-orange-300 border-orange-700',
+    orange: 'bg-emerald-900/60 text-emerald-300 border-emerald-700',
     purple: 'bg-purple-900/60 text-purple-300 border-purple-700',
     gray:   'bg-dark-600 text-gray-400 border-dark-500',
   }
@@ -179,7 +179,7 @@ export default function AlgoSpecialistView() {
   const [progress, setProgress]           = useState(0)
   const [deployedToday, setDeployedToday] = useState(() => {
     try {
-      const key = `intratrading_deployed_${new Date().toLocaleDateString('en-CA')}`
+      const key = `luckynavi_deployed_${new Date().toLocaleDateString('en-CA')}`
       return JSON.parse(localStorage.getItem(key) || '[]')
     } catch { return [] }
   })
@@ -220,7 +220,7 @@ export default function AlgoSpecialistView() {
       setDeployedToday(prev => {
         const updated = [...prev, entry]
         try {
-          const key = `intratrading_deployed_${new Date().toLocaleDateString('en-CA')}`
+          const key = `luckynavi_deployed_${new Date().toLocaleDateString('en-CA')}`
           localStorage.setItem(key, JSON.stringify(updated))
         } catch {}
         return updated
@@ -249,7 +249,7 @@ export default function AlgoSpecialistView() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Microscope size={20} className="text-orange-400" />
+            <Microscope size={20} className="text-emerald-400" />
             Day Review
           </h2>
           <p className="text-gray-500 text-xs mt-0.5">{today()} &middot; Intraday Live</p>
@@ -257,7 +257,7 @@ export default function AlgoSpecialistView() {
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-400 hover:to-pink-400 text-white rounded-lg text-sm font-semibold transition disabled:opacity-40"
+          className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white rounded-lg text-sm font-semibold transition disabled:opacity-40"
         >
           {generating ? (
             <><RefreshCw size={14} className="animate-spin" /> Analysing... {progress}%</>
@@ -272,7 +272,7 @@ export default function AlgoSpecialistView() {
       {/* ── Empty state ──────────────────────────────────────── */}
       {!hasAnalysis && !generating && deployedToday.length === 0 && (
         <Card className="text-center py-12">
-          <Microscope size={40} className="text-orange-400 mx-auto mb-4" />
+          <Microscope size={40} className="text-emerald-400 mx-auto mb-4" />
           <p className="text-white font-semibold mb-1">End-of-day review</p>
           <p className="text-gray-500 text-xs max-w-md mx-auto">
             Click "Analyse Today" after market close to get session review, strategy tweaks, and a prioritised action plan.
@@ -284,14 +284,14 @@ export default function AlgoSpecialistView() {
       {generating && !hasAnalysis && (
         <Card>
           <div className="flex items-center gap-3">
-            <RefreshCw size={16} className="animate-spin text-orange-400" />
+            <RefreshCw size={16} className="animate-spin text-emerald-400" />
             <div className="flex-1">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-gray-400 text-xs">Analysing today's live trades...</span>
-                <span className="text-orange-400 text-xs font-semibold">{progress}%</span>
+                <span className="text-emerald-400 text-xs font-semibold">{progress}%</span>
               </div>
               <div className="w-full h-1.5 bg-dark-600 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-orange-500 to-pink-500 rounded-full transition-all duration-300"
+                <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full transition-all duration-300"
                   style={{ width: `${progress}%` }} />
               </div>
             </div>
@@ -368,8 +368,8 @@ export default function AlgoSpecialistView() {
               {insights.tweaks.length > 0 && (
                 <div className="space-y-1.5">
                   {insights.tweaks.map((t, i) => (
-                    <div key={i} className="flex items-start gap-2 p-2 bg-orange-900/10 border border-orange-800/20 rounded-lg">
-                      <Target size={13} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div key={i} className="flex items-start gap-2 p-2 bg-emerald-900/10 border border-emerald-800/20 rounded-lg">
+                      <Target size={13} className="text-emerald-400 mt-0.5 flex-shrink-0" />
                       <span className="text-gray-300 text-xs leading-relaxed">{t}</span>
                     </div>
                   ))}
@@ -398,10 +398,10 @@ export default function AlgoSpecialistView() {
 
           {/* ── 4. PRIORITY ACTION PLAN (always visible) ───── */}
           {actionPlan.length > 0 && (
-            <Card className="border-orange-500/30 bg-gradient-to-b from-dark-800 to-dark-800/80">
+            <Card className="border-emerald-500/30 bg-gradient-to-b from-dark-800 to-dark-800/80">
               <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 rounded-lg bg-orange-500/15">
-                  <Star size={16} className="text-orange-400" />
+                <div className="p-1.5 rounded-lg bg-emerald-500/15">
+                  <Star size={16} className="text-emerald-400" />
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-sm">Priority Action Plan</h3>
@@ -418,7 +418,7 @@ export default function AlgoSpecialistView() {
                     : ArrowRight
                   const typeColor = action.type === 'fix' ? 'text-red-400'
                     : action.type === 'deploy' ? 'text-green-400'
-                    : action.type === 'tweak' ? 'text-orange-400'
+                    : action.type === 'tweak' ? 'text-emerald-400'
                     : 'text-blue-400'
                   const TypeIcon = typeIcon
 

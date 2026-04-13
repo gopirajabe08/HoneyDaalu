@@ -3,7 +3,7 @@ Futures Auto-Trading Engine (Intraday Live).
 
 Rules:
   - Scans F&O stocks with OI sentiment filter during market hours
-  - Places futures orders via Fyers (INTRADAY product type)
+  - Places futures orders via broker (INTRADAY product type)
   - Places exchange-level SL-M order immediately after entry (exchange protection)
   - Order window: 11:00 AM - 2:00 PM IST
   - Squares off all positions at 3:15 PM IST (with retry logic)
@@ -29,7 +29,7 @@ from services.futures_client import (
     calculate_position_size,
 )
 from services.trade_logger import log_trade
-from services.fyers_client import is_authenticated, get_quotes, cancel_order
+from services.broker_client import is_authenticated, get_quotes, cancel_order
 from fno_stocks import get_fno_symbols
 from utils.time_utils import now_ist, is_before_time, is_past_time
 from utils.state_manager import get_state_path, save_state, load_state
@@ -65,7 +65,7 @@ def _is_squareoff_time() -> bool:
 class FuturesAutoTrader:
     """
     Live futures intraday trading engine.
-    Places futures orders via Fyers with OI-filtered strategy signals.
+    Places futures orders via broker with OI-filtered strategy signals.
     Exchange-level SL-M protection on every position.
     """
 
@@ -207,7 +207,7 @@ class FuturesAutoTrader:
                 return {"error": "Market is closed. Futures trading runs during market hours (9:15 AM - 3:30 PM IST)."}
 
             if not is_authenticated():
-                return {"error": "Fyers is not authenticated. Please login first."}
+                return {"error": "Broker is not authenticated. Please login first."}
 
             if _is_past_order_cutoff():
                 return {"error": "Cannot start after 2:00 PM IST. No new orders after cutoff."}
@@ -340,17 +340,17 @@ class FuturesAutoTrader:
             self._update_position_pnl()
             _monitor_tick += 1
 
-            # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
+            # Broker health check every ~5 minutes (every 5th tick at 60s intervals)
             if _monitor_tick % 5 == 0:
                 try:
                     if not is_authenticated():
-                        self._log("WARN", "Fyers disconnected — attempting reconnect...")
-                        from services.fyers_client import headless_login
+                        self._log("WARN", "Broker disconnected — attempting reconnect...")
+                        from services.broker_client import headless_login
                         result = headless_login()
                         if "error" in result:
-                            self._log("ALERT", f"Fyers reconnect FAILED: {result['error']} — positions at risk!")
+                            self._log("ALERT", f"Broker reconnect FAILED: {result['error']} — positions at risk!")
                         else:
-                            self._log("INFO", "Fyers reconnected successfully")
+                            self._log("INFO", "Broker reconnected successfully")
                 except Exception:
                     pass
 

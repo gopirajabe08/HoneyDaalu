@@ -8,8 +8,8 @@ export const strategies = [
     indicators: ['9 EMA', '21 EMA', '50 SMA'],
     timeframes: ['5m', '15m'],
     swingTimeframes: ['1h', '1d'],
-    color: '#f97316',
-    gradient: 'from-orange-500 to-amber-500',
+    color: '#10b981',
+    gradient: 'from-emerald-500 to-amber-500',
   },
   {
     id: 'play2_triple_ma',
@@ -67,7 +67,7 @@ export const strategies = [
     timeframes: ['5m', '15m'],
     swingTimeframes: ['1d'],
     color: '#ec4899',
-    gradient: 'from-pink-500 to-rose-500',
+    gradient: 'from-cyan-500 to-rose-500',
   },
   {
     id: 'play7_orb',
@@ -108,7 +108,7 @@ export const strategies = [
 ]
 
 export const categoryMap = {
-  'Trend Following': { label: 'Trend Following (Momentum Capture)', color: '#f97316' },
+  'Trend Following': { label: 'Trend Following (Momentum Capture)', color: '#10b981' },
   'Intraday Precision': { label: 'Intraday Precision (Session Trading)', color: '#22c55e' },
   'Volatility & Reversals': { label: 'Volatility & Reversals (Bollinger Dynamics)', color: '#a855f7' },
   'Intraday Momentum': { label: 'Intraday Momentum (Opening Range)', color: '#06b6d4' },
@@ -161,7 +161,7 @@ export const optionsStrategies = [
     winRate: '~65-70%',
     description: 'Sell lower strike CE + Buy higher strike CE. Profits from time decay in mild downtrend.',
     color: '#ef4444',
-    gradient: 'from-red-500 to-orange-500',
+    gradient: 'from-red-500 to-emerald-500',
     highProbability: true,
   },
   {
@@ -172,8 +172,8 @@ export const optionsStrategies = [
     conviction: 'Strongly Bearish',
     winRate: '~55%',
     description: 'Buy higher strike PE + Sell lower strike PE. Profits when market drops sharply.',
-    color: '#f97316',
-    gradient: 'from-orange-500 to-red-500',
+    color: '#10b981',
+    gradient: 'from-emerald-500 to-red-500',
   },
   {
     id: 'long_straddle',

@@ -12,7 +12,7 @@ const tabs = [
 
 const TAB_COLORS = {
   blue: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-  orange: 'bg-orange-500/20 text-orange-400 border border-orange-500/30',
+  orange: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
   teal: 'bg-teal-500/20 text-teal-400 border border-teal-500/30',
   emerald: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
 }

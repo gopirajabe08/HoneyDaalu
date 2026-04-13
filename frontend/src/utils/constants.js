@@ -1,5 +1,5 @@
 /**
- * Shared constants for IntraTrading frontend.
+ * Shared constants for LuckyNavi frontend.
  *
  * Centralizes values that were previously duplicated across
  * 7+ trading components (LOG_COLORS, CONVICTION_COLORS, etc.)
@@ -10,7 +10,7 @@ export const LOG_COLORS = {
   START: 'text-green-400',
   STOP: 'text-red-400',
   SCAN: 'text-blue-400',
-  ORDER: 'text-orange-400',
+  ORDER: 'text-emerald-400',
   SQUAREOFF: 'text-purple-400',
   ALERT: 'text-yellow-400',
   ERROR: 'text-red-400',
@@ -27,7 +27,7 @@ export const CONVICTION_COLORS = {
   'strongly_bullish': 'bg-green-500/15 text-green-400',
   'mildly_bullish': 'bg-emerald-500/15 text-emerald-400',
   'neutral': 'bg-violet-500/15 text-violet-400',
-  'mildly_bearish': 'bg-orange-500/15 text-orange-400',
+  'mildly_bearish': 'bg-emerald-500/15 text-emerald-400',
   'strongly_bearish': 'bg-red-500/15 text-red-400',
   'high_volatility': 'bg-yellow-500/15 text-yellow-400',
 }

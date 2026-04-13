@@ -1,5 +1,5 @@
 """
-Options Swing Paper Trading Engine for IntraTrading.
+Options Swing Paper Trading Engine for LuckyNavi.
 
 Mirrors the Options Swing Trader exactly but uses virtual positions.
 Key differences from intraday options paper trader:
@@ -25,7 +25,7 @@ from services.scanner import is_market_open
 from services.options_scanner import scan_options
 from services.options_client import get_ltp
 from services.trade_logger import log_trade
-from services.fyers_client import is_authenticated
+from services.broker_client import is_authenticated
 from strategies.options_registry import OPTIONS_STRATEGY_MAP
 from config import (
     OPTIONS_SWING_MAX_POSITIONS,

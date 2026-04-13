@@ -2,7 +2,7 @@
 Options Scanner — scans NIFTY/BANKNIFTY for spread trade setups.
 
 Reads the current market regime (via market_regime.detect_regime), selects the
-recommended options strategy, fetches the live option chain from Fyers, and
+recommended options strategy, fetches the live option chain from the broker, and
 returns fully formed spread signals (legs, strikes, premiums, max risk/reward).
 Supports both intraday (weekly expiry) and swing (monthly expiry) modes.
 """

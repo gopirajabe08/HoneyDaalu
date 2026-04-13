@@ -37,7 +37,7 @@ export default function BTSTPage({ capital, setCapital }) {
   const [status, setStatus] = useState(null)
   const [autoMode, setAutoMode] = useState(true)
   const [regime, setRegime] = useState(null)
-  const [fyersPositions, setFyersPositions] = useState([])
+  const [brokerPositions, setBrokerPositions] = useState([])
   const pollRef = useRef(null)
   const logEndRef = useRef(null)
 
@@ -67,7 +67,7 @@ export default function BTSTPage({ capital, setCapital }) {
         } catch {}
       }
       setStatus(data)
-      // For live mode, fetch Fyers CNC positions as source of truth
+      // For live mode, fetch TradeJini CNC positions as source of truth
       if (config.isLive) {
         try {
           const posRes = await getPositions()
@@ -76,7 +76,7 @@ export default function BTSTPage({ capital, setCapital }) {
             const prod = (p.productType || '').toUpperCase()
             return prod === 'CNC' && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0)
           })
-          setFyersPositions(cncOnly)
+          setBrokerPositions(cncOnly)
         } catch {}
       }
     } catch {}
@@ -141,9 +141,9 @@ export default function BTSTPage({ capital, setCapital }) {
   const history = (status?.trade_history || []).filter(isCNCPosition)
   const logs = status?.logs || []
 
-  // For live: use Fyers P&L (source of truth). For paper: use engine P&L.
-  const fyersTotalPnl = fyersPositions.reduce((s, p) => s + (p.pl || 0), 0)
-  const totalPnl = isLive && fyersPositions.length > 0 ? fyersTotalPnl : (status?.total_pnl ?? 0)
+  // For live: use TradeJini P&L (source of truth). For paper: use engine P&L.
+  const brokerTotalPnl = brokerPositions.reduce((s, p) => s + (p.pl || 0), 0)
+  const totalPnl = isLive && brokerPositions.length > 0 ? brokerTotalPnl : (status?.total_pnl ?? 0)
 
   // Win/loss from trade history
   const allClosed = history
@@ -324,7 +324,7 @@ export default function BTSTPage({ capital, setCapital }) {
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all ${
                 isLive
                   ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white hover:shadow-lg hover:shadow-yellow-500/25'
-                  : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg hover:shadow-amber-500/25'
+                  : 'bg-gradient-to-r from-amber-500 to-emerald-500 text-white hover:shadow-lg hover:shadow-amber-500/25'
               }`}
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
@@ -396,13 +396,13 @@ export default function BTSTPage({ capital, setCapital }) {
         </div>
       )}
 
-      {/* Fyers CNC Positions (Source of Truth) — Live only */}
-      {isLive && fyersPositions.length > 0 && (
-        <div className="bg-dark-700 rounded-xl p-4 border border-orange-500/30">
-          <h3 className="text-xs font-semibold text-orange-400 mb-3 flex items-center gap-2">
+      {/* TradeJini CNC Positions (Source of Truth) — Live only */}
+      {isLive && brokerPositions.length > 0 && (
+        <div className="bg-dark-700 rounded-xl p-4 border border-emerald-500/30">
+          <h3 className="text-xs font-semibold text-emerald-400 mb-3 flex items-center gap-2">
             <Activity size={14} />
-            Fyers CNC Positions (Source of Truth)
-            <span className="text-[10px] text-gray-500 font-normal">{fyersPositions.length} position(s)</span>
+            TradeJini CNC Positions (Source of Truth)
+            <span className="text-[10px] text-gray-500 font-normal">{brokerPositions.length} position(s)</span>
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -414,7 +414,7 @@ export default function BTSTPage({ capital, setCapital }) {
                 </tr>
               </thead>
               <tbody>
-                {fyersPositions.map((p, i) => {
+                {brokerPositions.map((p, i) => {
                   const pnl = p.pl || 0
                   const sym = (p.symbol || '').replace('NSE:', '').replace('-EQ', '')
                   const netQty = p.netQty || 0

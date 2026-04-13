@@ -1,5 +1,5 @@
 """
-Options Swing Trading Engine for IntraTrading.
+Options Swing Trading Engine for LuckyNavi.
 
 Key differences from intraday options auto-trader:
   - Uses monthly expiry options (higher premium, more time value)
@@ -27,7 +27,7 @@ from services.scanner import is_market_open
 from services.options_scanner import scan_options
 from services.options_client import get_ltp, get_ltp_batch, place_spread_orders, get_nearest_expiry
 from services.trade_logger import log_trade
-from services.fyers_client import is_authenticated
+from services.broker_client import is_authenticated
 from strategies.options_registry import OPTIONS_STRATEGY_MAP
 from config import (
     OPTIONS_SWING_MAX_POSITIONS,
@@ -45,7 +45,7 @@ STATE_FILE = get_state_path(".options_swing_trader_state.json")
 class OptionsSwingTrader:
     """
     Live options swing trading engine.
-    Places MARGIN spread orders via Fyers. Positions carry over days.
+    Places MARGIN spread orders via broker. Positions carry over days.
     Max 2 positions. No time-based square-off. Exits before expiry.
     """
 
@@ -151,7 +151,7 @@ class OptionsSwingTrader:
                 return {"error": "Market is closed. Options swing trading scans run during market hours (9:15 AM - 3:30 PM IST)."}
 
             if not is_authenticated():
-                return {"error": "Fyers is not authenticated. Please login first."}
+                return {"error": "Broker is not authenticated. Please login first."}
 
             self._underlyings = underlyings or ["NIFTY", "BANKNIFTY"]
             self._capital = capital
@@ -324,7 +324,7 @@ class OptionsSwingTrader:
             return
 
         if not is_authenticated():
-            self._log("ERROR", "Fyers authentication lost")
+            self._log("ERROR", "Broker authentication lost")
             return
 
         slots_available = OPTIONS_SWING_MAX_POSITIONS - open_count

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link2, Link2Off, User, LogOut, RefreshCw, ExternalLink, Loader2, ClipboardPaste } from 'lucide-react'
-import { getFyersStatus, getFyersLoginUrl, fyersLogout, getFyersFunds, fyersVerifyAuthCode } from '../services/api'
+import { getBrokerStatus, getBrokerLoginUrl, brokerLogout, getBrokerFunds, brokerVerifyAuthCode } from '../services/api'
 
-export default function FyersConnect({ fyersStatus, setFyersStatus }) {
+export default function BrokerConnect({ brokerStatus, setBrokerStatus }) {
   const [loading, setLoading] = useState(true)
   const [funds, setFunds] = useState(null)
   const [error, setError] = useState('')
@@ -15,14 +15,14 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
   async function checkStatus() {
     setLoading(true)
     try {
-      const status = await getFyersStatus()
-      setFyersStatus(status)
+      const status = await getBrokerStatus()
+      setBrokerStatus(status)
       if (status.connected) {
         setStep('idle')
-        try { setFunds(await getFyersFunds()) } catch {}
+        try { setFunds(await getBrokerFunds()) } catch {}
       }
     } catch {
-      setFyersStatus({ connected: false, configured: false })
+      setBrokerStatus({ connected: false, configured: false })
     } finally {
       setLoading(false)
     }
@@ -31,9 +31,9 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
   async function handleLogin() {
     setError('')
     try {
-      const data = await getFyersLoginUrl()
+      const data = await getBrokerLoginUrl()
       if (data.auth_url) {
-        window.open(data.auth_url, 'fyers_login', 'width=600,height=700')
+        window.open(data.auth_url, 'tradejini_login', 'width=600,height=700')
         setStep('waiting')
         setTimeout(() => inputRef.current?.focus(), 300)
       } else {
@@ -64,7 +64,7 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
     setStep('verifying')
     setError('')
     try {
-      const result = await fyersVerifyAuthCode(code)
+      const result = await brokerVerifyAuthCode(code)
       if (result.status === 'ok') {
         setPastedUrl('')
         await checkStatus()
@@ -98,7 +98,7 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
     setStep('verifying')
     setError('')
     try {
-      const result = await fyersVerifyAuthCode(code)
+      const result = await brokerVerifyAuthCode(code)
       if (result.status === 'ok') {
         setPastedUrl('')
         await checkStatus()
@@ -113,8 +113,8 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
   }
 
   async function handleLogout() {
-    await fyersLogout()
-    setFyersStatus({ connected: false, configured: true })
+    await brokerLogout()
+    setBrokerStatus({ connected: false, configured: true })
     setFunds(null)
     setStep('idle')
     setPastedUrl('')
@@ -138,10 +138,10 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            {fyersStatus?.connected
+            {brokerStatus?.connected
               ? <Link2 size={16} className="text-green-400" />
               : <Link2Off size={16} className="text-gray-500" />}
-            <h3 className="text-sm font-semibold text-white">Fyers Account</h3>
+            <h3 className="text-sm font-semibold text-white">TradeJini Account</h3>
           </div>
           <button onClick={checkStatus} disabled={loading} className="text-gray-500 hover:text-gray-300 transition-colors">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -157,30 +157,30 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
         {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center py-4">
-            <Loader2 size={18} className="text-orange-400 animate-spin" />
+            <Loader2 size={18} className="text-emerald-400 animate-spin" />
             <span className="text-xs text-gray-400 ml-2">Connecting...</span>
           </div>
         )}
 
         {/* Not configured */}
-        {!loading && !fyersStatus?.configured && (
+        {!loading && !brokerStatus?.configured && (
           <div className="text-xs text-gray-400 leading-relaxed">
-            <p>Add <code className="text-orange-400">FYERS_APP_ID</code> & <code className="text-orange-400">FYERS_SECRET_KEY</code> to <code className="text-gray-300">backend/.env</code></p>
+            <p>Add <code className="text-emerald-400">TRADEJINI_API_KEY</code> & <code className="text-emerald-400">TRADEJINI_SECRET</code> to <code className="text-gray-300">backend/.env</code></p>
           </div>
         )}
 
         {/* Login flow */}
-        {!loading && fyersStatus?.configured && !fyersStatus?.connected && (
+        {!loading && brokerStatus?.configured && !brokerStatus?.connected && (
           <div>
             {step === 'idle' && (
               <>
-                <p className="text-xs text-gray-400 mb-3">Connect your Fyers account to place trades.</p>
+                <p className="text-xs text-gray-400 mb-3">Connect your TradeJini account to place trades.</p>
                 <button
                   onClick={handleLogin}
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
                 >
                   <ExternalLink size={14} />
-                  Login with Fyers
+                  Login with TradeJini
                 </button>
               </>
             )}
@@ -224,15 +224,15 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
         )}
 
         {/* Connected */}
-        {!loading && fyersStatus?.connected && (
+        {!loading && brokerStatus?.connected && (
           <div>
             <div className="flex items-center gap-3 mb-3 bg-dark-600 rounded-xl p-3">
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
                 <User size={16} className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{fyersStatus.profile?.name || 'Trader'}</p>
-                <p className="text-[10px] text-gray-400">{fyersStatus.profile?.fy_id || ''}</p>
+                <p className="text-sm font-medium text-white truncate">{brokerStatus.profile?.name || 'Trader'}</p>
+                <p className="text-[10px] text-gray-400">{brokerStatus.profile?.fy_id || ''}</p>
               </div>
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             </div>
@@ -240,7 +240,7 @@ export default function FyersConnect({ fyersStatus, setFyersStatus }) {
             {availableMargin && (
               <div className="space-y-2 mb-3">
                 <FundRow label="Available" value={availableMargin.available} color="text-green-400" />
-                <FundRow label="Used" value={availableMargin.used} color="text-orange-400" />
+                <FundRow label="Used" value={availableMargin.used} color="text-emerald-400" />
                 <FundRow label="Total" value={availableMargin.total} color="text-white" />
               </div>
             )}

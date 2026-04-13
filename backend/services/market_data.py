@@ -1,8 +1,8 @@
 """
-Market data service — fetches OHLCV candles via Fyers API (primary) with yfinance fallback.
+Market data service — fetches OHLCV candles via broker API (primary) with yfinance fallback.
 
-Fyers provides real-time data with 10 req/sec rate limit.
-yfinance is used as fallback when Fyers is not authenticated or fails.
+Broker provides real-time data with 10 req/sec rate limit.
+yfinance is used as fallback when broker is not authenticated or fails.
 All consumers get the same DataFrame format: [Open, High, Low, Close, Volume].
 """
 
@@ -20,8 +20,8 @@ from config import INTERVAL_PERIOD_MAP
 logger = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# Fyers interval mapping: our interval → Fyers resolution string
-FYERS_INTERVAL_MAP = {
+# Broker interval mapping: our interval → broker resolution string
+BROKER_INTERVAL_MAP = {
     "1m": "1",
     "3m": "3",
     "5m": "5",
@@ -33,7 +33,7 @@ FYERS_INTERVAL_MAP = {
 }
 
 # How many calendar days of data to request per interval
-FYERS_DAYS_MAP = {
+BROKER_DAYS_MAP = {
     "5m": 30,
     "15m": 60,
     "30m": 60,
@@ -70,60 +70,60 @@ def _set_cache(symbol: str, interval: str, df: pd.DataFrame):
     _cache[(symbol, interval)] = (time.time(), df)
 
 
-# Rate limiter for Fyers API (max 10 req/sec)
-_last_fyers_call = 0.0
-_FYERS_MIN_INTERVAL = 0.1  # 100ms between calls = 10/sec
+# Rate limiter for broker API (max 10 req/sec)
+_last_broker_call = 0.0
+_BROKER_MIN_INTERVAL = 0.1  # 100ms between calls = 10/sec
 
 
-def _rate_limit_fyers():
-    """Ensure we don't exceed Fyers rate limit."""
-    global _last_fyers_call
+def _rate_limit_broker():
+    """Ensure we don't exceed broker rate limit."""
+    global _last_broker_call
     now = time.time()
-    elapsed = now - _last_fyers_call
-    if elapsed < _FYERS_MIN_INTERVAL:
-        time.sleep(_FYERS_MIN_INTERVAL - elapsed)
-    _last_fyers_call = time.time()
+    elapsed = now - _last_broker_call
+    if elapsed < _BROKER_MIN_INTERVAL:
+        time.sleep(_BROKER_MIN_INTERVAL - elapsed)
+    _last_broker_call = time.time()
 
 
-def _fetch_via_fyers(nse_symbol: str, interval: str) -> Optional[pd.DataFrame]:
+def _fetch_via_broker(nse_symbol: str, interval: str) -> Optional[pd.DataFrame]:
     """
-    Fetch OHLCV data from Fyers history API.
+    Fetch OHLCV data from broker history API.
     Returns DataFrame with [Open, High, Low, Close, Volume] or None.
     """
     try:
-        from services.fyers_client import get_fyers, is_authenticated, format_fyers_symbol
+        from services.broker_client import get_fyers, is_authenticated, format_broker_symbol
 
         if not is_authenticated():
             return None
 
-        fyers = get_fyers()
-        if fyers is None:
+        broker = get_fyers()
+        if broker is None:
             return None
 
-        fyers_resolution = FYERS_INTERVAL_MAP.get(interval)
-        if not fyers_resolution:
+        broker_resolution = BROKER_INTERVAL_MAP.get(interval)
+        if not broker_resolution:
             return None
 
         # Calculate date range
-        days = FYERS_DAYS_MAP.get(interval, 30)
+        days = BROKER_DAYS_MAP.get(interval, 30)
         now = datetime.now(IST)
         date_from = (now - timedelta(days=days)).strftime("%Y-%m-%d")
         date_to = now.strftime("%Y-%m-%d")
 
-        fyers_symbol = format_fyers_symbol(nse_symbol)
+        broker_symbol = format_broker_symbol(nse_symbol)
 
-        _rate_limit_fyers()
+        _rate_limit_broker()
 
         data = {
-            "symbol": fyers_symbol,
-            "resolution": fyers_resolution,
+            "symbol": broker_symbol,
+            "resolution": broker_resolution,
             "date_format": "1",
             "range_from": date_from,
             "range_to": date_to,
             "cont_flag": "1",
         }
 
-        response = fyers.history(data=data)
+        response = broker.history(data=data)
 
         if not response or response.get("s") != "ok":
             return None
@@ -132,7 +132,7 @@ def _fetch_via_fyers(nse_symbol: str, interval: str) -> Optional[pd.DataFrame]:
         if not candles or len(candles) < 5:
             return None
 
-        # Fyers candle format: [timestamp, open, high, low, close, volume]
+        # Broker candle format: [timestamp, open, high, low, close, volume]
         df = pd.DataFrame(candles, columns=["Timestamp", "Open", "High", "Low", "Close", "Volume"])
         df["Datetime"] = pd.to_datetime(df["Timestamp"], unit="s", utc=True).dt.tz_convert(IST)
         df.set_index("Datetime", inplace=True)
@@ -155,7 +155,7 @@ def _fetch_via_fyers(nse_symbol: str, interval: str) -> Optional[pd.DataFrame]:
         return df[["Open", "High", "Low", "Close", "Volume"]]
 
     except Exception as e:
-        logger.debug(f"[MarketData] Fyers fetch failed for {nse_symbol} ({interval}): {e}")
+        logger.debug(f"[MarketData] Broker fetch failed for {nse_symbol} ({interval}): {e}")
         return None
 
 
@@ -200,7 +200,7 @@ def fetch_stock_data(
 ) -> Optional[pd.DataFrame]:
     """
     Fetch OHLCV data for a single NSE stock.
-    Primary: Fyers API (real-time). Fallback: yfinance (delayed).
+    Primary: broker API (real-time). Fallback: yfinance (delayed).
 
     Args:
         nse_symbol: NSE symbol (e.g., "RELIANCE")
@@ -214,10 +214,10 @@ def fetch_stock_data(
     if cached is not None:
         return cached
 
-    # Try Fyers first (real-time)
-    df = _fetch_via_fyers(nse_symbol, interval)
+    # Try broker first (real-time)
+    df = _fetch_via_broker(nse_symbol, interval)
 
-    # Fallback to yfinance if Fyers fails
+    # Fallback to yfinance if broker fails
     if df is None:
         df = _fetch_via_yfinance(nse_symbol, interval, period)
 
@@ -243,25 +243,25 @@ def get_nifty_trend(timeframe: str = "5m") -> str:
         if cached is not None:
             return cached.iloc[0]["trend"]
 
-        # Try Fyers for NIFTY index
+        # Try broker for NIFTY index
         df = None
         try:
-            from services.fyers_client import get_fyers, is_authenticated
+            from services.broker_client import get_fyers, is_authenticated
             if is_authenticated():
-                fyers = get_fyers()
-                if fyers:
-                    fyers_resolution = FYERS_INTERVAL_MAP.get(timeframe, "15")
+                broker = get_fyers()
+                if broker:
+                    broker_resolution = BROKER_INTERVAL_MAP.get(timeframe, "15")
                     now = datetime.now(IST)
                     data = {
                         "symbol": "NSE:NIFTY50-INDEX",
-                        "resolution": fyers_resolution,
+                        "resolution": broker_resolution,
                         "date_format": "1",
                         "range_from": (now - timedelta(days=30)).strftime("%Y-%m-%d"),
                         "range_to": now.strftime("%Y-%m-%d"),
                         "cont_flag": "1",
                     }
-                    _rate_limit_fyers()
-                    response = fyers.history(data=data)
+                    _rate_limit_broker()
+                    response = broker.history(data=data)
                     if response and response.get("s") == "ok":
                         candles = response.get("candles", [])
                         if candles and len(candles) >= 20:
@@ -319,7 +319,7 @@ def fetch_bulk_data(
 ) -> dict[str, pd.DataFrame]:
     """
     Fetch data for multiple symbols concurrently.
-    Uses Fyers with rate limiting, falls back to yfinance per-symbol.
+    Uses broker with rate limiting, falls back to yfinance per-symbol.
 
     Returns:
         dict mapping symbol -> DataFrame (only successful fetches).

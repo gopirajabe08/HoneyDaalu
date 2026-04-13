@@ -6,7 +6,7 @@
 #   bash deploy/update-env.sh <elastic-ip> <path-to-key.pem>
 #
 # Example:
-#   bash deploy/update-env.sh 13.235.100.50 ~/Downloads/intratrading-key.pem
+#   bash deploy/update-env.sh 13.235.100.50 ~/Downloads/Honeydaalu-key.pem
 # ═══════════════════════════════════════════════════════════════════════
 
 if [ -z "$1" ] || [ -z "$2" ]; then
@@ -26,9 +26,9 @@ fi
 echo "Uploading .env to EC2 at $EC2_IP..."
 scp -i "$PEM_KEY" "$LOCAL_ENV" ubuntu@"$EC2_IP":/tmp/.env.upload
 ssh -i "$PEM_KEY" ubuntu@"$EC2_IP" "
-    sudo mv /tmp/.env.upload /opt/intratrading/app/backend/.env
-    sudo chown intratrading:intratrading /opt/intratrading/app/backend/.env
-    sudo chmod 600 /opt/intratrading/app/backend/.env
+    sudo mv /tmp/.env.upload /opt/luckynavi/app/backend/.env
+    sudo chown luckynavi:luckynavi /opt/luckynavi/app/backend/.env
+    sudo chmod 600 /opt/luckynavi/app/backend/.env
     echo '.env updated on server'
 "
 echo "Done. Credentials updated securely."

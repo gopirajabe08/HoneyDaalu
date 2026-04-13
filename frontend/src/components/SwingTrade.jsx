@@ -42,7 +42,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
   const [selected, setSelected] = useState({})
   const [autoMode, setAutoMode] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [fyersPositions, setFyersPositions] = useState([])
+  const [brokerPositions, setBrokerPositions] = useState([])
   const scanInterval = getAutoScanInterval(selected)
   const pollRef = useRef(null)
   const countdownRef = useRef(null)
@@ -71,7 +71,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
         try {
           const posRes = await getPositions()
           const posArr = posRes?.netPositions || posRes?.data?.netPositions || []
-          setFyersPositions(posArr.filter(p => p.productType === 'CNC' && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0)))
+          setBrokerPositions(posArr.filter(p => p.productType === 'CNC' && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0)))
         } catch {}
       }
       if (data.next_scan_at) {
@@ -192,8 +192,8 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
   const activeTrades = status?.active_trades ?? []
   const tradeHistory = status?.trade_history ?? []
   const runningStrategies = status?.strategies ?? []
-  const fyersTotalPnl = fyersPositions.reduce((s, p) => s + (p.pl || 0), 0)
-  const totalPnl = isLive && fyersPositions.length > 0 ? fyersTotalPnl : (status?.total_pnl ?? 0)
+  const brokerTotalPnl = brokerPositions.reduce((s, p) => s + (p.pl || 0), 0)
+  const totalPnl = isLive && brokerPositions.length > 0 ? brokerTotalPnl : (status?.total_pnl ?? 0)
 
   const allClosed = tradeHistory
   const winners = allClosed.filter(t => (t.pnl ?? 0) > 0)
@@ -206,7 +206,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
       <div className="flex items-center gap-3">
         <Repeat size={18} className={accentText} />
         <p className="text-gray-400 text-xs">
-          {isLive ? 'Live swing trading with CNC orders via Fyers' : 'Virtual swing trading with no real money'}
+          {isLive ? 'Live swing trading with CNC orders via TradeJini' : 'Virtual swing trading with no real money'}
         </p>
         {running && <div className={`w-2.5 h-2.5 rounded-full ${accentDot} animate-pulse`} />}
         <button onClick={async () => { setRefreshing(true); await pollStatus(); setRefreshing(false) }} disabled={refreshing}
@@ -223,7 +223,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
           {(running || allClosed.length > 0 || activeTrades.length > 0) && (
             <div className="grid grid-cols-6 gap-3">
               <StatCard label="Capital" value={status?.capital > 0 ? `₹${(status.capital >= 100000 ? (status.capital/100000).toFixed(1)+'L' : (status.capital/1000).toFixed(0)+'K')}` : '--'} color="text-white" />
-              <StatCard label={isLive ? 'P&L (Fyers)' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
+              <StatCard label={isLive ? 'P&L (TradeJini)' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
                 color={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'} />
               <StatCard label="Win Rate" value={allClosed.length > 0 ? `${winRate}%` : '--'}
                 sub={allClosed.length > 0 ? `${winners.length}W / ${losers.length}L` : ''} />
@@ -357,7 +357,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
               <h3 className="text-white font-semibold mb-1">Swing Trading</h3>
               <p className="text-gray-500 text-xs max-w-md mx-auto">
                 {isLive
-                  ? 'Select strategies and click Start to begin live swing trading with CNC orders via Fyers.'
+                  ? 'Select strategies and click Start to begin live swing trading with CNC orders via TradeJini.'
                   : 'Select strategies and click Start to begin virtual swing trading. Same rules as live \u2014 no money at risk.'}
               </p>
             </div>
@@ -512,7 +512,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
                     <div className="mt-2 flex items-start gap-2 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">
                       <ShieldAlert size={10} className="text-red-400 flex-shrink-0 mt-0.5" />
                       <p className="text-[9px] text-red-400 leading-relaxed">
-                        Live mode places real CNC orders on Fyers. Real money at risk.
+                        Live mode places real CNC orders on TradeJini. Real money at risk.
                       </p>
                     </div>
                   )}
@@ -522,7 +522,7 @@ export default function SwingTrade({ mode = 'live', capital, setCapital }) {
               <div className="mt-3 flex items-start gap-2 px-1">
                 <AlertTriangle size={10} className="text-gray-600 flex-shrink-0 mt-0.5" />
                 <p className="text-[9px] text-gray-600 leading-relaxed">
-                  Swing mode &bull; Max 1 position &bull; 2% risk &bull; Positions carry overnight &bull; {isLive ? 'CNC orders via Fyers' : 'No real orders'}
+                  Swing mode &bull; Max 1 position &bull; 2% risk &bull; Positions carry overnight &bull; {isLive ? 'CNC orders via TradeJini' : 'No real orders'}
                 </p>
               </div>
             </div>

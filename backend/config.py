@@ -1,5 +1,5 @@
 """
-Central configuration for IntraTrading.
+Central configuration for LuckyNavi.
 
 All tunable parameters live here — time windows, position limits, intervals,
 price filters, strategy settings, and options config. Traders import from
@@ -54,12 +54,12 @@ NSE_HOLIDAYS = {
 
 INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN = 10, 30   # 10:30 AM — start placing orders
 INTRADAY_ORDER_CUTOFF_HOUR, INTRADAY_ORDER_CUTOFF_MIN = 13, 30  # 1:30 PM — stop placing new orders (need 1.75h for trade to develop)
-INTRADAY_SQUAREOFF_HOUR, INTRADAY_SQUAREOFF_MIN = 15, 20       # 3:20 PM — square off (before Fyers auto-square at 3:25)
+INTRADAY_SQUAREOFF_HOUR, INTRADAY_SQUAREOFF_MIN = 15, 20       # 3:20 PM — square off (before broker auto-square at 3:25)
 INTRADAY_MARKET_CLOSE_HOUR, INTRADAY_MARKET_CLOSE_MIN = 15, 30 # 3:30 PM — market closes
 
 # ── Intraday Position Limits ─────────────────────────────────────────────────
 
-INTRADAY_CAPITAL_PER_POSITION = 40000  # ~₹40K per slot (accounts for margin blocked by entry + SL + target orders on Fyers)
+INTRADAY_CAPITAL_PER_POSITION = 40000  # ~₹40K per slot (accounts for margin blocked by entry + SL + target orders on broker)
 INTRADAY_MIN_POSITIONS = 1
 INTRADAY_MAX_POSITIONS_CAP = 2        # Safety cap for ₹1L capital level
 INTRADAY_PAPER_MAX_POSITIONS = 10     # paper: more positions for testing
@@ -159,11 +159,11 @@ VWAP_MARKET_CLOSE_OFFSET_MIN = 60  # stop 1 hour before close
 OPTIONS_UNDERLYINGS = ["NIFTY", "BANKNIFTY"]
 
 OPTIONS_LOT_SIZES = {
-    "NIFTY": 65,       # Updated Mar 2026 (was 25, Fyers min lot = 65)
-    "BANKNIFTY": 30,    # Updated Mar 2026 (was 15, Fyers min lot = 30)
+    "NIFTY": 65,       # Updated Mar 2026 (was 25, broker min lot = 65)
+    "BANKNIFTY": 30,    # Updated Mar 2026 (was 15, broker min lot = 30)
 }
 
-# Fyers symbol prefixes for options
+# Broker symbol prefixes for options
 OPTIONS_SYMBOL_PREFIX = {
     "NIFTY": "NSE:NIFTY",
     "BANKNIFTY": "NSE:BANKNIFTY",

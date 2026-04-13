@@ -30,13 +30,13 @@ export default function SystemHealth() {
 
   async function check() {
     try {
-      const [fyers, eq, opt, btst, market, funds, monitor] = await Promise.all([
-        authFetch('/api/fyers/status'),
+      const [broker, eq, opt, btst, market, funds, monitor] = await Promise.all([
+        authFetch('/api/broker/status'),
         authFetch('/api/auto/status'),
         authFetch('/api/options/auto/status'),
         authFetch('/api/btst/status'),
         authFetch('/api/market-status'),
-        authFetch('/api/fyers/funds'),
+        authFetch('/api/broker/funds'),
         authFetch('/api/monitor/log'),
       ])
 
@@ -53,8 +53,8 @@ export default function SystemHealth() {
       ).length
 
       setData({
-        fyers: fyers?.connected === true || fyers?.profile?.name,
-        fyersName: fyers?.profile?.name || '',
+        broker: broker?.connected === true || broker?.profile?.name,
+        brokerName: broker?.profile?.name || '',
         eqRunning: eq?.is_running || false,
         eqScans: eq?.scan_count || 0,
         eqOrders: eq?.order_count || 0,
@@ -77,7 +77,7 @@ export default function SystemHealth() {
   if (!data) return null
 
   const allEnginesOk = data.eqRunning || data.optRunning || data.btstRunning || !data.marketOpen
-  const overall = data.fyers && allEnginesOk && data.recentErrors === 0
+  const overall = data.broker && allEnginesOk && data.recentErrors === 0
 
   return (
     <div className="rounded-2xl border border-dark-500 overflow-hidden">
@@ -97,14 +97,14 @@ export default function SystemHealth() {
 
       {/* Status grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-dark-500">
-        {/* Fyers */}
+        {/* TradeJini */}
         <div className="bg-dark-800 p-3">
           <div className="flex items-center gap-1.5 mb-2">
-            {data.fyers ? <Wifi size={12} className="text-emerald-400" /> : <WifiOff size={12} className="text-red-400" />}
-            <span className="text-[10px] font-semibold text-white">Fyers</span>
+            {data.broker ? <Wifi size={12} className="text-emerald-400" /> : <WifiOff size={12} className="text-red-400" />}
+            <span className="text-[10px] font-semibold text-white">TradeJini</span>
           </div>
-          <StatusDot ok={data.fyers} label={data.fyers ? 'Connected' : 'Disconnected'} />
-          {data.fyersName && <p className="text-[9px] text-gray-500 mt-1">{data.fyersName}</p>}
+          <StatusDot ok={data.broker} label={data.broker ? 'Connected' : 'Disconnected'} />
+          {data.brokerName && <p className="text-[9px] text-gray-500 mt-1">{data.brokerName}</p>}
           <p className="text-[9px] text-gray-500">Margin: ₹{(data.available || 0).toLocaleString('en-IN')}</p>
         </div>
 

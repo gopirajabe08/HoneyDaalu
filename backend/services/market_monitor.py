@@ -2,7 +2,7 @@
 Market Monitor Daemon v2 — Autonomous monitoring + corrective action.
 
 Runs as a background thread. Every 5 minutes during market hours:
-  1. Fyers connection → auto-reconnect
+  1. Broker connection → auto-reconnect
   2. Engine health → auto-restart stopped engines
   3. Signal generation → alert if 0 signals too long
   4. P&L tracking → safety mode if losses mount
@@ -67,21 +67,21 @@ def _api_post(endpoint, data=None, timeout=10):
         return None
 
 
-def _check_and_fix_fyers():
-    """Check Fyers connection. Reconnect if down."""
+def _check_and_fix_broker():
+    """Check broker connection. Reconnect if down."""
     try:
-        from services.fyers_client import is_authenticated, headless_login
+        from services.broker_client import is_authenticated, headless_login
         if not is_authenticated():
-            _log("ACTION", "Fyers disconnected — reconnecting...")
+            _log("ACTION", "Broker disconnected — reconnecting...")
             result = headless_login()
             if "error" in result:
-                _log("ALERT", f"Fyers reconnect FAILED: {result['error']}")
+                _log("ALERT", f"Broker reconnect FAILED: {result['error']}")
             else:
-                _log("ACTION", "Fyers reconnected successfully")
+                _log("ACTION", "Broker reconnected successfully")
         else:
-            _log("OK", "Fyers: connected")
+            _log("OK", "Broker: connected")
     except Exception as e:
-        _log("ERROR", f"Fyers check: {e}")
+        _log("ERROR", f"Broker check: {e}")
 
 
 def _check_and_fix_engines():
@@ -202,7 +202,7 @@ def _run_monitor_loop():
     while _running:
         if _is_market_hours():
             _log("CHECK", "─" * 40)
-            _check_and_fix_fyers()
+            _check_and_fix_broker()
             _check_and_fix_engines()
             _check_regime()
             _check_signal_health()

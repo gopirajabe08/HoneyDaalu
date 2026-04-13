@@ -1,5 +1,5 @@
 """
-Swing Paper Trading Engine for IntraTrading.
+Swing Paper Trading Engine for LuckyNavi.
 
 Mirrors swing trading rules but uses virtual positions.
 Key differences from intraday paper trader:
@@ -19,7 +19,7 @@ from typing import Optional
 
 from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.trade_logger import log_trade
-from services.fyers_client import get_quotes, is_authenticated
+from services.broker_client import get_quotes, is_authenticated
 from config import SWING_PAPER_MAX_POSITIONS, SWING_SCAN_INTERVAL_SECONDS, SWING_DAILY_SCAN_TIMES
 from utils.time_utils import now_ist
 from utils.state_manager import get_state_path, save_state, load_state
@@ -504,7 +504,7 @@ class SwingPaperTrader:
 
         capital_req = qty * entry_price
 
-        # Realistic Fyers brokerage + STT + other charges
+        # Realistic brokerage + STT + other charges
         turnover = qty * entry_price
         brokerage_per_leg = min(20, turnover * 0.0003)  # ₹20 or 0.03% (whichever lower)
         brokerage = round(brokerage_per_leg * 2, 2)  # Entry + Exit = 2 legs

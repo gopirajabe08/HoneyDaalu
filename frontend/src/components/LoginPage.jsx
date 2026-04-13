@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Lock, Mail, Shield, ArrowRight, Loader2, CheckCircle2, AlertCircle, Smartphone } from 'lucide-react'
+import { Lock, Mail, Zap, ArrowRight, Loader2, CheckCircle2, AlertCircle, Smartphone } from 'lucide-react'
 import { requestOTP, verifyOTP } from '../services/api'
 
 export default function LoginPage({ onLoginSuccess }) {
@@ -159,28 +159,28 @@ export default function LoginPage({ onLoginSuccess }) {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 mb-4">
-            <Shield size={32} className="text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4" style={{ background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))' }}>
+            <Zap size={32} style={{ color: 'var(--text-primary)' }} />
           </div>
           <h1 className="text-2xl font-bold">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-400">Intra</span>
-            <span className="text-white">Trading</span>
+            <span className="text-gradient">Lucky</span>
+            <span style={{ color: 'var(--text-primary)' }}>Navi</span>
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Secure Portal Access</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Algo Trading Portal</p>
         </div>
 
         {/* Card */}
-        <div className="bg-dark-800 border border-dark-600 rounded-2xl p-8 shadow-2xl">
+        <div className="rounded-2xl p-8 shadow-2xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
 
           {/* Step 1: Email */}
           {step === 'email' && (
@@ -189,13 +189,13 @@ export default function LoginPage({ onLoginSuccess }) {
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-500/10 mb-3">
                   <Mail size={24} className="text-blue-400" />
                 </div>
-                <h2 className="text-lg font-semibold text-white">Sign In</h2>
-                <p className="text-gray-400 text-sm mt-1">Enter your email to receive a one-time password</p>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Sign In</h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Enter your email to receive a one-time password</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Email Address</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Email Address</label>
                   <input
                     type="email"
                     value={email}
@@ -203,7 +203,8 @@ export default function LoginPage({ onLoginSuccess }) {
                     placeholder="your@email.com"
                     autoFocus
                     autoComplete="email"
-                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-colors"
+                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-colors"
+                    style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                   />
                 </div>
 
@@ -217,7 +218,8 @@ export default function LoginPage({ onLoginSuccess }) {
                 <button
                   type="submit"
                   disabled={loading || !email.trim()}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  style={{ background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))', color: 'var(--text-primary)' }}
                 >
                   {loading ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -229,9 +231,9 @@ export default function LoginPage({ onLoginSuccess }) {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 mt-5 pt-4 border-t border-dark-600">
-                <Smartphone size={14} className="text-gray-500" />
-                <p className="text-[11px] text-gray-500">OTP will be sent to your Telegram</p>
+              <div className="flex items-center gap-2 mt-5 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+                <Smartphone size={14} style={{ color: 'var(--text-muted)' }} />
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>OTP will appear in the server console</p>
               </div>
             </form>
           )}
@@ -243,9 +245,9 @@ export default function LoginPage({ onLoginSuccess }) {
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-green-500/10 mb-3">
                   <Lock size={24} className="text-green-400" />
                 </div>
-                <h2 className="text-lg font-semibold text-white">Enter OTP</h2>
-                <p className="text-gray-400 text-sm mt-1">
-                  Check your Telegram for the 6-digit code
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Enter OTP</h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  Check the server console for the 6-digit code
                 </p>
               </div>
 
@@ -263,15 +265,16 @@ export default function LoginPage({ onLoginSuccess }) {
                       onChange={(e) => handleOtpChange(i, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(i, e)}
                       onPaste={i === 0 ? handleOtpPaste : undefined}
-                      className="w-12 h-14 text-center text-xl font-bold bg-dark-700 border border-dark-500 rounded-xl text-white focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-colors"
+                      className="w-12 h-14 text-center text-xl font-bold rounded-xl focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-colors"
+                      style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                     />
                   ))}
                 </div>
 
                 {/* Timer */}
                 {countdown > 0 && (
-                  <p className="text-center text-xs text-gray-500">
-                    OTP expires in <span className="text-orange-400 font-mono">{formatCountdown(countdown)}</span>
+                  <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+                    OTP expires in <span className="font-mono" style={{ color: 'var(--accent)' }}>{formatCountdown(countdown)}</span>
                   </p>
                 )}
 
@@ -285,7 +288,8 @@ export default function LoginPage({ onLoginSuccess }) {
                 <button
                   onClick={handleVerifyOTP}
                   disabled={loading || otp.join('').length !== 6}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  style={{ background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))', color: 'var(--text-primary)' }}
                 >
                   {loading ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -300,14 +304,16 @@ export default function LoginPage({ onLoginSuccess }) {
                 <div className="flex items-center justify-between pt-2">
                   <button
                     onClick={() => { setStep('email'); setError(''); setOtp(['', '', '', '', '', '']) }}
-                    className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                    className="text-xs hover:opacity-80 transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
                   >
                     Change email
                   </button>
                   <button
                     onClick={handleResendOTP}
                     disabled={countdown > 0 || loading}
-                    className="text-xs text-orange-400 hover:text-orange-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                    className="text-xs disabled:cursor-not-allowed transition-colors"
+                    style={{ color: countdown > 0 || loading ? 'var(--text-muted)' : 'var(--accent)', opacity: countdown > 0 || loading ? 0.4 : 1 }}
                   >
                     {countdown > 0 ? `Resend in ${formatCountdown(countdown)}` : 'Resend OTP'}
                   </button>
@@ -322,17 +328,17 @@ export default function LoginPage({ onLoginSuccess }) {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-4">
                 <CheckCircle2 size={32} className="text-green-400" />
               </div>
-              <h2 className="text-lg font-semibold text-white mb-1">Welcome Back</h2>
-              <p className="text-gray-400 text-sm">Authentication successful. Loading dashboard...</p>
+              <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Welcome Back</h2>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Authentication successful. Loading dashboard...</p>
               <div className="mt-4">
-                <Loader2 size={20} className="animate-spin text-orange-400 mx-auto" />
+                <Loader2 size={20} className="animate-spin mx-auto" style={{ color: 'var(--accent)' }} />
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[10px] text-gray-600 mt-6">
+        <p className="text-center text-[10px] mt-6" style={{ color: 'var(--text-muted)' }}>
           Secured with OTP + JWT authentication
         </p>
       </div>

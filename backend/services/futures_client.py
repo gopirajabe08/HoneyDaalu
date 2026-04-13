@@ -1,5 +1,5 @@
 """
-Futures Client — Fyers API wrapper for futures-specific operations.
+Futures Client — broker API wrapper for futures-specific operations.
 
 Handles:
   - Futures symbol formatting (NSE:SYMBOL26MARFUT)
@@ -12,9 +12,9 @@ import logging
 from datetime import datetime, timezone, timedelta, date
 from calendar import monthrange
 
-from services.fyers_client import (
-    place_order as _fyers_place_order,
-    get_quotes as _fyers_get_quotes,
+from services.broker_client import (
+    place_order as _broker_place_order,
+    get_quotes as _broker_get_quotes,
     is_authenticated,
 )
 from fno_stocks import get_lot_size
@@ -82,7 +82,7 @@ def days_to_expiry() -> int:
 
 def build_futures_symbol(symbol: str, expiry: date | None = None) -> str:
     """
-    Build Fyers futures symbol.
+    Build broker futures symbol.
     Format: NSE:SYMBOL26MARFUT
     """
     if expiry is None:
@@ -97,15 +97,15 @@ def get_futures_ltp(symbol: str) -> float:
     if not is_authenticated():
         return 0
     try:
-        fyers_sym = build_futures_symbol(symbol)
-        res = _fyers_get_quotes([fyers_sym])
+        broker_sym = build_futures_symbol(symbol)
+        res = _broker_get_quotes([broker_sym])
         quotes = res.get("d", [])
         if not quotes:
             data = res.get("data", {})
             if isinstance(data, dict):
                 quotes = data.get("d", [])
         for q in quotes:
-            if q.get("n", "") == fyers_sym:
+            if q.get("n", "") == broker_sym:
                 return q.get("v", {}).get("lp", 0)
         return 0
     except Exception:
@@ -117,10 +117,10 @@ def get_futures_ltp_batch(symbols: list[str]) -> dict[str, float]:
     if not symbols or not is_authenticated():
         return {}
 
-    fyers_symbols = [build_futures_symbol(s) for s in symbols]
+    broker_symbols = [build_futures_symbol(s) for s in symbols]
     ltp_map = {}
     try:
-        res = _fyers_get_quotes(fyers_symbols)
+        res = _broker_get_quotes(broker_symbols)
         quotes = res.get("d", [])
         if not quotes:
             data = res.get("data", {})
@@ -128,13 +128,13 @@ def get_futures_ltp_batch(symbols: list[str]) -> dict[str, float]:
                 quotes = data.get("d", [])
 
         for q in quotes:
-            fyers_sym = q.get("n", "")
+            broker_sym = q.get("n", "")
             ltp = q.get("v", {}).get("lp", 0)
-            if fyers_sym and ltp:
+            if broker_sym and ltp:
                 # Map back to base symbol
                 for sym in symbols:
                     expected = build_futures_symbol(sym)
-                    if fyers_sym == expected:
+                    if broker_sym == expected:
                         ltp_map[sym] = ltp
                         break
     except Exception as e:
@@ -147,7 +147,7 @@ def place_futures_order(symbol: str, qty: int, side: int,
                         order_type: int = 2, product_type: str = "INTRADAY",
                         limit_price: float = 0, stop_price: float = 0) -> dict:
     """
-    Place a futures order via Fyers.
+    Place a futures order via broker.
 
     Args:
         symbol: Base symbol (e.g. "RELIANCE")
@@ -158,10 +158,10 @@ def place_futures_order(symbol: str, qty: int, side: int,
         limit_price: For limit orders
         stop_price: For SL/SL-M orders
     """
-    fyers_symbol = build_futures_symbol(symbol)
+    broker_symbol = build_futures_symbol(symbol)
 
-    return _fyers_place_order(
-        symbol=fyers_symbol,
+    return _broker_place_order(
+        symbol=broker_symbol,
         qty=qty,
         side=side,
         order_type=order_type,

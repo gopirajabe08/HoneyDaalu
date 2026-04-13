@@ -1,4 +1,4 @@
-"""FastAPI backend for IntraTrading scanner with Fyers integration."""
+"""FastAPI backend for LuckyNavi trading platform."""
 
 import sys
 import os
@@ -14,7 +14,8 @@ from typing import Optional
 
 from strategies import STRATEGY_MAP
 from services.scanner import run_scan, get_market_status
-from services import fyers_client
+from services import broker_client
+from services import telegram_notify
 from services.auto_trader import auto_trader
 from services.paper_trader import paper_trader
 from services.swing_trader import swing_trader
@@ -30,7 +31,6 @@ from services.futures_paper_trader import futures_paper_trader
 from services.futures_swing_trader import futures_swing_trader
 from services.futures_swing_paper_trader import futures_swing_paper_trader
 from services.backtester import run_backtest_api
-from services import telegram_notify
 from services.auth import request_otp, verify_otp, verify_token
 from services.strategy_tracker import (
     get_daily_report, get_recent_reports, get_strategy_registry,
@@ -42,7 +42,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="IntraTrading Scanner", version="1.0.0")
+app = FastAPI(title="LuckyNavi", version="1.0.0")
 
 
 @app.on_event("shutdown")
@@ -56,8 +56,8 @@ def notify_shutdown():
 
 
 @app.on_event("startup")
-def auto_connect_fyers():
-    """Auto-connect Fyers on server startup — fresh TOTP login daily."""
+def auto_connect_broker():
+    """Auto-connect broker on server startup — fresh TOTP login daily."""
     # C10: Auto-setup sleep prevention
     try:
         import subprocess
@@ -70,24 +70,24 @@ def auto_connect_fyers():
     except Exception:
         print("[Startup] Sleep prevention: FAILED — Mac may sleep", flush=True)
 
-    if not fyers_client.is_configured():
-        logger.warning("Fyers credentials not configured in .env — skipping auto-connect")
+    if not broker_client.is_configured():
+        logger.warning("Broker credentials not configured in .env — skipping auto-connect")
         return
 
     # A1: Always fresh login daily — clear stale tokens
-    fyers_client.logout()
+    broker_client.logout()
     print("[Startup] Attempting fresh TOTP login...", flush=True)
     for attempt in range(1, 4):
-        result = fyers_client.headless_login()
+        result = broker_client.headless_login()
         import time as _time
         _time.sleep(3)  # Wait for token to propagate
-        if fyers_client.is_authenticated():
-            profile = fyers_client.get_profile()
+        if broker_client.is_authenticated():
+            profile = broker_client.get_profile()
             name = profile.get("data", {}).get("name", "Unknown")
-            print(f"[Startup] Fyers connected: {name} (attempt {attempt})", flush=True)
+            print(f"[Startup] Broker connected: {name} (attempt {attempt})", flush=True)
             try:
                 from services import telegram_notify
-                telegram_notify.send(f"✅ <b>Fyers Login OK</b>\n{name}\nAttempt {attempt}/3")
+                telegram_notify.send(f"✅ <b>Broker Login OK</b>\n{name}\nAttempt {attempt}/3")
             except Exception:
                 pass
             break
@@ -95,10 +95,10 @@ def auto_connect_fyers():
             print(f"[Startup] Login attempt {attempt}/3 — not authenticated yet, retrying...", flush=True)
             _time.sleep(5)
     else:
-        print("[Startup] WARNING: Fyers login failed after 3 attempts — live engines will not start", flush=True)
+        print("[Startup] WARNING: Broker login failed after 3 attempts — live engines will not start", flush=True)
         try:
             from services import telegram_notify
-            telegram_notify.send("🚨 <b>ALERT: Fyers Login FAILED</b>\n3 attempts exhausted.\nHeadless login broken — check immediately!\nNo live trading today until fixed.")
+            telegram_notify.send("🚨 <b>ALERT: Broker Login FAILED</b>\n3 attempts exhausted.\nHeadless login broken — check immediately!\nNo live trading today until fixed.")
         except Exception:
             pass
 
@@ -229,28 +229,28 @@ def auto_connect_fyers():
 
             # ── Live engines: Equity Intraday + Options Intraday ONLY ──
             # Futures Live and all Swing Live stay paper-only until proven profitable.
-            # A2: Verify Fyers is truly connected (retry up to 5 times, re-login if needed)
-            for _fyers_check in range(5):
-                if fyers_client.is_authenticated():
+            # A2: Verify broker is truly connected (retry up to 5 times, re-login if needed)
+            for _broker_check in range(5):
+                if broker_client.is_authenticated():
                     break
-                _log(f"Fyers not authenticated — re-login attempt {_fyers_check+1}/5...")
+                _log(f"Broker not authenticated — re-login attempt {_broker_check+1}/5...")
                 try:
-                    fyers_client.headless_login()
+                    broker_client.headless_login()
                     time.sleep(3)
                 except Exception:
                     pass
                 time.sleep(5)
             else:
-                _log("Fyers not connected after 5 re-login attempts — skipping live engines")
+                _log("Broker not connected after 5 re-login attempts — skipping live engines")
                 try:
                     from services import telegram_notify
-                    telegram_notify.send("🚨 <b>ALERT: Fyers Disconnected Mid-Day</b>\n5 re-login attempts failed.\nLive engines stopped. Check immediately!")
+                    telegram_notify.send("🚨 <b>ALERT: Broker Disconnected Mid-Day</b>\n5 re-login attempts failed.\nLive engines stopped. Check immediately!")
                 except Exception:
                     pass
                 return
 
             try:
-                funds = fyers_client.get_funds()
+                funds = broker_client.get_funds()
                 fund_list = funds.get("fund_limit", [])
                 available = 0
                 for f in fund_list:
@@ -280,7 +280,7 @@ def auto_connect_fyers():
                 # Check NFO segment
                 nfo_enabled = False
                 for _nfo_try in range(3):
-                    nfo_enabled = fyers_client.is_nfo_enabled()
+                    nfo_enabled = broker_client.is_nfo_enabled()
                     if nfo_enabled:
                         break
                     time.sleep(5)
@@ -374,7 +374,7 @@ def auto_connect_fyers():
                         btst_strats = _btst_strategies()
                         r = btst_trader.start(strategies=btst_strats, capital=0)
                         if not r.get("error"):
-                            _log(f"BTST Live: started | {len(btst_strats)} strategies (daily TF) | capital from Fyers at scan time")
+                            _log(f"BTST Live: started | {len(btst_strats)} strategies (daily TF) | capital from broker at scan time")
                         else:
                             _log(f"BTST Live error: {r.get('error')}")
                     except Exception as e:
@@ -398,7 +398,7 @@ def auto_connect_fyers():
                         traceback.print_exc()
 
                 # Start Options Live — LAST priority, spread margin fix active
-                # BUY legs placed first → Fyers recognizes spread → reduced margin
+                # BUY legs placed first → broker recognizes spread → reduced margin
                 opt_status = "DISABLED (NFO not enabled)"
                 if nfo_enabled and opt_capital >= 15000:
                     try:
@@ -506,6 +506,59 @@ def auto_connect_fyers():
 
         print("[AutoShutdown] 3:45 PM — starting EOD pipeline...", flush=True)
 
+        # Day-end summary via Telegram
+        try:
+            from services.broker_client import get_funds as _eod_funds, get_tradebook as _eod_trades
+            broker_trades = 0
+            broker_pnl = 0
+            try:
+                tb = _eod_trades()
+                for t in tb.get("tradeBook", []):
+                    broker_trades += 1
+                    broker_pnl += t.get("pl", 0)
+            except Exception:
+                pass
+
+            # Fallback to internal tracking if broker data unavailable
+            if broker_trades == 0:
+                for t in getattr(auto_trader, '_trade_history', []):
+                    broker_trades += 1
+                    broker_pnl += t.get("pnl", 0)
+                for t in getattr(options_auto_trader, '_trade_history', []):
+                    broker_trades += 1
+                    broker_pnl += t.get("pnl", 0)
+
+            total_pnl = round(broker_pnl, 2)
+            trades = broker_trades
+            wins = 0
+            losses = 0
+            for t in getattr(auto_trader, '_trade_history', []):
+                if t.get("pnl", 0) >= 0:
+                    wins += 1
+                else:
+                    losses += 1
+            for t in getattr(options_auto_trader, '_trade_history', []):
+                if t.get("pnl", 0) >= 0:
+                    wins += 1
+                else:
+                    losses += 1
+
+            capital = 0
+            try:
+                funds = _eod_funds()
+                for f_item in funds.get("fund_limit", []):
+                    if f_item.get("id") == 10:
+                        capital = f_item.get("equityAmount", 0)
+            except Exception:
+                capital = getattr(auto_trader, '_capital', 100000)
+
+            charges = round(trades * 65, 2) if trades > 0 else 0
+            net_pnl = round(total_pnl - charges, 2)
+            btst_open = len([t for t in getattr(btst_trader, '_active_trades', []) if t.get("status") == "OPEN"])
+            telegram_notify.day_end(total_pnl, charges, net_pnl, trades, wins, losses, capital, btst_open)
+        except Exception:
+            pass
+
         # Run EOD analysis
         try:
             from services.auto_tuner import run_eod_pipeline
@@ -520,177 +573,6 @@ def auto_connect_fyers():
             print("[AutoShutdown] Sleep re-enabled", flush=True)
         except:
             pass
-
-        # Telegram: day-end summary using FYERS realized P&L (source of truth)
-        try:
-            # Get REAL P&L from Fyers positions (realized profit for closed positions)
-            fyers_pnl = 0.0
-            fyers_trades = 0
-            try:
-                positions_data = fyers_client.get_positions()
-                positions = positions_data.get("netPositions", [])
-                if not positions:
-                    data = positions_data.get("data", {})
-                    if isinstance(data, dict):
-                        positions = data.get("netPositions", [])
-                for pos in positions:
-                    realized = pos.get("realized_profit", 0)
-                    traded = pos.get("buyQty", 0) > 0 or pos.get("sellQty", 0) > 0
-                    if traded:
-                        fyers_pnl += realized
-                        if pos.get("netQty", 0) == 0:  # Fully closed
-                            fyers_trades += 1
-            except Exception:
-                pass
-
-            # Fallback to internal tracking if Fyers data unavailable
-            if fyers_trades == 0:
-                for t in getattr(auto_trader, '_trade_history', []):
-                    fyers_trades += 1
-                    fyers_pnl += t.get("pnl", 0)
-                for t in getattr(options_auto_trader, '_trade_history', []):
-                    fyers_trades += 1
-                    fyers_pnl += t.get("pnl", 0)
-
-            total_pnl = round(fyers_pnl, 2)
-            trades = fyers_trades
-            wins = 0
-            losses = 0
-            # Count wins/losses from both engines
-            for t in getattr(auto_trader, '_trade_history', []):
-                if t.get("pnl", 0) >= 0:
-                    wins += 1
-                else:
-                    losses += 1
-            for t in getattr(options_auto_trader, '_trade_history', []):
-                if t.get("pnl", 0) >= 0:
-                    wins += 1
-                else:
-                    losses += 1
-
-            # Get current capital from Fyers (truth)
-            capital = 0
-            try:
-                funds = fyers_client.get_funds()
-                for f_item in funds.get("fund_limit", []):
-                    if f_item.get("id") == 10:
-                        capital = f_item.get("equityAmount", 0)
-            except Exception:
-                capital = getattr(auto_trader, '_capital', 100000)
-
-            charges = round(trades * 65, 2) if trades > 0 else 0
-            net_pnl = round(total_pnl - charges, 2)
-            btst_open = len([t for t in getattr(btst_trader, '_active_trades', []) if t.get("status") == "OPEN"])
-            telegram_notify.day_end(total_pnl, charges, net_pnl, trades, wins, losses, capital, btst_open)
-        except Exception:
-            pass
-
-        # ── Intelligence Report — full system analysis via Telegram ──
-        try:
-            report_lines = []
-            today_str = now_ist().strftime("%b %d")
-
-            # 1. Capital allocation decision
-            eq_cap = getattr(auto_trader, '_capital', 0)
-            opt_cap = getattr(options_auto_trader, '_capital', 0)
-            btst_cap = getattr(btst_trader, '_capital', 0)
-            report_lines.append(f"<b>📊 System Intelligence — {today_str}</b>")
-            report_lines.append("")
-            report_lines.append(f"<b>Capital Split:</b>")
-            report_lines.append(f"  Options: ₹{opt_cap:,.0f} | Equity: ₹{eq_cap:,.0f} | BTST: ₹{btst_cap:,.0f}")
-
-            # 2. Regime & strategies used
-            try:
-                from services.equity_regime import detect_equity_regime
-                regime = detect_equity_regime()
-                regime_name = regime.get("regime", "?").replace("_", " ")
-                strat_ids = regime.get("strategy_ids", [])
-                vix_now = regime.get("components", {}).get("vix", 0)
-                report_lines.append(f"  Regime: {regime_name} | VIX: {vix_now:.1f}")
-                report_lines.append(f"  Strategies: {', '.join(strat_ids)}")
-            except Exception:
-                pass
-
-            # 3. Engine performance
-            report_lines.append("")
-            report_lines.append("<b>Engine Results:</b>")
-
-            # Equity
-            eq_scans = getattr(auto_trader, '_scan_count', 0)
-            eq_orders = getattr(auto_trader, '_order_count', 0)
-            eq_history = getattr(auto_trader, '_trade_history', [])
-            eq_pnl = sum(t.get("pnl", 0) for t in eq_history)
-            eq_wins = sum(1 for t in eq_history if t.get("pnl", 0) >= 0)
-            eq_losses = len(eq_history) - eq_wins
-            report_lines.append(f"  Equity: {eq_scans} scans → {eq_orders} orders → {len(eq_history)} trades")
-            if eq_history:
-                report_lines.append(f"    P&L: ₹{eq_pnl:,.0f} | W:{eq_wins} L:{eq_losses}")
-                for t in eq_history:
-                    report_lines.append(f"    • {t.get('symbol','?')} {t.get('signal_type','')} ₹{t.get('pnl',0):,.0f} ({t.get('exit_reason','?')}) [{t.get('strategy','?')}]")
-            else:
-                report_lines.append(f"    No trades (0 signals matched or market conditions too tight)")
-
-            # Options
-            opt_history = getattr(options_auto_trader, '_trade_history', [])
-            opt_pnl = sum(t.get("pnl", 0) for t in opt_history)
-            opt_scans = getattr(options_auto_trader, '_scan_count', 0)
-            report_lines.append(f"  Options: {opt_scans} scans → {len(opt_history)} spreads")
-            if opt_history:
-                opt_wins = sum(1 for t in opt_history if t.get("pnl", 0) >= 0)
-                report_lines.append(f"    P&L: ₹{opt_pnl:,.0f} | W:{opt_wins} L:{len(opt_history)-opt_wins}")
-                for t in opt_history:
-                    report_lines.append(f"    • {t.get('strategy','?')} {t.get('underlying','?')} ₹{t.get('pnl',0):,.0f} ({t.get('exit_reason','?')})")
-            else:
-                report_lines.append(f"    No spreads placed")
-
-            # BTST
-            btst_history = getattr(btst_trader, '_trade_history', [])
-            btst_active = [t for t in getattr(btst_trader, '_active_trades', []) if t.get("status") == "OPEN"]
-            btst_scans = getattr(btst_trader, '_scan_count', 0)
-            report_lines.append(f"  BTST: {btst_scans} scans → {len(btst_history)} closed, {len(btst_active)} holding overnight")
-            for t in btst_active:
-                report_lines.append(f"    🌙 {t.get('symbol','?')} holding | entry ₹{t.get('entry_price',0):,.0f} | SL ₹{t.get('stop_loss',0):,.0f}")
-
-            # 4. Issues detected
-            report_lines.append("")
-            report_lines.append("<b>System Health:</b>")
-            issues = []
-
-            if eq_scans > 0 and eq_orders == 0:
-                issues.append("Equity: scanned but 0 orders — signals too tight or margin issue")
-            if opt_scans > 0 and len(opt_history) == 0 and opt_cap > 0:
-                issues.append("Options: scanned but 0 spreads — check spread margin or signal quality")
-
-            # Check for SL failures in logs
-            eq_logs = getattr(auto_trader, '_logs', [])
-            sl_fails = sum(1 for l in eq_logs if isinstance(l, dict) and 'SL' in l.get('message', '') and 'FAIL' in l.get('message', ''))
-            if sl_fails > 0:
-                issues.append(f"⚠ {sl_fails} SL placement failures detected")
-
-            # Check Fyers disconnects
-            fyers_disconnects = sum(1 for l in eq_logs if isinstance(l, dict) and 'disconnected' in l.get('message', '').lower())
-            if fyers_disconnects > 0:
-                issues.append(f"Fyers disconnected {fyers_disconnects} time(s) during the day")
-
-            if not issues:
-                report_lines.append("  ✅ No issues detected")
-            else:
-                for issue in issues:
-                    report_lines.append(f"  ⚠ {issue}")
-
-            # 5. Tomorrow suggestion
-            report_lines.append("")
-            total_live = eq_pnl + opt_pnl
-            if total_live > 0:
-                report_lines.append(f"<b>Tomorrow:</b> Winning day (+₹{total_live:,.0f}). Keep same allocation.")
-            elif total_live > -500:
-                report_lines.append(f"<b>Tomorrow:</b> Small loss (₹{total_live:,.0f}). Dynamic allocator will adjust.")
-            else:
-                report_lines.append(f"<b>Tomorrow:</b> Loss day (₹{total_live:,.0f}). System will reduce allocation + hold cash reserve.")
-
-            telegram_notify.send("\n".join(report_lines))
-        except Exception as e:
-            print(f"[AutoShutdown] Intelligence report error: {e}", flush=True)
 
         print("[AutoShutdown] Server shutting down. Trading day complete.", flush=True)
         try:
@@ -710,7 +592,8 @@ def auto_connect_fyers():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173",
-                   "http://13.203.187.98", "http://13.203.187.98:80"],
+                   "http://3.109.167.163", "http://3.109.167.163:80",
+                   "https://3.109.167.163", "https://3.109.167.163:443"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -816,13 +699,39 @@ def auth_status(request: Request):
 
 @app.get("/")
 def root():
-    return {"status": "ok", "app": "IntraTrading Scanner"}
+    return {"status": "ok", "app": "LuckyNavi"}
 
 
 @app.get("/api/market/status")
 def market_status():
     """Check if NSE market is currently open."""
     return get_market_status()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  SEBI Compliance
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@app.get("/api/compliance/status")
+def compliance_status():
+    """Get SEBI algo trading compliance status."""
+    from services.sebi_compliance import get_compliance_status
+    return get_compliance_status()
+
+
+@app.get("/api/compliance/ops")
+def compliance_ops():
+    """Get current OPS (Orders Per Second) statistics."""
+    from services.sebi_compliance import get_ops_stats
+    return get_ops_stats()
+
+
+@app.get("/api/compliance/strategies")
+def compliance_strategies():
+    """Get strategy-to-algo-ID mapping."""
+    from services.sebi_compliance import STRATEGY_ALGO_IDS
+    return {"strategies": STRATEGY_ALGO_IDS}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -882,24 +791,24 @@ def get_timeframes(strategy_id: str):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  Fyers Authentication
+#  Broker Authentication
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-@app.get("/api/fyers/status")
-def fyers_status():
-    """Check Fyers connection status."""
-    configured = fyers_client.is_configured()
+@app.get("/api/broker/status")
+def broker_status():
+    """Check broker connection status."""
+    configured = broker_client.is_configured()
     if not configured:
         return {
             "connected": False,
             "configured": False,
-            "message": "Fyers API credentials not set. Add FYERS_APP_ID and FYERS_SECRET_KEY to backend/.env",
+            "message": "Broker API credentials not set. Add credentials to backend/.env",
         }
 
-    authenticated = fyers_client.is_authenticated()
+    authenticated = broker_client.is_authenticated()
     if authenticated:
-        profile = fyers_client.get_profile()
+        profile = broker_client.get_profile()
         data = profile.get("data", {})
         return {
             "connected": True,
@@ -919,80 +828,80 @@ def fyers_status():
     }
 
 
-@app.get("/api/fyers/login")
-def fyers_login():
-    """Get the Fyers OAuth2 login URL."""
-    if not fyers_client.is_configured():
-        return {"error": "Fyers API credentials not configured in .env"}
+@app.get("/api/broker/login")
+def broker_login():
+    """Get the broker OAuth2 login URL."""
+    if not broker_client.is_configured():
+        return {"error": "Broker API credentials not configured in .env"}
 
-    auth_url = fyers_client.get_auth_url()
+    auth_url = broker_client.get_auth_url()
     if auth_url:
         return {"auth_url": auth_url}
     return {"error": "Failed to generate auth URL"}
 
 
-@app.get("/api/fyers/callback")
-def fyers_callback(
+@app.get("/api/broker/callback")
+def broker_callback(
     auth_code: Optional[str] = Query(None),
     s: Optional[str] = Query(None, alias="auth_code"),
 ):
     """
     OAuth2 callback handler.
-    Fyers redirects here with ?auth_code=xxx after user logs in.
+    Broker redirects here with ?auth_code=xxx after user logs in.
     """
     code = auth_code or s
     if not code:
         return {"error": "No auth_code received"}
 
-    result = fyers_client.generate_token(code)
+    result = broker_client.generate_token(code)
 
     if "error" in result:
         return result
 
     # Redirect to frontend after successful auth
-    return RedirectResponse(url="http://localhost:3000?fyers_auth=success")
+    return RedirectResponse(url="http://localhost:3000?broker_auth=success")
 
 
 class AuthCodeRequest(BaseModel):
     auth_code: str
 
 
-@app.post("/api/fyers/verify")
-def fyers_verify(req: AuthCodeRequest):
+@app.post("/api/broker/verify")
+def broker_verify(req: AuthCodeRequest):
     """Exchange a manually-pasted auth code for an access token."""
-    result = fyers_client.generate_token(req.auth_code)
+    result = broker_client.generate_token(req.auth_code)
     return result
 
 
-@app.post("/api/fyers/headless-login")
-def fyers_headless_login():
+@app.post("/api/broker/headless-login")
+def broker_headless_login():
     """Trigger headless TOTP login."""
-    return fyers_client.headless_login()
+    return broker_client.headless_login()
 
 
-@app.post("/api/fyers/logout")
-def fyers_logout():
-    """Clear Fyers session."""
-    return fyers_client.logout()
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  Fyers Account & Funds
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-@app.get("/api/fyers/profile")
-def fyers_profile():
-    return fyers_client.get_profile()
-
-
-@app.get("/api/fyers/funds")
-def fyers_funds():
-    return fyers_client.get_funds()
+@app.post("/api/broker/logout")
+def broker_logout():
+    """Clear broker session."""
+    return broker_client.logout()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  Fyers Orders
+#  Broker Account & Funds
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@app.get("/api/broker/profile")
+def broker_profile():
+    return broker_client.get_profile()
+
+
+@app.get("/api/broker/funds")
+def broker_funds():
+    return broker_client.get_funds()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Broker Orders
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -1015,10 +924,10 @@ class BracketOrderRequest(BaseModel):
     target: float
 
 
-@app.post("/api/fyers/order")
+@app.post("/api/broker/order")
 def place_order(req: OrderRequest):
     """Place a regular order."""
-    return fyers_client.place_order(
+    return broker_client.place_order(
         symbol=req.symbol,
         qty=req.qty,
         side=req.side,
@@ -1029,10 +938,10 @@ def place_order(req: OrderRequest):
     )
 
 
-@app.post("/api/fyers/order/bracket")
+@app.post("/api/broker/order/bracket")
 def place_bracket_order(req: BracketOrderRequest):
     """Place a bracket order (entry + SL + target)."""
-    return fyers_client.place_bracket_order(
+    return broker_client.place_bracket_order(
         symbol=req.symbol,
         qty=req.qty,
         side=req.side,
@@ -1042,52 +951,52 @@ def place_bracket_order(req: BracketOrderRequest):
     )
 
 
-@app.delete("/api/fyers/order/{order_id}")
+@app.delete("/api/broker/order/{order_id}")
 def cancel_order(order_id: str):
-    return fyers_client.cancel_order(order_id)
+    return broker_client.cancel_order(order_id)
 
 
-@app.get("/api/fyers/orders")
+@app.get("/api/broker/orders")
 def get_orderbook():
-    return fyers_client.get_orderbook()
+    return broker_client.get_orderbook()
 
 
-@app.get("/api/fyers/trades")
+@app.get("/api/broker/trades")
 def get_tradebook():
-    return fyers_client.get_tradebook()
+    return broker_client.get_tradebook()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  Fyers Positions & Holdings
+#  Broker Positions & Holdings
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-@app.get("/api/fyers/positions")
+@app.get("/api/broker/positions")
 def get_positions():
-    return fyers_client.get_positions()
+    return broker_client.get_positions()
 
 
-@app.get("/api/fyers/holdings")
+@app.get("/api/broker/holdings")
 def get_holdings():
-    return fyers_client.get_holdings()
+    return broker_client.get_holdings()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  Fyers Market Data
+#  Broker Market Data
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-@app.get("/api/fyers/quotes")
+@app.get("/api/broker/quotes")
 def get_quotes(symbols: str = Query(..., description="Comma-separated NSE symbols")):
     """Get live quotes. Usage: ?symbols=RELIANCE,TCS,INFY"""
     symbol_list = [s.strip() for s in symbols.split(",") if s.strip()]
-    return fyers_client.get_quotes(symbol_list)
+    return broker_client.get_quotes(symbol_list)
 
 
-@app.get("/api/fyers/depth/{symbol}")
+@app.get("/api/broker/depth/{symbol}")
 def get_market_depth(symbol: str):
     """Get market depth for a symbol."""
-    return fyers_client.get_market_depth(symbol)
+    return broker_client.get_market_depth(symbol)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1435,7 +1344,7 @@ def trade_history(
 
 def _estimate_trade_brokerage(trade: dict) -> float:
     """
-    Estimate Fyers charges for a single round-trip trade.
+    Estimate broker charges for a single round-trip trade.
     Handles both equity intraday and options F&O charge structures.
     Paper trades return 0.
     """

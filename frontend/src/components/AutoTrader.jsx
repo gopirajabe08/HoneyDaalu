@@ -131,11 +131,11 @@ export default function AutoTrader({ capital }) {
 
   return (
     <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-pink-500/5 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-cyan-500/5 pointer-events-none" />
       <div className="relative z-10">
         {/* Header */}
         <div className="flex items-center gap-2 mb-3">
-          <Zap size={16} className={running ? 'text-green-400' : 'text-orange-400'} />
+          <Zap size={16} className={running ? 'text-green-400' : 'text-emerald-400'} />
           <h3 className="text-sm font-semibold text-white">Auto-Trading</h3>
           {running && <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse ml-auto" />}
         </div>
@@ -189,7 +189,7 @@ export default function AutoTrader({ capital }) {
                   <Clock size={12} className="text-gray-400" />
                   <span className="text-[10px] text-gray-400">Next scan in</span>
                 </div>
-                <span className="text-xs font-semibold text-orange-400 tabular-nums">{formatCountdown(countdown)}</span>
+                <span className="text-xs font-semibold text-emerald-400 tabular-nums">{formatCountdown(countdown)}</span>
               </div>
             )}
 
@@ -269,7 +269,7 @@ export default function AutoTrader({ capital }) {
                   return (
                     <div key={strat.id} className={`rounded-xl border transition-all ${
                       isSelected
-                        ? 'bg-dark-600 border-orange-500/30'
+                        ? 'bg-dark-600 border-emerald-500/30'
                         : 'bg-dark-800 border-dark-600 hover:border-dark-500'
                     }`}>
                       <button
@@ -278,7 +278,7 @@ export default function AutoTrader({ capital }) {
                       >
                         <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all ${
                           isSelected
-                            ? 'bg-orange-500 border-orange-500'
+                            ? 'bg-emerald-500 border-emerald-500'
                             : 'border-gray-600 bg-dark-700'
                         }`}>
                           {isSelected && <Check size={10} className="text-white" />}
@@ -297,7 +297,7 @@ export default function AutoTrader({ capital }) {
                               onClick={() => setTimeframe(strat.id, tf)}
                               className={`px-2 py-0.5 rounded text-[9px] font-medium transition-all ${
                                 selected[strat.id] === tf
-                                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                   : 'bg-dark-700 text-gray-500 border border-dark-500 hover:text-gray-300'
                               }`}
                             >
@@ -334,7 +334,7 @@ export default function AutoTrader({ capital }) {
             <button
               onClick={handleStart}
               disabled={loading || selectedCount === 0}
-              className="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <><Loader2 size={16} className="animate-spin" /> Starting...</>

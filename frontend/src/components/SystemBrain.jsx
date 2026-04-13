@@ -26,7 +26,7 @@ export default function SystemBrain() {
         authFetch(`${API}/api/auto/status`),
         authFetch(`${API}/api/options/auto/status`),
         authFetch(`${API}/api/btst/status`),
-        authFetch(`${API}/api/fyers/positions`),
+        authFetch(`${API}/api/broker/positions`),
       ])
 
       const posArr = positions?.netPositions || positions?.data?.netPositions || []
@@ -84,7 +84,7 @@ export default function SystemBrain() {
               <Activity size={18} className={totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'} />
             </div>
             <div>
-              <p className="text-xs text-gray-400">Today's Live P&L (Fyers)</p>
+              <p className="text-xs text-gray-400">Today's Live P&L (TradeJini)</p>
               <p className={`text-xl font-bold tracking-tight ${pnlCls(totalPnl)}`}>{inr(totalPnl)}</p>
             </div>
           </div>

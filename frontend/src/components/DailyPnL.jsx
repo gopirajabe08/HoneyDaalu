@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { RefreshCw, TrendingUp, TrendingDown, Calendar, BarChart3, Zap, BookOpen, Wallet, Plus, Minus, X, Settings } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { getDailyPnl, getPositions, getOrderbook, getFyersFunds, getCapitalInfo, setInitialCapital, addCapitalTransaction, deleteCapitalTransaction } from '../services/api'
+import { getDailyPnl, getPositions, getOrderbook, getBrokerFunds, getCapitalInfo, setInitialCapital, addCapitalTransaction, deleteCapitalTransaction } from '../services/api'
 
 const STRATEGY_NAMES = {
   play1: 'EMA Crossover', play1_ema_crossover: 'EMA Crossover',
@@ -25,8 +25,8 @@ const STRATEGY_NAMES = {
   futures_ema_rsi_pullback: 'Fut EMA Pullback',
 }
 
-// Calculate brokerage from actual Fyers turnover + filled order count
-function calcFyersBrokerage(positions, orders) {
+// Calculate brokerage from actual TradeJini turnover + filled order count
+function calcBrokerage(positions, orders) {
   const traded = positions.filter(p => (p.buyQty || 0) > 0 || (p.sellQty || 0) > 0)
   const totalBuyVal = traded.reduce((s, p) => s + (p.buyVal || 0), 0)
   const totalSellVal = traded.reduce((s, p) => s + (p.sellVal || 0), 0)
@@ -96,12 +96,12 @@ export default function DailyPnL() {
       if (sourceMode === 'live') {
         promises.push(getPositions().catch(() => null))
         promises.push(getOrderbook().catch(() => null))
-        promises.push(getFyersFunds().catch(() => null))
+        promises.push(getBrokerFunds().catch(() => null))
       }
       const [result, posRes, ordRes, fundsRes] = await Promise.all(promises)
       let rows = Array.isArray(result) ? result : []
 
-      // Override today with Fyers broker data (source of truth for live)
+      // Override today with TradeJini broker data (source of truth for live)
       if (sourceMode === 'live' && posRes) {
         const positions = posRes?.netPositions || posRes?.data?.netPositions || []
         const orders = ordRes?.orderBook || ordRes?.data?.orderBook || []
@@ -114,23 +114,23 @@ export default function DailyPnL() {
         const fGrossLoss = fLosers.reduce((s, p) => s + (p.pl || p.realized_profit || 0), 0)
         const fWinRate = (fWins.length + fLosers.length) > 0
           ? Math.round((fWins.length / (fWins.length + fLosers.length)) * 100 * 10) / 10 : 0
-        const brokerageToday = calcFyersBrokerage(positions, orders)
+        const brokerageToday = calcBrokerage(positions, orders)
 
-        // Extract Fyers fund data
+        // Extract TradeJini fund data
         const fundList = fundsRes?.fund_limit || []
         const getFundVal = (id) => {
           const f = fundList.find(x => x.id === id)
           return f ? (f.equityAmount || 0) : 0
         }
-        const fyersStartOfDay = getFundVal(9)   // "Limit at start of the day"
-        const fyersAvailBal = getFundVal(10)     // "Available Balance"
-        const fyersTotalBal = getFundVal(1)      // "Total Balance"
-        const fyersFundTransfer = getFundVal(6)  // "Fund Transfer" (added today)
-        const fyersRealizedPnl = getFundVal(4)   // "Realized Profit and Loss"
+        const brokerStartOfDay = getFundVal(9)   // "Limit at start of the day"
+        const brokerAvailBal = getFundVal(10)     // "Available Balance"
+        const brokerTotalBal = getFundVal(1)      // "Total Balance"
+        const brokerFundTransfer = getFundVal(6)  // "Fund Transfer" (added today)
+        const brokerRealizedPnl = getFundVal(4)   // "Realized Profit and Loss"
 
         const todayStr = new Date().toLocaleDateString('en-CA')
         const todayIdx = rows.findIndex(d => d.date === todayStr)
-        const fyersEntry = {
+        const brokerEntry = {
           date: todayStr,
           total_pnl: Math.round(fRealizedPnl * 100) / 100,
           brokerage: brokerageToday,
@@ -144,17 +144,17 @@ export default function DailyPnL() {
           strategies: todayIdx >= 0 ? rows[todayIdx].strategies : [],
           auto_trades: traded.length,
           paper_trades: 0,
-          // Capital from Fyers
-          capital_start: fyersStartOfDay,
-          capital_end: fyersAvailBal || fyersTotalBal,
-          fund_added: fyersFundTransfer > 0 ? fyersFundTransfer : 0,
-          fund_withdrawn: fyersFundTransfer < 0 ? Math.abs(fyersFundTransfer) : 0,
+          // Capital from TradeJini
+          capital_start: brokerStartOfDay,
+          capital_end: brokerAvailBal || brokerTotalBal,
+          fund_added: brokerFundTransfer > 0 ? brokerFundTransfer : 0,
+          fund_withdrawn: brokerFundTransfer < 0 ? Math.abs(brokerFundTransfer) : 0,
         }
         if (todayIdx >= 0) {
           rows = [...rows]
-          rows[todayIdx] = fyersEntry
-        } else if (traded.length > 0 || fyersStartOfDay > 0) {
-          rows = [...rows, fyersEntry]
+          rows[todayIdx] = brokerEntry
+        } else if (traded.length > 0 || brokerStartOfDay > 0) {
+          rows = [...rows, brokerEntry]
         }
 
         // Recalculate cumulative P&L
@@ -164,15 +164,15 @@ export default function DailyPnL() {
           r.cumulative_pnl = Math.round(cumulative * 100) / 100
         }
 
-        // Backfill capital for historical rows using Fyers start-of-day as anchor
-        // Today's capital_start = Fyers "Limit at start of day"
+        // Backfill capital for historical rows using TradeJini start-of-day as anchor
+        // Today's capital_start = TradeJini "Limit at start of day"
         // Work backwards: previous_day_end = this_day_start
-        if (fyersStartOfDay > 0 && rows.length > 0) {
+        if (brokerStartOfDay > 0 && rows.length > 0) {
           // Find today's index in sorted rows
           const todayRowIdx = rows.findIndex(r => r.date === todayStr)
           if (todayRowIdx >= 0) {
             // Backward pass: each prior day's capital_end = next day's capital_start
-            let nextStart = fyersStartOfDay
+            let nextStart = brokerStartOfDay
             for (let i = todayRowIdx - 1; i >= 0; i--) {
               const row = rows[i]
               row.capital_end = Math.round(nextStart * 100) / 100
@@ -193,7 +193,7 @@ export default function DailyPnL() {
   }
 
   const isLive = sourceMode === 'live'
-  const accentActive = isLive ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'
+  const accentActive = isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'
 
   // Summary stats (use gross total_pnl — brokerage shown separately)
   const totalPnl = data.reduce((s, d) => s + d.total_pnl, 0)
@@ -221,14 +221,14 @@ export default function DailyPnL() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <BarChart3 size={18} className={isLive ? 'text-orange-400' : 'text-blue-400'} />
+          <BarChart3 size={18} className={isLive ? 'text-emerald-400' : 'text-blue-400'} />
           <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Daily P&L</h2>
           {/* Live / Paper toggle */}
           <div className="flex items-center bg-dark-700 rounded-xl border border-dark-500 p-0.5">
             <button
               onClick={() => setSourceMode('live')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                isLive ? 'bg-orange-500/15 text-orange-400' : 'text-gray-500 hover:text-gray-300'
+                isLive ? 'bg-emerald-500/15 text-emerald-400' : 'text-gray-500 hover:text-gray-300'
               }`}
             >
               <Zap size={12} /> Live
@@ -427,7 +427,7 @@ export default function DailyPnL() {
             stratPnl[s] = (stratPnl[s] || 0) + d.total_pnl
           })
         })
-        const stratColors = ['#f97316', '#3b82f6', '#a855f7', '#eab308', '#06b6d4', '#ec4899']
+        const stratColors = ['#10b981', '#3b82f6', '#a855f7', '#eab308', '#06b6d4', '#ec4899']
         const stratPieData = Object.entries(stratPnl)
           .map(([key, val], i) => ({ name: STRATEGY_NAMES[key] || key, value: Math.round(Math.abs(val)), pnl: Math.round(val), color: stratColors[i % stratColors.length] }))
           .filter(d => d.value > 0)
@@ -634,8 +634,8 @@ export default function DailyPnL() {
               <div className="flex items-center gap-2">
                 <h3 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Daily Breakdown</h3>
                 {isLive && (
-                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/30">
-                    Fyers = Source of Truth (today)
+                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    TradeJini = Source of Truth (today)
                   </span>
                 )}
               </div>
@@ -686,14 +686,14 @@ export default function DailyPnL() {
                       const hasCapital = d.capital_start > 0
                       const fundNet = (d.fund_added || 0) - (d.fund_withdrawn || 0)
                       const netPnl = d.net_pnl ?? d.total_pnl
-                      const isFyersDay = isLive && d.date === todayStr && d.auto_trades > 0
+                      const isTradeJiniDay = isLive && d.date === todayStr && d.auto_trades > 0
                       return (
-                        <tr key={i} className={`border-b border-dark-600/50 hover:bg-dark-600/30 ${isFyersDay ? 'bg-orange-500/5' : ''}`}>
+                        <tr key={i} className={`border-b border-dark-600/50 hover:bg-dark-600/30 ${isTradeJiniDay ? 'bg-emerald-500/5' : ''}`}>
                           <td className="py-2 text-xs" style={{ color: 'var(--text-primary)' }}>{d.date}</td>
                           <td className="py-2 text-center">
-                            {isFyersDay ? (
-                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/30">
-                                FYERS
+                            {isTradeJiniDay ? (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                BROKER
                               </span>
                             ) : (
                               <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-gray-500/10 text-gray-500">
@@ -717,7 +717,7 @@ export default function DailyPnL() {
                           </td>
                           <td className="py-2 text-right text-xs">
                             {fundNet !== 0 ? (
-                              <span className={fundNet > 0 ? 'text-blue-400' : 'text-orange-400'}>
+                              <span className={fundNet > 0 ? 'text-blue-400' : 'text-emerald-400'}>
                                 {fundNet > 0 ? '+' : ''}{'\u20B9'}{fundNet.toLocaleString('en-IN')}
                               </span>
                             ) : <span className="text-gray-600">--</span>}
@@ -764,7 +764,7 @@ export default function DailyPnL() {
                       </td>
                       <td className="py-2.5 text-right text-xs font-bold">
                         {totFundNet !== 0 ? (
-                          <span className={totFundNet > 0 ? 'text-blue-400' : 'text-orange-400'}>
+                          <span className={totFundNet > 0 ? 'text-blue-400' : 'text-emerald-400'}>
                             {totFundNet > 0 ? '+' : ''}{'\u20B9'}{Math.round(totFundNet).toLocaleString('en-IN')}
                           </span>
                         ) : <span className="text-gray-600">--</span>}

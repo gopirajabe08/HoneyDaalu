@@ -1,5 +1,5 @@
 /**
- * Shared formatting functions for IntraTrading frontend.
+ * Shared formatting functions for LuckyNavi frontend.
  *
  * Centralizes currency formatting and other display helpers
  * that were previously duplicated across 8+ components.

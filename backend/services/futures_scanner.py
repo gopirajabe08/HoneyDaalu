@@ -28,7 +28,7 @@ from config import (
 def _estimate_futures_brokerage(qty: int, entry: float, exit_price: float) -> float:
     """
     Estimate round-trip brokerage for a futures trade.
-    Fyers charges: ₹20/order (2 orders) + STT 0.0125% on sell + exchange + GST.
+    Broker charges: ₹20/order (2 orders) + STT 0.0125% on sell + exchange + GST.
     """
     if qty == 0 or entry == 0:
         return 0.0
@@ -193,8 +193,8 @@ def run_futures_scan(strategy_key: str, timeframe: str, capital: float,
     ), reverse=True)
 
     # SEBI F&O ban check: Not filtered here — handled at order placement level.
-    # If a stock is in SEBI's F&O ban period, Fyers will reject the order.
-    # The auto_trader and fyers_client already handle order rejections gracefully.
+    # If a stock is in SEBI's F&O ban period, the broker will reject the order.
+    # The auto_trader and broker_client already handle order rejections gracefully.
     # Paper trading signals are unaffected (no real orders placed).
 
     return {

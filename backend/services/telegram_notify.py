@@ -1,5 +1,5 @@
 """
-Telegram notification service for IntraTrading.
+Telegram notification service for LuckyNavi.
 
 3-Tier notification system:
   TIER 1 — ALERT: Money at risk. Always send. (flash crash, disconnect, margin)
@@ -30,8 +30,8 @@ _WINDOW_SECONDS = 600
 _send_timestamps: list[float] = []
 _rate_lock = threading.Lock()
 
-# Track Fyers disconnect time to suppress brief hiccups (<5 min)
-_fyers_disconnect_time: float = 0
+# Track broker disconnect time to suppress brief hiccups (<5 min)
+_broker_disconnect_time: float = 0
 
 
 def _is_rate_limited() -> bool:
@@ -186,33 +186,32 @@ def margin_warning(available: float):
     )
 
 
-def fyers_disconnected():
-    """Fyers connection lost — record time, send alert only if prolonged (>2 min)."""
-    global _fyers_disconnect_time
-    _fyers_disconnect_time = _time_mod.time()
-    # Don't send immediately — wait for reconnect check.
-    # If still disconnected after 2 min, auto_trader will call this again.
-    logger.warning("[Telegram] Fyers disconnected — will alert if not reconnected in 2 min")
+def broker_disconnected():
+    """Broker connection lost — record time, send alert only if prolonged (>2 min)."""
+    global _broker_disconnect_time
+    _broker_disconnect_time = _time_mod.time()
+    logger.warning("[Telegram] Broker disconnected — will alert if not reconnected in 2 min")
 
 
-def fyers_still_disconnected(minutes: int = 5):
-    """Fyers still down after multiple checks — now it's serious."""
+def broker_still_disconnected(minutes: int = 5):
+    """Broker still down after multiple checks — now it's serious."""
     send(
-        f"🔌 <b>Fyers Down ({minutes}+ min)</b>\n\n"
+        f"🔌 <b>Broker Down ({minutes}+ min)</b>\n\n"
         f"Connection lost. Retrying...\n"
         f"SL orders on exchange still active"
     )
 
 
-def fyers_reconnected():
-    """Fyers back — only notify if it was down >2 min."""
-    global _fyers_disconnect_time
-    if _fyers_disconnect_time > 0:
-        down_seconds = _time_mod.time() - _fyers_disconnect_time
-        _fyers_disconnect_time = 0
-        if down_seconds >= 120:  # Only notify if down >2 min
-            send(f"✅ <b>Fyers Reconnected</b> (was down {int(down_seconds/60)} min)")
-    # If down <2 min, stay silent — brief hiccup, user doesn't care
+def broker_reconnected():
+    """Broker back — only notify if it was down >2 min."""
+    global _broker_disconnect_time
+    if _broker_disconnect_time > 0:
+        down_seconds = _time_mod.time() - _broker_disconnect_time
+        _broker_disconnect_time = 0
+        if down_seconds >= 120:
+            send(f"✅ <b>Broker Reconnected</b> (was down {int(down_seconds/60)} min)")
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════

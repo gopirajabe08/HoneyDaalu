@@ -1,5 +1,5 @@
 """
-Custom exception hierarchy for IntraTrading.
+Custom exception hierarchy for LuckyNavi.
 
 Provides specific exception types so callers can handle different
 failure modes (auth, orders, scanning) without catching bare Exception.

@@ -1,5 +1,5 @@
 """
-BTST (Buy Today Sell Tomorrow) Trading Engine for IntraTrading.
+BTST (Buy Today Sell Tomorrow) Trading Engine for LuckyNavi.
 
 Key differences from intraday auto-trader:
   - Product type: CNC (delivery), not INTRADAY
@@ -27,7 +27,7 @@ from collections import OrderedDict
 from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.market_data import get_nifty_trend
 from services.trade_logger import log_trade
-from services.fyers_client import (
+from services.broker_client import (
     place_order,
     cancel_order,
     get_positions,
@@ -86,7 +86,7 @@ class BTSTTrader:
     """
     Live BTST trading engine.
 
-    Places CNC orders via Fyers. Positions carry overnight.
+    Places CNC orders via broker. Positions carry overnight.
     Entry window: 2:00 PM - 3:15 PM. Max 2 positions.
     Next-day exit: profit target (+2%), loss limit (-1.5%), max hold (2 days).
     """
@@ -200,15 +200,15 @@ class BTSTTrader:
             logger.warning(f"[BTSTTrader] Failed to load state: {e}")
 
     def _recover_orphaned_positions(self):
-        """Detect Fyers CNC positions not tracked in active_trades.
+        """Detect broker CNC positions not tracked in active_trades.
         Adds them as monitored entries so they're visible and counted."""
         try:
             open_symbols, positions = self._get_open_positions_detail()
             tracked_symbols = {t["symbol"] for t in self._active_trades}
 
             for pos in positions:
-                fyers_sym = pos.get("symbol", "")
-                plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
+                broker_sym = pos.get("symbol", "")
+                plain = broker_sym.replace("NSE:", "").replace("-EQ", "")
                 qty = pos.get("netQty", pos.get("qty", 0))
 
                 if plain in tracked_symbols or qty == 0:
@@ -269,7 +269,7 @@ class BTSTTrader:
                 return {"error": "Market is closed. BTST trading starts during market hours (9:15 AM - 3:30 PM IST)."}
 
             if not is_authenticated():
-                return {"error": "Fyers is not authenticated. Please login first."}
+                return {"error": "Broker is not authenticated. Please login first."}
 
             if not strategies:
                 return {"error": "At least one strategy must be selected."}
@@ -293,7 +293,7 @@ class BTSTTrader:
                     min(int(capital // BTST_CAPITAL_PER_POSITION), BTST_MAX_POSITIONS)
                 )
             else:
-                # Capital=0 means dynamic allocation at scan time from Fyers funds
+                # Capital=0 means dynamic allocation at scan time from broker funds
                 self.max_open_positions = BTST_MAX_POSITIONS
             self._running = True
             self._active_trades = []
@@ -431,9 +431,9 @@ class BTSTTrader:
             # ── Entry window scan ──
             if not _is_past_order_cutoff() and is_market_open():
                 if not is_authenticated():
-                    self._log("ERROR", "Fyers authentication lost — cannot scan")
+                    self._log("ERROR", "Broker authentication lost — cannot scan")
                 else:
-                    # Dynamic capital: fetch available funds from Fyers at scan time
+                    # Dynamic capital: fetch available funds from broker at scan time
                     # This allows equity intraday to use full capital during the day
                     # BTST uses whatever is free at 2:00 PM
                     if self._capital <= 0:
@@ -450,7 +450,7 @@ class BTSTTrader:
                                         BTST_MIN_POSITIONS,
                                         min(int(self._capital // BTST_CAPITAL_PER_POSITION), BTST_MAX_POSITIONS)
                                     )
-                                    self._log("INFO", f"BTST capital from Fyers: ₹{self._capital:,.0f} available | {self.max_open_positions} position(s)")
+                                    self._log("INFO", f"BTST capital from broker: ₹{self._capital:,.0f} available | {self.max_open_positions} position(s)")
                                     break
                         except Exception as e:
                             self._log("WARN", f"Failed to fetch funds for BTST: {e}")
@@ -483,17 +483,17 @@ class BTSTTrader:
                 if _monitor_tick % 5 == 0 and self._active_trades:
                     self._check_exit_rules()
 
-                # Fyers health check every ~5 minutes
+                # Broker health check every ~5 minutes
                 if _monitor_tick % 5 == 0:
                     try:
                         if not is_authenticated():
-                            self._log("WARN", "Fyers disconnected — attempting reconnect...")
-                            from services.fyers_client import headless_login
+                            self._log("WARN", "Broker disconnected — attempting reconnect...")
+                            from services.broker_client import headless_login
                             result = headless_login()
                             if "error" in result:
-                                self._log("ALERT", f"Fyers reconnect FAILED: {result['error']}")
+                                self._log("ALERT", f"Broker reconnect FAILED: {result['error']}")
                             else:
-                                self._log("INFO", "Fyers reconnected successfully")
+                                self._log("INFO", "Broker reconnected successfully")
                     except Exception:
                         pass
 
@@ -544,8 +544,8 @@ class BTSTTrader:
 
         # Check open positions
         internal_open = [t for t in self._active_trades if t["status"] == "OPEN"]
-        open_symbols_fyers, _ = self._get_open_positions_detail()
-        open_symbols = {t["symbol"] for t in internal_open} | open_symbols_fyers
+        open_symbols_broker, _ = self._get_open_positions_detail()
+        open_symbols = {t["symbol"] for t in internal_open} | open_symbols_broker
         open_count = len(internal_open)
 
         if open_count >= self.max_open_positions:
@@ -774,10 +774,10 @@ class BTSTTrader:
             time.sleep(3)
             order_status = self._get_order_status(entry_order_id)
             if order_status == "rejected":
-                self._log("ERROR", f"{symbol} — order REJECTED by Fyers (ID: {entry_order_id}). NOT tracking.")
+                self._log("ERROR", f"{symbol} — order REJECTED by broker (ID: {entry_order_id}). NOT tracking.")
                 return False
             elif order_status == "cancelled":
-                self._log("WARN", f"{symbol} — order CANCELLED on Fyers (ID: {entry_order_id}). NOT tracking.")
+                self._log("WARN", f"{symbol} — order CANCELLED on broker (ID: {entry_order_id}). NOT tracking.")
                 return False
             elif order_status == "filled":
                 actual_price = self._get_fill_price(entry_order_id)
@@ -1005,7 +1005,7 @@ class BTSTTrader:
     # ── Position Monitoring ───────────────────────────────────────────────
 
     def _update_position_pnl(self):
-        """Refresh P&L for active BTST trades using Fyers positions and holdings."""
+        """Refresh P&L for active BTST trades using broker positions and holdings."""
         if not self._active_trades:
             return
 
@@ -1130,7 +1130,7 @@ class BTSTTrader:
             self._log("WARN", f"{symbol} — SL re-placement failed: {sl_result.get('error', '')}")
 
     def _check_sl_order_health(self):
-        """Verify SL orders are still pending on Fyers for all active trades.
+        """Verify SL orders are still pending on broker for all active trades.
         If cancelled/rejected, re-place them."""
         active_with_sl = [t for t in self._active_trades
                           if t["status"] == "OPEN" and t.get("sl_order_id")]
@@ -1194,7 +1194,7 @@ class BTSTTrader:
     # ── Helpers ───────────────────────────────────────────────────────────
 
     def _get_open_positions_detail(self) -> tuple[set, list]:
-        """Get open CNC position symbols and full position data from Fyers."""
+        """Get open CNC position symbols and full position data from broker."""
         try:
             positions_data = get_positions()
             if "error" in positions_data:
@@ -1214,8 +1214,8 @@ class BTSTTrader:
                     prod = pos.get("productType", "")
                     if prod != "CNC":
                         continue
-                    fyers_sym = pos.get("symbol", "")
-                    plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
+                    broker_sym = pos.get("symbol", "")
+                    plain = broker_sym.replace("NSE:", "").replace("-EQ", "")
                     open_symbols.add(plain)
                     open_positions.append(pos)
 
@@ -1243,18 +1243,18 @@ class BTSTTrader:
     def _get_ltp(self, symbol: str) -> float:
         """Get last traded price for a symbol via quotes API."""
         try:
-            fyers_symbol = f"NSE:{symbol}-EQ"
-            quotes = get_quotes([fyers_symbol])
+            broker_symbol = f"NSE:{symbol}-EQ"
+            quotes = get_quotes([broker_symbol])
             if quotes and "d" in quotes:
                 for q in quotes["d"]:
-                    if q.get("n", "") == fyers_symbol:
+                    if q.get("n", "") == broker_symbol:
                         return q.get("v", {}).get("lp", 0)
             return 0
         except Exception:
             return 0
 
     def _get_order_status(self, order_id: str) -> str:
-        """Check order status from Fyers orderbook."""
+        """Check order status from broker orderbook."""
         try:
             orderbook = get_orderbook()
             orders = orderbook.get("orderBook", [])
@@ -1278,7 +1278,7 @@ class BTSTTrader:
             return "unknown"
 
     def _get_fill_price(self, order_id: str) -> float:
-        """Get actual fill price from Fyers orderbook."""
+        """Get actual fill price from broker orderbook."""
         try:
             orderbook = get_orderbook()
             orders = orderbook.get("orderBook", [])
@@ -1294,7 +1294,7 @@ class BTSTTrader:
             return 0
 
     def _is_order_filled(self, order_id: str) -> bool:
-        """Check if a specific order was filled (status=2 in Fyers)."""
+        """Check if a specific order was filled (status=2 in broker)."""
         try:
             orderbook = get_orderbook()
             orders = orderbook.get("orderBook", [])

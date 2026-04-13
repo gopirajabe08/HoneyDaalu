@@ -74,7 +74,7 @@ export default function ImprovementTracker() {
         }`}
         title="Strategy Improvement Tracker"
       >
-        <div className="bg-orange-500/90 hover:bg-orange-400 text-white px-1.5 py-4 rounded-l-lg shadow-lg cursor-pointer">
+        <div className="bg-emerald-500/90 hover:bg-emerald-400 text-white px-1.5 py-4 rounded-l-lg shadow-lg cursor-pointer">
           <span className="text-xs font-bold writing-vertical" style={{ writingMode: 'vertical-rl' }}>
             {isOpen ? '✕ CLOSE' : '📊 TRACKER'}
           </span>
@@ -90,7 +90,7 @@ export default function ImprovementTracker() {
         <div className="p-4 space-y-4">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-orange-400">Improvement Tracker</h2>
+            <h2 className="text-lg font-bold text-emerald-400">Improvement Tracker</h2>
             <button
               onClick={fetchData}
               className="text-xs text-dark-300 hover:text-white px-2 py-1 rounded bg-dark-600 hover:bg-dark-500"
@@ -111,7 +111,7 @@ export default function ImprovementTracker() {
                   const wrDelta = prev ? day.winRate - prev.winRate : null
                   return (
                     <div key={day.date} className={`p-3 rounded-xl border ${
-                      i === 0 ? 'bg-dark-600/50 border-orange-500/30' : 'bg-dark-700/50 border-dark-500/30'
+                      i === 0 ? 'bg-dark-600/50 border-emerald-500/30' : 'bg-dark-700/50 border-dark-500/30'
                     }`}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-semibold text-white">
@@ -326,7 +326,7 @@ function GenerateButton({ onGenerated }) {
       <button
         onClick={generate}
         disabled={generating}
-        className="w-full py-2 rounded-lg text-sm font-medium bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 disabled:opacity-50 transition-colors"
+        className="w-full py-2 rounded-lg text-sm font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50 transition-colors"
       >
         {generating ? 'Generating...' : '📊 Generate Daily Report'}
       </button>

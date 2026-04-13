@@ -9,13 +9,13 @@ Classifies each F&O stock's Open Interest sentiment into one of four states:
 
 Also calculates a conviction score based on Volume/OI change magnitude.
 
-Data source: Fyers quotes() API returns OI for futures symbols.
+Data source: broker quotes() API returns OI for futures symbols.
 """
 
 import logging
 from datetime import datetime, timezone, timedelta
 
-from services.fyers_client import get_quotes, is_authenticated
+from services.broker_client import get_quotes, is_authenticated
 from services.futures_client import build_futures_symbol
 from fno_stocks import get_fno_symbols, get_lot_size
 
@@ -61,9 +61,9 @@ def analyse_single_symbol(symbol: str) -> dict | None:
     if not is_authenticated():
         return None
 
-    fyers_symbol = build_futures_symbol(symbol)
+    broker_symbol = build_futures_symbol(symbol)
     try:
-        res = get_quotes([fyers_symbol])
+        res = get_quotes([broker_symbol])
         quotes = res.get("d", [])
         if not quotes:
             data = res.get("data", {})
@@ -97,7 +97,7 @@ def analyse_single_symbol(symbol: str) -> dict | None:
 
         return {
             "symbol": symbol,
-            "futures_symbol": fyers_symbol,
+            "futures_symbol": broker_symbol,
             "ltp": ltp,
             "prev_close": prev_close,
             "price_change_pct": round(price_change_pct, 2),
@@ -120,7 +120,7 @@ def analyse_batch(symbols: list[str], batch_size: int = 50) -> dict[str, dict]:
     Returns {symbol: oi_data_dict} for each successfully fetched symbol.
     """
     if not is_authenticated():
-        logger.warning("[FuturesOI] Fyers not authenticated — skipping OI analysis")
+        logger.warning("[FuturesOI] Broker not authenticated — skipping OI analysis")
         return {}
 
     result = {}
@@ -128,10 +128,10 @@ def analyse_batch(symbols: list[str], batch_size: int = 50) -> dict[str, dict]:
     # Process in batches to avoid API limits
     for i in range(0, len(symbols), batch_size):
         batch = symbols[i:i + batch_size]
-        fyers_symbols = [build_futures_symbol(s) for s in batch]
+        broker_symbols = [build_futures_symbol(s) for s in batch]
 
         try:
-            res = get_quotes(fyers_symbols)
+            res = get_quotes(broker_symbols)
             quotes = res.get("d", [])
             if not quotes:
                 data = res.get("data", {})
@@ -140,9 +140,9 @@ def analyse_batch(symbols: list[str], batch_size: int = 50) -> dict[str, dict]:
 
             for q in quotes:
                 try:
-                    fyers_sym = q.get("n", "")
+                    broker_sym = q.get("n", "")
                     # Extract base symbol: NSE:RELIANCE26MARFUT -> RELIANCE
-                    base = fyers_sym.replace("NSE:", "")
+                    base = broker_sym.replace("NSE:", "")
                     # Remove the date+FUT suffix
                     for s in batch:
                         if base.startswith(s):
@@ -173,7 +173,7 @@ def analyse_batch(symbols: list[str], batch_size: int = 50) -> dict[str, dict]:
 
                     result[sym] = {
                         "symbol": sym,
-                        "futures_symbol": fyers_sym,
+                        "futures_symbol": broker_sym,
                         "ltp": ltp,
                         "prev_close": prev_close,
                         "price_change_pct": round(price_change_pct, 2),

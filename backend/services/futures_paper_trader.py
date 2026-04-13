@@ -16,7 +16,7 @@ from services.futures_oi_analyser import analyse_batch
 from services.futures_regime import detect_futures_regime
 from services.futures_client import get_futures_ltp_batch
 from services.trade_logger import log_trade
-from services.fyers_client import is_authenticated
+from services.broker_client import is_authenticated
 from fno_stocks import get_fno_symbols
 from utils.time_utils import now_ist, is_past_time, is_before_time
 from utils.state_manager import get_state_path, save_state, load_state
@@ -269,11 +269,11 @@ class FuturesPaperTrader:
             self._update_position_pnl()
             _monitor_tick += 1
 
-            # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
+            # Broker health check every ~5 minutes (every 5th tick at 60s intervals)
             if _monitor_tick % 5 == 0:
                 try:
                     if not is_authenticated():
-                        self._log("WARN", "Fyers disconnected — using delayed data. Reconnect via UI.")
+                        self._log("WARN", "Broker disconnected — using delayed data. Reconnect via UI.")
                 except Exception:
                     pass
 
@@ -431,7 +431,7 @@ class FuturesPaperTrader:
         side = 1 if signal_type == "BUY" else -1
         entry = round(entry + slippage if side == 1 else entry - slippage, 2)
 
-        # Realistic Fyers brokerage + STT + other charges (futures)
+        # Realistic brokerage + STT + other charges (futures)
         turnover = entry * qty
         brokerage_per_leg = min(20, turnover * 0.0003)  # ₹20 or 0.03% (whichever lower)
         brokerage = round(brokerage_per_leg * 2, 2)  # Entry + Exit = 2 legs

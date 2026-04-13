@@ -13,7 +13,7 @@ const STRATEGY_META = {
   play3_vwap_pullback: { name: 'VWAP Trend-Pullback',    color: 'text-blue-400'   },
   play4_supertrend:    { name: 'Supertrend Power Trend', color: 'text-green-400'  },
   play5_bb_squeeze:    { name: 'BB Squeeze Breakout',    color: 'text-red-400'    },
-  play6_bb_mean_rev:   { name: 'BB Mean Reversion',      color: 'text-pink-400'   },
+  play6_bb_mean_rev:   { name: 'BB Mean Reversion',      color: 'text-cyan-400'   },
 }
 
 const STATUS_MAP = { 1:'PENDING', 2:'FILLED', 4:'TRANSIT', 5:'REJECTED', 6:'CANCELLED', 20:'MOD' }
@@ -39,14 +39,14 @@ const Badge = ({ label, color }) => {
     red:'bg-red-900/60 text-red-300 border-red-700',
     yellow:'bg-yellow-900/60 text-yellow-300 border-yellow-700',
     blue:'bg-blue-900/60 text-blue-300 border-blue-700',
-    orange:'bg-orange-900/60 text-orange-300 border-orange-700',
+    orange:'bg-emerald-900/60 text-emerald-300 border-emerald-700',
     gray:'bg-dark-600 text-gray-400 border-dark-500',
   }
   return <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${map[color]??map.gray}`}>{label}</span>
 }
 const SectionHead = ({ icon:Icon, title }) => (
   <div className="flex items-center gap-2 mb-3">
-    <Icon size={16} className="text-orange-400" />
+    <Icon size={16} className="text-emerald-400" />
     <h3 className="text-white font-semibold text-sm tracking-wide">{title}</h3>
   </div>
 )
@@ -66,8 +66,8 @@ export default function EODAnalyst() {
     setLoading(true); setError(null)
     try {
       const [strategiesRaw, tradesRaw, ordersRaw, positionsRaw, autoRaw] = await Promise.all([
-        api('/api/strategies'), api('/api/fyers/trades'), api('/api/fyers/orders'),
-        api('/api/fyers/positions'), api('/api/auto/status'),
+        api('/api/strategies'), api('/api/broker/trades'), api('/api/broker/orders'),
+        api('/api/broker/positions'), api('/api/auto/status'),
       ])
       const orders = (ordersRaw?.orderBook??[]).map(o=>({
         symbol: o.symbol?.replace('NSE:','').replace('-EQ',''),
@@ -143,7 +143,7 @@ export default function EODAnalyst() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Brain size={20} className="text-orange-400"/>
+            <Brain size={20} className="text-emerald-400"/>
             EOD Strategy Analyst
           </h2>
           <p className="text-gray-500 text-xs mt-0.5">{data?.today??'—'} · Nifty 500</p>
@@ -155,7 +155,7 @@ export default function EODAnalyst() {
             {loading?'Loading…':'Refresh'}
           </button>
           <button onClick={runAnalysis} disabled={!data||analysing||loading}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-400 hover:to-pink-400 text-white rounded-lg text-xs font-semibold transition disabled:opacity-40">
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white rounded-lg text-xs font-semibold transition disabled:opacity-40">
             <Brain size={13}/>
             {analysing?'Analysing…':'Run EOD Analysis'}
           </button>
@@ -194,7 +194,7 @@ export default function EODAnalyst() {
           {tabs.map(t=>(
             <button key={t} onClick={()=>setTab(t)}
               className={`px-4 py-2 text-xs font-semibold capitalize transition rounded-t-lg
-                ${tab===t?'bg-dark-700 text-orange-400 border-b-2 border-orange-400':'text-gray-500 hover:text-gray-300'}`}>
+                ${tab===t?'bg-dark-700 text-emerald-400 border-b-2 border-emerald-400':'text-gray-500 hover:text-gray-300'}`}>
               {t==='analysis'?'AI Analysis':t.charAt(0).toUpperCase()+t.slice(1)}
             </button>
           ))}
@@ -361,21 +361,21 @@ export default function EODAnalyst() {
           <div className="space-y-4">
             {!analysis && !analysing && (
               <Card className="text-center py-16">
-                <Brain size={40} className="text-orange-400 mx-auto mb-4"/>
+                <Brain size={40} className="text-emerald-400 mx-auto mb-4"/>
                 <p className="text-white font-semibold mb-1">AI-Powered EOD Analysis</p>
                 <p className="text-gray-500 text-xs mb-6 max-w-sm mx-auto">
                   Fetches live Nifty/VIX data, analyses every trade vs today's market conditions,
                   flags execution bugs, and gives specific parameter changes for tomorrow.
                 </p>
                 <button onClick={runAnalysis}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-400 hover:to-pink-400 text-white rounded-xl font-semibold text-sm transition">
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white rounded-xl font-semibold text-sm transition">
                   <Brain size={16}/> Run EOD Analysis
                 </button>
               </Card>
             )}
             {analysing && (
               <Card className="text-center py-16">
-                <RefreshCw size={32} className="text-orange-400 mx-auto mb-4 animate-spin"/>
+                <RefreshCw size={32} className="text-emerald-400 mx-auto mb-4 animate-spin"/>
                 <p className="text-white font-semibold">Analysing today's session...</p>
                 <p className="text-gray-500 text-xs mt-2">Fetching live market data + reviewing all trades</p>
               </Card>
@@ -384,7 +384,7 @@ export default function EODAnalyst() {
               <>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Brain size={16} className="text-orange-400"/>
+                    <Brain size={16} className="text-emerald-400"/>
                     <span className="text-white font-semibold text-sm">EOD Analysis Report</span>
                     <span className="text-gray-500 text-xs">{data.today}</span>
                   </div>
@@ -399,17 +399,17 @@ export default function EODAnalyst() {
 
                 {/* Apply Recommendations */}
                 {recommendations && recommendations.some(r => r.changes && Object.keys(r.changes).length > 0) && !applyResult && (
-                  <Card className="border-orange-900/50">
+                  <Card className="border-emerald-900/50">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <AlertTriangle size={14} className="text-orange-400"/>
+                          <AlertTriangle size={14} className="text-emerald-400"/>
                           <span className="text-white font-semibold text-sm">Parameter Changes Recommended</span>
                         </div>
                         <div className="space-y-1 mt-2">
                           {recommendations.filter(r => r.changes && Object.keys(r.changes).length > 0).map((r, i) => (
                             <div key={i} className="text-xs text-gray-300">
-                              <span className="text-orange-300 font-semibold">{r.strategy_name}:</span>
+                              <span className="text-emerald-300 font-semibold">{r.strategy_name}:</span>
                               {' '}{r.reasons.join(' ')}
                               <span className="text-gray-500 ml-1">
                                 [{Object.entries(r.changes).map(([k,v]) => {

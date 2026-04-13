@@ -33,15 +33,15 @@ const STRATEGY_COLORS = {
   play1: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
   play2: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
   play3: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-  play4: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+  play4: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   play5: 'bg-green-500/15 text-green-400 border-green-500/30',
-  play6: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
+  play6: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
   play1_ema_crossover: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
   play2_triple_ma: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
   play3_vwap_pullback: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-  play4_supertrend: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+  play4_supertrend: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   play5_bb_squeeze: 'bg-green-500/15 text-green-400 border-green-500/30',
-  play6_bb_contra: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
+  play6_bb_contra: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
   bull_call_spread: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   bull_put_spread: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   bear_call_spread: 'bg-red-500/15 text-red-400 border-red-500/30',
@@ -172,7 +172,7 @@ export default function TradeLog() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <ScrollText size={18} className="text-orange-400" />
+          <ScrollText size={18} className="text-emerald-400" />
           <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Trade Log</h2>
           {/* Live / Paper / All quick toggle */}
           <div className="flex items-center rounded-xl border p-0.5" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
@@ -187,7 +187,7 @@ export default function TradeLog() {
             <button
               onClick={() => setLiveMode('LIVE')}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                liveMode === 'LIVE' ? 'bg-orange-500/15 text-orange-400' : 'text-gray-500 hover:text-gray-300'
+                liveMode === 'LIVE' ? 'bg-emerald-500/15 text-emerald-400' : 'text-gray-500 hover:text-gray-300'
               }`}
             >
               <Zap size={10} /> Live
@@ -251,7 +251,7 @@ export default function TradeLog() {
           onClick={() => setTab('trades')}
           className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
             tab === 'trades'
-              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
               : 'bg-dark-700 text-gray-400 border border-dark-500 hover:text-gray-300'
           }`}
         >
@@ -261,7 +261,7 @@ export default function TradeLog() {
           onClick={() => setTab('logs')}
           className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
             tab === 'logs'
-              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
               : 'bg-dark-700 text-gray-400 border border-dark-500 hover:text-gray-300'
           }`}
         >
@@ -280,7 +280,7 @@ export default function TradeLog() {
                 onChange={e => setSourceFilter(e.target.value)}
                 className={`appearance-none pl-3 pr-7 py-1.5 rounded-lg text-[11px] font-medium border outline-none cursor-pointer transition-all ${
                   sourceFilter !== 'ALL'
-                    ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                     : 'bg-dark-700 text-gray-400 border-dark-500 hover:border-dark-400'
                 }`}
               >
@@ -308,7 +308,7 @@ export default function TradeLog() {
                 onChange={e => setStrategyFilter(e.target.value)}
                 className={`appearance-none pl-3 pr-7 py-1.5 rounded-lg text-[11px] font-medium border outline-none cursor-pointer transition-all ${
                   strategyFilter !== 'ALL'
-                    ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                     : 'bg-dark-700 text-gray-400 border-dark-500 hover:border-dark-400'
                 }`}
               >
@@ -328,7 +328,7 @@ export default function TradeLog() {
                   onClick={() => { setDays(d); setDateFrom(''); setDateTo('') }}
                   className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
                     days === d && !dateFrom && !dateTo
-                      ? 'bg-orange-500/20 text-orange-400'
+                      ? 'bg-emerald-500/20 text-emerald-400'
                       : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
@@ -411,7 +411,7 @@ export default function TradeLog() {
                         exitReason === 'SQUARE_OFF' ? 'text-purple-400' : 'text-gray-400'
                       // Live trade highlight, paper trade dim
                       const rowOpacity = t._isLive ? '' : 'opacity-60'
-                      const rowBorder = t._isLive ? 'border-l-2 border-l-orange-500/40' : ''
+                      const rowBorder = t._isLive ? 'border-l-2 border-l-emerald-500/40' : ''
 
                       return (
                         <tr key={i} className={`border-b border-dark-600/50 hover:bg-dark-600/30 ${rowOpacity} ${rowBorder}`}>
@@ -431,7 +431,7 @@ export default function TradeLog() {
                           </td>
                           <td className="py-2 text-center">
                             <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${
-                              t.source === 'auto' ? 'bg-orange-500/15 text-orange-400' :
+                              t.source === 'auto' ? 'bg-emerald-500/15 text-emerald-400' :
                               t.source === 'swing' ? 'bg-emerald-500/15 text-emerald-400' :
                               t.source === 'swing_paper' ? 'bg-teal-500/15 text-teal-400' :
                               t.source === 'options_auto' ? 'bg-violet-500/15 text-violet-400' :
@@ -529,7 +529,7 @@ export default function TradeLog() {
                 onClick={() => setLogFilter(f)}
                 className={`px-3 py-1 rounded-lg text-[10px] font-medium transition-all ${
                   logFilter === f
-                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'bg-dark-700 text-gray-400 border border-dark-500 hover:text-gray-300'
                 }`}
               >
@@ -551,7 +551,7 @@ export default function TradeLog() {
                       [{entry.level}]
                     </span>
                     <span className={`flex-shrink-0 text-[9px] font-medium px-1 py-0.5 rounded min-w-[50px] text-center ${
-                      entry.source === 'auto' ? 'bg-orange-500/10 text-orange-400' :
+                      entry.source === 'auto' ? 'bg-emerald-500/10 text-emerald-400' :
                       entry.source === 'swing' ? 'bg-emerald-500/10 text-emerald-400' :
                       entry.source === 'swing_paper' ? 'bg-teal-500/10 text-teal-400' :
                       entry.source === 'options_auto' ? 'bg-violet-500/10 text-violet-400' :

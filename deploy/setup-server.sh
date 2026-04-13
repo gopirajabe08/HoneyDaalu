@@ -1,13 +1,13 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════════
-# IntraTrading — AWS EC2 Server Setup (run ONCE on fresh Ubuntu 24.04)
+# LuckyNavi — AWS EC2 Server Setup (run ONCE on fresh Ubuntu 24.04)
 #
 # Usage: ssh -i key.pem ubuntu@<elastic-ip> 'bash -s' < setup-server.sh
 # ═══════════════════════════════════════════════════════════════════════
 
 set -e
 
-echo "═══ IntraTrading Server Setup ═══"
+echo "═══ LuckyNavi Server Setup ═══"
 
 # ── System packages ──
 sudo apt-get update -y
@@ -18,84 +18,83 @@ sudo apt-get install -y \
     build-essential libffi-dev libssl-dev
 
 # ── Create app user ──
-sudo useradd -m -s /bin/bash intratrading 2>/dev/null || true
-sudo mkdir -p /opt/intratrading
-sudo chown intratrading:intratrading /opt/intratrading
+sudo useradd -m -s /bin/bash luckynavi 2>/dev/null || true
+sudo mkdir -p /opt/luckynavi
+sudo chown luckynavi:luckynavi /opt/luckynavi
 
 # ── Clone repo (first time) or pull (subsequent) ──
-if [ ! -d /opt/intratrading/app/.git ]; then
+if [ ! -d /opt/luckynavi/app/.git ]; then
     echo "Cloning repository..."
-    sudo -u intratrading git clone https://github.com/YOUR_USERNAME/IntraTrading.git /opt/intratrading/app
+    sudo -u luckynavi git clone https://github.com/gopirajabe08/HoneyDaalu.git /opt/luckynavi/app
 else
     echo "Repository exists — pulling latest..."
-    sudo -u intratrading git -C /opt/intratrading/app pull origin main
+    sudo -u luckynavi git -C /opt/luckynavi/app pull origin main
 fi
 
 # ── Backend: Python venv + dependencies ──
-cd /opt/intratrading/app/backend
-sudo -u intratrading python3.12 -m venv venv
-sudo -u intratrading ./venv/bin/pip install --upgrade pip
-sudo -u intratrading ./venv/bin/pip install -r requirements.txt
+cd /opt/luckynavi/app/backend
+sudo -u luckynavi python3.12 -m venv venv
+sudo -u luckynavi ./venv/bin/pip install --upgrade pip
+sudo -u luckynavi ./venv/bin/pip install -r requirements.txt
 
 # ── Frontend: Build static files ──
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
-cd /opt/intratrading/app/frontend
-sudo -u intratrading npm install
-sudo -u intratrading npm run build
+cd /opt/luckynavi/app/frontend
+sudo -u luckynavi npm install
+sudo -u luckynavi npm run build
 
 # ── Create .env placeholder ──
-if [ ! -f /opt/intratrading/app/backend/.env ]; then
+if [ ! -f /opt/luckynavi/app/backend/.env ]; then
     cat > /tmp/env_template << 'ENVEOF'
-# Fyers Credentials (fill in)
-FYERS_APP_ID=
-FYERS_SECRET_KEY=
-FYERS_TOTP_SECRET=
-FYERS_PIN=
+# TradeJini CubePlus API Credentials (fill in)
+TRADEJINI_API_KEY=
+TRADEJINI_API_SECRET=
+TRADEJINI_TOTP_SECRET=
+TRADEJINI_CLIENT_ID=
 
-# Telegram Notifications
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
+# JWT Secret for frontend auth
+JWT_SECRET=
 ENVEOF
-    sudo mv /tmp/env_template /opt/intratrading/app/backend/.env
-    sudo chown intratrading:intratrading /opt/intratrading/app/backend/.env
-    sudo chmod 600 /opt/intratrading/app/backend/.env
-    echo "⚠️  Fill in /opt/intratrading/app/backend/.env with your credentials!"
+    sudo mv /tmp/env_template /opt/luckynavi/app/backend/.env
+    sudo chown luckynavi:luckynavi /opt/luckynavi/app/backend/.env
+    sudo chmod 600 /opt/luckynavi/app/backend/.env
+    echo "WARNING: Fill in /opt/luckynavi/app/backend/.env with your credentials!"
 fi
 
 # ── Systemd service: Backend ──
-sudo tee /etc/systemd/system/intratrading-backend.service > /dev/null << 'EOF'
+sudo tee /etc/systemd/system/luckynavi-backend.service > /dev/null << 'EOF'
 [Unit]
-Description=IntraTrading Backend (FastAPI)
+Description=LuckyNavi Backend (FastAPI)
 After=network.target
 
 [Service]
 Type=simple
-User=intratrading
-Group=intratrading
-WorkingDirectory=/opt/intratrading/app/backend
-ExecStart=/opt/intratrading/app/backend/venv/bin/python main.py
+User=luckynavi
+Group=luckynavi
+WorkingDirectory=/opt/luckynavi/app/backend
+ExecStart=/opt/luckynavi/app/backend/venv/bin/python main.py
 Restart=no
 RestartSec=10
 Environment=PYTHONUNBUFFERED=1
 
 # Don't auto-restart — the app has its own lifecycle (auto-shutdown at 3:45 PM)
-# Restart=no prevents the crash loop that caused 400+ Telegram messages
+# Restart=no prevents crash loops
 
-StandardOutput=append:/var/log/intratrading/backend.log
-StandardError=append:/var/log/intratrading/backend.log
+StandardOutput=append:/var/log/luckynavi/backend.log
+StandardError=append:/var/log/luckynavi/backend.log
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 # ── Log directory ──
-sudo mkdir -p /var/log/intratrading
-sudo chown intratrading:intratrading /var/log/intratrading
+sudo mkdir -p /var/log/luckynavi
+sudo chown luckynavi:luckynavi /var/log/luckynavi
 
 # ── Logrotate ──
-sudo tee /etc/logrotate.d/intratrading > /dev/null << 'EOF'
-/var/log/intratrading/*.log {
+sudo tee /etc/logrotate.d/luckynavi > /dev/null << 'EOF'
+/var/log/luckynavi/*.log {
     daily
     rotate 30
     compress
@@ -106,7 +105,7 @@ sudo tee /etc/logrotate.d/intratrading > /dev/null << 'EOF'
 EOF
 
 # ── Nginx reverse proxy ──
-sudo tee /etc/nginx/sites-available/intratrading > /dev/null << 'EOF'
+sudo tee /etc/nginx/sites-available/luckynavi > /dev/null << 'EOF'
 server {
     listen 80;
     server_name _;
@@ -132,7 +131,7 @@ server {
 
     # Frontend (built static files)
     location / {
-        root /opt/intratrading/app/frontend/dist;
+        root /opt/luckynavi/app/frontend/dist;
         try_files $uri $uri/ /index.html;
     }
 
@@ -163,17 +162,16 @@ server {
 }
 EOF
 
-sudo ln -sf /etc/nginx/sites-available/intratrading /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/luckynavi /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl restart nginx
 
 # ── Cron: Auto-start backend at 9:00 AM IST (Mon-Fri, skips NSE holidays) ──
 # AWS uses UTC. IST = UTC+5:30. So 9:00 AM IST = 3:30 AM UTC.
-# The start script checks NSE_HOLIDAYS from backend/config.py before starting.
-chmod +x /opt/intratrading/app/deploy/start-if-trading-day.sh
-sudo -u intratrading crontab -l 2>/dev/null | grep -v intratrading > /tmp/crontab_clean || true
-echo "30 3 * * 1-5 /opt/intratrading/app/deploy/start-if-trading-day.sh" >> /tmp/crontab_clean
-sudo -u intratrading crontab /tmp/crontab_clean
+chmod +x /opt/luckynavi/app/deploy/start-if-trading-day.sh
+sudo -u luckynavi crontab -l 2>/dev/null | grep -v luckynavi > /tmp/crontab_clean || true
+echo "30 3 * * 1-5 /opt/luckynavi/app/deploy/start-if-trading-day.sh" >> /tmp/crontab_clean
+sudo -u luckynavi crontab /tmp/crontab_clean
 rm /tmp/crontab_clean
 
 # ── Enable services ──
@@ -188,13 +186,13 @@ sudo ufw --force enable
 
 echo ""
 echo "═══════════════════════════════════════════════════════"
-echo "  IntraTrading Server Setup COMPLETE"
+echo "  LuckyNavi Server Setup COMPLETE"
 echo "═══════════════════════════════════════════════════════"
 echo ""
 echo "  Next steps:"
-echo "  1. Fill in /opt/intratrading/app/backend/.env"
-echo "  2. Test: sudo systemctl start intratrading-backend"
-echo "  3. Check: sudo systemctl status intratrading-backend"
-echo "  4. Logs: tail -f /var/log/intratrading/backend.log"
-echo "  5. Register Elastic IP with Fyers"
+echo "  1. Fill in /opt/luckynavi/app/backend/.env"
+echo "  2. Test: sudo systemctl start luckynavi-backend"
+echo "  3. Check: sudo systemctl status luckynavi-backend"
+echo "  4. Logs: tail -f /var/log/luckynavi/backend.log"
+echo "  5. Register Elastic IP with TradeJini for IP whitelisting"
 echo ""

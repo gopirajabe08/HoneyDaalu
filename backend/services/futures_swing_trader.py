@@ -29,7 +29,7 @@ from services.futures_client import (
     get_next_expiry,
 )
 from services.trade_logger import log_trade
-from services.fyers_client import is_authenticated, cancel_order, get_orderbook
+from services.broker_client import is_authenticated, cancel_order, get_orderbook
 from fno_stocks import get_fno_symbols
 from utils.time_utils import now_ist
 from utils.state_manager import get_state_path, save_state, load_state
@@ -177,7 +177,7 @@ class FuturesSwingTrader:
             if not is_market_open():
                 return {"error": "Market is closed."}
             if not is_authenticated():
-                return {"error": "Fyers not authenticated."}
+                return {"error": "Broker not authenticated."}
             if not strategies:
                 return {"error": "At least one strategy must be selected."}
 
@@ -380,7 +380,7 @@ class FuturesSwingTrader:
             return
 
         if not is_authenticated():
-            self._log("ERROR", "Fyers auth lost")
+            self._log("ERROR", "Broker auth lost")
             return
 
         oi_data = analyse_batch(get_fno_symbols())

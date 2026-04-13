@@ -1,5 +1,5 @@
 """
-Options Client — wraps Fyers API for options-specific operations.
+Options Client — wraps broker API for options-specific operations.
 Handles option chain fetching, symbol building, Greeks/OI, and India VIX.
 """
 
@@ -10,7 +10,7 @@ from typing import Optional
 
 import yfinance as yf
 
-from services.fyers_client import get_fyers, get_quotes, is_authenticated
+from services.broker_client import get_fyers, get_quotes, is_authenticated
 from config import (
     OPTIONS_LOT_SIZES, OPTIONS_SYMBOL_PREFIX, OPTIONS_INDEX_SYMBOLS,
     OPTIONS_STRIKE_INTERVAL, OPTIONS_UNDERLYINGS,
@@ -47,14 +47,14 @@ def get_india_vix() -> float:
 # ── Spot Price ─────────────────────────────────────────────────────────────
 
 def get_spot_price(underlying: str) -> float:
-    """Get current spot price for NIFTY or BANKNIFTY. Fyers first, yfinance fallback."""
-    # Try Fyers API first (real-time LTP)
-    fyers = get_fyers()
-    if fyers is not None:
+    """Get current spot price for NIFTY or BANKNIFTY. Broker first, yfinance fallback."""
+    # Try broker API first (real-time LTP)
+    broker = get_fyers()
+    if broker is not None:
         symbol = OPTIONS_INDEX_SYMBOLS.get(underlying, "")
         if symbol:
             try:
-                res = fyers.quotes(data={"symbols": symbol})
+                res = broker.quotes(data={"symbols": symbol})
                 quotes = res.get("d", [])
                 for q in quotes:
                     v = q.get("v", {})
@@ -63,7 +63,7 @@ def get_spot_price(underlying: str) -> float:
                         if lp:
                             return float(lp)
             except Exception as e:
-                logger.warning(f"[OptionsClient] Fyers spot price failed for {underlying}: {e}")
+                logger.warning(f"[OptionsClient] Broker spot price failed for {underlying}: {e}")
 
     # Fallback to yfinance (delayed but reliable)
     yf_symbols = {"NIFTY": "^NSEI", "BANKNIFTY": "^NSEBANK"}
@@ -145,13 +145,13 @@ def get_nearest_expiry(underlying: str, preference: str = "weekly") -> tuple[str
                     break
         expiry_date = last_thursday
 
-    # Fyers uses YYMON format (e.g., 26MAR), no day in symbol
+    # Broker uses YYMON format (e.g., 26MAR), no day in symbol
     return expiry_date.strftime("%y") + expiry_date.strftime("%b").upper(), expiry_date
 
 
 def build_option_symbol(underlying: str, expiry: str, strike: int, option_type: str) -> str:
     """
-    Build Fyers option symbol.
+    Build broker option symbol.
     Format: NSE:NIFTY2503222500CE
     Args:
         underlying: "NIFTY" or "BANKNIFTY"
@@ -170,8 +170,8 @@ def get_option_chain(underlying: str, expiry_preference: str = "weekly") -> dict
     Fetch option chain data for an underlying.
     Returns dict with: strikes, expiry, spot_price, atm_strike, chain data.
     """
-    fyers = get_fyers()
-    if fyers is None:
+    broker = get_fyers()
+    if broker is None:
         return {"error": "Not authenticated"}
 
     spot = get_spot_price(underlying)
@@ -201,7 +201,7 @@ def get_option_chain(underlying: str, expiry_preference: str = "weekly") -> dict
     for i in range(0, len(all_symbols), batch_size):
         batch = all_symbols[i:i + batch_size]
         try:
-            res = fyers.quotes(data={"symbols": ",".join(batch)})
+            res = broker.quotes(data={"symbols": ",".join(batch)})
             quotes = res.get("d", [])
             for q in quotes:
                 sym = q.get("n", "") or q.get("symbol", "")
@@ -245,12 +245,12 @@ def get_option_chain(underlying: str, expiry_preference: str = "weekly") -> dict
 
 
 def get_ltp(symbol: str) -> float:
-    """Get LTP for a specific option symbol via Fyers quotes API."""
-    fyers = get_fyers()
-    if fyers is None:
+    """Get LTP for a specific option symbol via broker quotes API."""
+    broker = get_fyers()
+    if broker is None:
         return 0.0
     try:
-        res = fyers.quotes(data={"symbols": symbol})
+        res = broker.quotes(data={"symbols": symbol})
         quotes = res.get("d", [])
         for q in quotes:
             v = q.get("v", {})
@@ -262,27 +262,27 @@ def get_ltp(symbol: str) -> float:
 
 
 def get_ltp_batch(symbols: list[str]) -> dict[str, float]:
-    """Get LTP for multiple option symbols in a single Fyers API call.
+    """Get LTP for multiple option symbols in a single broker API call.
 
     Args:
-        symbols: List of Fyers option symbols (e.g. ["NSE:NIFTY2503222500CE", "NSE:NIFTY2503222400PE"])
+        symbols: List of broker option symbols (e.g. ["NSE:NIFTY2503222500CE", "NSE:NIFTY2503222400PE"])
 
     Returns:
         Dict mapping symbol -> LTP (only includes symbols with valid prices)
     """
     if not symbols:
         return {}
-    fyers = get_fyers()
-    if fyers is None:
+    broker = get_fyers()
+    if broker is None:
         return {}
 
     result = {}
-    # Fyers quotes API supports up to 50 symbols per call
+    # Broker quotes API supports up to 50 symbols per call
     batch_size = 50
     for i in range(0, len(symbols), batch_size):
         batch = symbols[i:i + batch_size]
         try:
-            res = fyers.quotes(data={"symbols": ",".join(batch)})
+            res = broker.quotes(data={"symbols": ",".join(batch)})
             quotes = res.get("d", [])
             for q in quotes:
                 sym = q.get("n", "") or q.get("symbol", "")
@@ -324,13 +324,13 @@ def place_option_order(
     limit_price: float = 0,
     order_tag: str = "options_intraday",
 ) -> dict:
-    """Place an order for an option contract via Fyers."""
-    fyers = get_fyers()
-    if fyers is None:
+    """Place an order for an option contract via broker."""
+    broker = get_fyers()
+    if broker is None:
         return {"error": "Not authenticated"}
 
     data = {
-        "symbol": symbol,  # Already in Fyers format: NSE:NIFTY2503222500CE
+        "symbol": symbol,  # Already in broker format: NSE:NIFTY2503222500CE
         "qty": qty,
         "type": order_type,
         "side": side,
@@ -344,9 +344,9 @@ def place_option_order(
     }
 
     try:
-        from services.fyers_client import _enforce_order_rate_limit
+        from services.broker_client import _enforce_order_rate_limit
         _enforce_order_rate_limit()
-        response = fyers.place_order(data=data)
+        response = broker.place_order(data=data)
         if response.get("s") == "ok" or "id" in response:
             return response
         return {"error": response.get("message", str(response))}
@@ -361,7 +361,7 @@ def place_spread_orders(legs: list[dict], product_type: str = "INTRADAY", use_li
     Returns combined result with all order IDs.
 
     CRITICAL: BUY legs are placed FIRST, then SELL legs.
-    This ensures Fyers recognizes the spread and applies spread margin (~₹20K)
+    This ensures the broker recognizes the spread and applies spread margin (~₹20K)
     instead of naked option margin (~₹1.13L). Without this ordering,
     SELL legs get rejected for margin shortfall.
 
@@ -369,7 +369,7 @@ def place_spread_orders(legs: list[dict], product_type: str = "INTRADAY", use_li
     (reverse) the already-placed legs to avoid unhedged exposure.
     """
     # Reorder: BUY legs first (side=1), then SELL legs (side=-1)
-    # This is critical for spread margin recognition on Fyers
+    # This is critical for spread margin recognition on the broker
     ordered_legs = sorted(legs, key=lambda l: l.get("side", 0), reverse=True)
 
     results = []
@@ -388,7 +388,7 @@ def place_spread_orders(legs: list[dict], product_type: str = "INTRADAY", use_li
         # Before SELL leg: verify margin is available (BUY leg should have established spread)
         if leg["side"] == -1 and succeeded_legs:
             try:
-                from services.fyers_client import get_funds
+                from services.broker_client import get_funds
                 funds = get_funds()
                 avail = 0
                 for f_item in funds.get("fund_limit", []):
@@ -415,7 +415,7 @@ def place_spread_orders(legs: list[dict], product_type: str = "INTRADAY", use_li
                 pass  # Proceed if funds check fails
 
         import time as _time
-        # Small delay between legs to let Fyers recognize the spread
+        # Small delay between legs to let the broker recognize the spread
         if i > 0:
             _time.sleep(2)
 

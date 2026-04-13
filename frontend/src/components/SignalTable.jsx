@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { TrendingUp, TrendingDown, Target, ShieldAlert, Clock, BarChart3, Zap, Loader2 } from 'lucide-react'
 import { placeOrder, placeBracketOrder } from '../services/api'
 
-export default function SignalTable({ scanResult, capital, fyersConnected }) {
+export default function SignalTable({ scanResult, capital, brokerConnected }) {
   if (!scanResult) return null
 
   const { signals, stocks_scanned, stocks_eligible, scan_time_seconds, error } = scanResult
@@ -43,14 +43,14 @@ export default function SignalTable({ scanResult, capital, fyersConnected }) {
                   <th className="text-center text-[11px] font-medium text-gray-400 px-3 py-3">R:R</th>
                   <th className="text-right text-[11px] font-medium text-gray-400 px-3 py-3">Qty</th>
                   <th className="text-right text-[11px] font-medium text-gray-400 px-3 py-3">Capital</th>
-                  {fyersConnected && (
+                  {brokerConnected && (
                     <th className="text-center text-[11px] font-medium text-gray-400 px-3 py-3">Trade</th>
                   )}
                 </tr>
               </thead>
               <tbody>
                 {signals.map((sig, i) => (
-                  <SignalRow key={i} sig={sig} fyersConnected={fyersConnected} />
+                  <SignalRow key={i} sig={sig} brokerConnected={brokerConnected} />
                 ))}
               </tbody>
             </table>
@@ -61,7 +61,7 @@ export default function SignalTable({ scanResult, capital, fyersConnected }) {
   )
 }
 
-function SignalRow({ sig, fyersConnected }) {
+function SignalRow({ sig, brokerConnected }) {
   const [orderState, setOrderState] = useState('idle') // idle | loading | success | error
   const [orderMsg, setOrderMsg] = useState('')
   const isBuy = sig.signal_type === 'BUY'
@@ -133,13 +133,13 @@ function SignalRow({ sig, fyersConnected }) {
         {sig.target_2 ? `\u20B9${sig.target_2}` : '\u2014'}
       </td>
       <td className="text-center px-3 py-3">
-        <span className="text-xs font-medium text-orange-400">{sig.risk_reward_ratio}</span>
+        <span className="text-xs font-medium text-emerald-400">{sig.risk_reward_ratio}</span>
       </td>
       <td className="text-right px-3 py-3 text-sm text-gray-200">{sig.quantity}</td>
       <td className="text-right px-3 py-3 text-sm text-gray-300">
         {'\u20B9'}{sig.capital_required?.toLocaleString('en-IN')}
       </td>
-      {fyersConnected && (
+      {brokerConnected && (
         <td className="px-3 py-3">
           {orderState === 'idle' && (
             <div className="flex gap-1 justify-center">
@@ -161,7 +161,7 @@ function SignalRow({ sig, fyersConnected }) {
           )}
           {orderState === 'loading' && (
             <div className="flex justify-center">
-              <Loader2 size={14} className="text-orange-400 animate-spin" />
+              <Loader2 size={14} className="text-emerald-400 animate-spin" />
             </div>
           )}
           {orderState === 'success' && (

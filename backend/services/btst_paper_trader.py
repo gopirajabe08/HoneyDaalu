@@ -1,10 +1,10 @@
 """
-BTST Paper Trading Engine for IntraTrading.
+BTST Paper Trading Engine for LuckyNavi.
 
 Mirrors BTST trading rules but uses virtual positions.
 Key differences from live btst_trader:
-  - No Fyers orders — virtual positions only
-  - Uses LTP from Fyers quotes for P&L
+  - No broker orders — virtual positions only
+  - Uses LTP from broker quotes for P&L
   - Synthetic order IDs ("BTST_PAPER_1", etc)
   - Max 4 positions (more for testing)
   - Same exit rules, same scan logic
@@ -22,7 +22,7 @@ from collections import OrderedDict
 from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.market_data import get_nifty_trend
 from services.trade_logger import log_trade
-from services.fyers_client import get_quotes, is_authenticated
+from services.broker_client import get_quotes, is_authenticated
 from config import (
     BTST_ORDER_START_HOUR, BTST_ORDER_START_MIN,
     BTST_ORDER_CUTOFF_HOUR, BTST_ORDER_CUTOFF_MIN,
@@ -572,7 +572,7 @@ class BTSTPaperTrader:
                 strategy_count_this_scan[sig_strategy] = strategy_count_this_scan.get(sig_strategy, 0) + 1
 
     def _place_virtual_order(self, signal: dict) -> bool:
-        """Place a virtual BTST order (no real Fyers orders)."""
+        """Place a virtual BTST order (no real broker orders)."""
         symbol = signal.get("symbol", "")
         signal_type = signal.get("signal_type", "")
         entry_price = signal.get("entry_price", 0)
@@ -610,7 +610,7 @@ class BTSTPaperTrader:
 
         capital_req = qty * entry_price
 
-        # Realistic Fyers brokerage + STT + other charges (CNC delivery)
+        # Realistic brokerage + STT + other charges (CNC delivery)
         turnover = qty * entry_price
         brokerage_per_leg = min(20, turnover * 0.0003)
         brokerage = round(brokerage_per_leg * 2, 2)
@@ -736,7 +736,7 @@ class BTSTPaperTrader:
     # ── Position Monitoring ───────────────────────────────────────────────
 
     def _update_position_pnl(self):
-        """Refresh P&L for active virtual BTST trades using Fyers LTP quotes."""
+        """Refresh P&L for active virtual BTST trades using broker LTP quotes."""
         if not self._active_trades:
             return
 
@@ -791,7 +791,7 @@ class BTSTPaperTrader:
         self._save_state()
 
     def _fetch_ltp(self, symbols: list[str]) -> dict[str, float]:
-        """Fetch LTP for a list of symbols via Fyers quotes API."""
+        """Fetch LTP for a list of symbols via broker quotes API."""
         ltp_map = {}
         if not symbols:
             return ltp_map

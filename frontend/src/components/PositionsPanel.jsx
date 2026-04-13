@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react'
 import { RefreshCw, TrendingUp, TrendingDown, List } from 'lucide-react'
 import { getPositions, getOrderbook } from '../services/api'
 
-export default function PositionsPanel({ fyersConnected }) {
+export default function PositionsPanel({ brokerConnected }) {
   const [tab, setTab] = useState('positions')
   const [positions, setPositions] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (fyersConnected) refresh()
-  }, [fyersConnected])
+    if (brokerConnected) refresh()
+  }, [brokerConnected])
 
   async function refresh() {
     setLoading(true)
@@ -31,7 +31,7 @@ export default function PositionsPanel({ fyersConnected }) {
     }
   }
 
-  if (!fyersConnected) return null
+  if (!brokerConnected) return null
 
   const totalPnl = positions.reduce((sum, p) => sum + (p.pl || p.unrealized_profit || 0), 0)
 
@@ -42,7 +42,7 @@ export default function PositionsPanel({ fyersConnected }) {
         <button
           onClick={() => setTab('positions')}
           className={`flex-1 px-4 py-3 text-xs font-medium transition-colors ${
-            tab === 'positions' ? 'text-white border-b-2 border-orange-500' : 'text-gray-400 hover:text-gray-300'
+            tab === 'positions' ? 'text-white border-b-2 border-emerald-500' : 'text-gray-400 hover:text-gray-300'
           }`}
         >
           Positions ({positions.length})
@@ -50,7 +50,7 @@ export default function PositionsPanel({ fyersConnected }) {
         <button
           onClick={() => setTab('orders')}
           className={`flex-1 px-4 py-3 text-xs font-medium transition-colors ${
-            tab === 'orders' ? 'text-white border-b-2 border-orange-500' : 'text-gray-400 hover:text-gray-300'
+            tab === 'orders' ? 'text-white border-b-2 border-emerald-500' : 'text-gray-400 hover:text-gray-300'
           }`}
         >
           Orders ({orders.length})

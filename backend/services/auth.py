@@ -1,7 +1,7 @@
 """
-Authentication service for IntraTrading web portal.
+Authentication service for LuckyNavi web portal.
 
-Email OTP authentication via Telegram delivery + JWT tokens.
+Email OTP authentication via console delivery + JWT tokens.
 Single-user system: only AUTH_EMAIL from .env can log in.
 
 Security:
@@ -81,7 +81,7 @@ def _is_email_allowed(email: str) -> bool:
 
 def request_otp(email: str) -> dict:
     """
-    Generate OTP and send via Telegram.
+    Generate OTP and print to console.
     Returns {"status": "otp_sent"} or {"error": "..."}.
     """
     email = email.strip().lower()
@@ -117,7 +117,7 @@ def request_otp(email: str) -> dict:
     try:
         from services import telegram_notify
         telegram_notify.send(
-            f"🔐 <b>IntraTrading Login OTP</b>\n\n"
+            f"🔐 <b>LuckyNavi Login OTP</b>\n\n"
             f"Your OTP: <code>{otp}</code>\n\n"
             f"Valid for 5 minutes.\n"
             f"If you didn't request this, ignore it."
@@ -175,7 +175,7 @@ def verify_otp(email: str, otp: str) -> dict:
         from services import telegram_notify
         telegram_notify.send(
             f"✅ <b>Login Successful</b>\n\n"
-            f"IntraTrading portal accessed.\n"
+            f"LuckyNavi portal accessed.\n"
             f"Session valid for 24 hours."
         )
     except Exception:
@@ -193,7 +193,7 @@ def _create_jwt(email: str) -> str:
         "sub": email,
         "iat": now,
         "exp": now + timedelta(hours=JWT_EXPIRY_HOURS),
-        "iss": "intratrading",
+        "iss": "luckynavi",
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
@@ -206,7 +206,7 @@ def verify_token(token: str) -> dict:
     import jwt
 
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], issuer="intratrading")
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], issuer="luckynavi")
         email = payload.get("sub", "")
 
         if not _is_email_allowed(email):

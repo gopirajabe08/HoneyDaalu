@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Dashboard from './components/Dashboard'
-import FyersConnect from './components/FyersConnect'
+import BrokerConnect from './components/BrokerConnect'
 import EquityPage from './components/EquityPage'
 import PositionsPage from './components/PositionsPage'
 import TradeLog from './components/TradeLog'
@@ -14,7 +14,7 @@ import FuturesPage from './components/FuturesPage'
 import BTSTPage from './components/BTSTPage'
 import LoginPage from './components/LoginPage'
 // import ImprovementTracker from './components/ImprovementTracker'  // Disabled — auto-tune removed
-import { getFyersStatus, checkAuthStatus, logout } from './services/api'
+import { getBrokerStatus, checkAuthStatus, logout } from './services/api'
 import { getAuthToken } from './services/api/base'
 import { ThemeProvider } from './contexts/ThemeContext'
 
@@ -24,7 +24,7 @@ function AppContent() {
   const [optionsCapital, setOptionsCapital] = useState(25000)
   const [futuresCapital, setFuturesCapital] = useState(100000)
   const [btstCapital, setBtstCapital] = useState(100000)
-  const [fyersStatus, setFyersStatus] = useState({ connected: false, configured: false })
+  const [brokerStatus, setBrokerStatus] = useState({ connected: false, configured: false })
 
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -70,9 +70,9 @@ function AppContent() {
   useEffect(() => {
     if (!isAuthenticated) return
     const fetchStatus = () =>
-      getFyersStatus()
-        .then(setFyersStatus)
-        .catch(() => setFyersStatus({ connected: false, configured: false }))
+      getBrokerStatus()
+        .then(setBrokerStatus)
+        .catch(() => setBrokerStatus({ connected: false, configured: false }))
     fetchStatus()
     const iv = setInterval(fetchStatus, 30000)
     return () => clearInterval(iv)
@@ -105,13 +105,13 @@ function AppContent() {
   function renderPage() {
     switch (activePage) {
       case 'dashboard':
-        return <Dashboard fyersStatus={fyersStatus} />
+        return <Dashboard brokerStatus={brokerStatus} />
 
       case 'equity':
         return <EquityPage capital={equityCapital} setCapital={setEquityCapital} />
 
       case 'positions':
-        return <PositionsPage fyersConnected={fyersStatus?.connected} />
+        return <PositionsPage brokerConnected={brokerStatus?.connected} />
 
       case 'logs':
         return <TradeLog />
@@ -144,7 +144,7 @@ function AppContent() {
       <Sidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleLogout} />
 
       <div className="ml-[72px]">
-        <Header fyersStatus={fyersStatus} />
+        <Header brokerStatus={brokerStatus} />
 
         <main className="px-6 pb-8">
           {renderPage()}

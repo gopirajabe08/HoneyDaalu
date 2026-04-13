@@ -1,5 +1,5 @@
 """
-Shared utilities for IntraTrading backend.
+Shared utilities for LuckyNavi backend.
 
 Modules:
     time_utils    - IST timezone handling and market time checks

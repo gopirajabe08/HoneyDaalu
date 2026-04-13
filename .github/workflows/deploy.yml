@@ -1,0 +1,21 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - '.claude/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}         # Your Elastic IP
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}        # Contents of your .pem file
+          script: |
+            bash /opt/luckynavi/app/deploy/deploy.sh

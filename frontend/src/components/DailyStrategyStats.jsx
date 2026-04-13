@@ -20,12 +20,12 @@ const EXTRA_STRAT_NAMES = {
 }
 
 const STRAT_COLORS = [
-  '#f97316', '#3b82f6', '#10b981', '#a855f7', '#ec4899', '#06b6d4',
+  '#10b981', '#3b82f6', '#10b981', '#a855f7', '#ec4899', '#06b6d4',
   '#eab308', '#ef4444', '#6366f1', '#14b8a6', '#f43f5e', '#8b5cf6',
 ]
 
 const ACCENT_COLORS = {
-  orange: 'text-orange-400', blue: 'text-blue-400', emerald: 'text-emerald-400',
+  orange: 'text-emerald-400', blue: 'text-blue-400', emerald: 'text-emerald-400',
   violet: 'text-violet-400', green: 'text-green-400', teal: 'text-teal-400',
 }
 

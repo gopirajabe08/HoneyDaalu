@@ -9,21 +9,21 @@ export const API_BASE = '/api'
  * Get the stored auth token from localStorage.
  */
 export function getAuthToken() {
-  return localStorage.getItem('intratrading_token')
+  return localStorage.getItem('luckynavi_token')
 }
 
 /**
  * Set the auth token in localStorage.
  */
 export function setAuthToken(token) {
-  localStorage.setItem('intratrading_token', token)
+  localStorage.setItem('luckynavi_token', token)
 }
 
 /**
  * Clear the auth token from localStorage.
  */
 export function clearAuthToken() {
-  localStorage.removeItem('intratrading_token')
+  localStorage.removeItem('luckynavi_token')
 }
 
 /**

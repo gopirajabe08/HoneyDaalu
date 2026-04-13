@@ -1,5 +1,5 @@
 """
-Swing Trading Engine for IntraTrading.
+Swing Trading Engine for LuckyNavi.
 
 Key differences from intraday auto-trader:
   - Max 1 open position (strict)
@@ -19,7 +19,7 @@ from typing import Optional
 
 from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.trade_logger import log_trade
-from services.fyers_client import (
+from services.broker_client import (
     place_order,
     cancel_order,
     get_positions,
@@ -42,7 +42,7 @@ STATE_FILE = get_state_path(".swing_trader_state.json")
 class SwingTrader:
     """
     Live swing trading engine.
-    Places CNC orders via Fyers. Positions carry over days.
+    Places CNC orders via broker. Positions carry over days.
     Max 1 position. No time-based square-off.
     """
 
@@ -155,7 +155,7 @@ class SwingTrader:
                 return {"error": "Market is closed. Swing trading scans run during market hours (9:15 AM - 3:30 PM IST)."}
 
             if not is_authenticated():
-                return {"error": "Fyers is not authenticated. Please login first."}
+                return {"error": "Broker is not authenticated. Please login first."}
 
             if not strategies:
                 return {"error": "At least one strategy must be selected."}
@@ -394,7 +394,7 @@ class SwingTrader:
         self._scan_count += 1
         self._log("SCAN", f"Swing scan #{self._scan_count}...")
 
-        # First: check existing position SL/target via Fyers positions
+        # First: check existing position SL/target via broker positions
         self._update_position_pnl()
 
         open_count = len(self._active_trades)
@@ -403,7 +403,7 @@ class SwingTrader:
             return
 
         if not is_authenticated():
-            self._log("ERROR", "Fyers authentication lost")
+            self._log("ERROR", "Broker authentication lost")
             return
 
         all_signals = []
@@ -767,7 +767,7 @@ class SwingTrader:
             return set()
 
     def _is_order_filled(self, order_id: str) -> bool:
-        """Check if a specific order was filled (status=2 in Fyers)."""
+        """Check if a specific order was filled (status=2 in broker)."""
         try:
             orderbook = get_orderbook()
             orders = orderbook.get("orderBook", [])
@@ -779,13 +779,13 @@ class SwingTrader:
             return False
 
     def _is_order_pending(self, order_id: str) -> bool:
-        """Check if a specific order is still pending/open (status=6 or trigger_pending in Fyers)."""
+        """Check if a specific order is still pending/open (status=6 or trigger_pending in broker)."""
         try:
             orderbook = get_orderbook()
             orders = orderbook.get("orderBook", [])
             for order in orders:
                 if order.get("id", "") == order_id:
-                    # Fyers status: 1=cancelled, 2=traded/filled, 4=transit, 5=rejected, 6=pending
+                    # Broker status: 1=cancelled, 2=traded/filled, 4=transit, 5=rejected, 6=pending
                     status = order.get("status", 0)
                     return status in (4, 6)  # transit or pending (includes trigger-pending SL orders)
             return False
@@ -795,11 +795,11 @@ class SwingTrader:
     def _get_ltp(self, symbol: str) -> float:
         """Get last traded price for a symbol via quotes API."""
         try:
-            fyers_symbol = f"NSE:{symbol}-EQ"
-            quotes = get_quotes([fyers_symbol])
+            broker_symbol = f"NSE:{symbol}-EQ"
+            quotes = get_quotes([broker_symbol])
             if quotes and "d" in quotes:
                 for q in quotes["d"]:
-                    if q.get("n", "") == fyers_symbol:
+                    if q.get("n", "") == broker_symbol:
                         return q.get("v", {}).get("lp", 0)
             return 0
         except Exception:
@@ -914,8 +914,8 @@ class SwingTrader:
             for pos in positions:
                 qty = pos.get("netQty", pos.get("qty", 0))
                 if qty != 0:
-                    fyers_sym = pos.get("symbol", "")
-                    plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
+                    broker_sym = pos.get("symbol", "")
+                    plain = broker_sym.replace("NSE:", "").replace("-EQ", "")
                     open_symbols.add(plain)
                     open_positions.append(pos)
 

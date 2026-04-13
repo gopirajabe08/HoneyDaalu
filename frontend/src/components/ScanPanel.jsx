@@ -74,7 +74,7 @@ export default function ScanPanel({
                   ${tfDisabled
                     ? 'bg-dark-600 text-gray-600 border border-dark-500 cursor-not-allowed'
                     : selectedTimeframe === tf
-                      ? 'bg-gradient-to-r from-orange-500 to-pink-500 text-white'
+                      ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white'
                       : 'bg-dark-600 text-gray-400 border border-dark-500 hover:text-gray-300'
                   }`}
                 title={tfDisabled ? 'Available during market hours only' : ''}
@@ -91,7 +91,7 @@ export default function ScanPanel({
       <button
         onClick={onScan}
         disabled={scanDisabled}
-        className="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {scanning ? (
           <>

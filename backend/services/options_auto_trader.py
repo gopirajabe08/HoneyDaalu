@@ -1,9 +1,9 @@
 """
-Options Auto-Trading Engine for IntraTrading.
+Options Auto-Trading Engine for LuckyNavi.
 
 Rules:
   - Scans NIFTY/BANKNIFTY for spread setups during market hours
-  - Places spread orders via Fyers options_client
+  - Places spread orders via options_client
   - Order window: 10:00 AM - 2:00 PM IST
   - Squares off all positions at 3:00 PM IST
   - Max 3 open spread positions at a time
@@ -26,7 +26,7 @@ from services.scanner import is_market_open
 from services.options_scanner import scan_options
 from services.options_client import get_ltp, get_ltp_batch, place_spread_orders, place_option_order
 from services.trade_logger import log_trade
-from services.fyers_client import is_authenticated
+from services.broker_client import is_authenticated
 from strategies.options_registry import OPTIONS_STRATEGY_MAP
 from config import (
     OPTIONS_CAPITAL_PER_POSITION, OPTIONS_MIN_POSITIONS, OPTIONS_MAX_POSITIONS_CAP,
@@ -60,7 +60,7 @@ def _is_squareoff_time() -> bool:
 class OptionsAutoTrader:
     """
     Live options auto-trading engine.
-    Places spread orders on NIFTY/BANKNIFTY via Fyers.
+    Places spread orders on NIFTY/BANKNIFTY via broker.
     """
 
     def __init__(self):
@@ -171,7 +171,7 @@ class OptionsAutoTrader:
                 return {"error": "Market is closed. Options trading runs during market hours (9:15 AM - 3:30 PM IST)."}
 
             if not is_authenticated():
-                return {"error": "Fyers is not authenticated. Please login first."}
+                return {"error": "Broker is not authenticated. Please login first."}
 
             if _is_past_order_cutoff():
                 return {"error": "Cannot start after 2:00 PM IST. No new orders after 2:00 PM."}
@@ -194,7 +194,7 @@ class OptionsAutoTrader:
             self._ltp_fail_counts = {}
 
             self._log("START", f"Options auto trader STARTED — {', '.join(self._underlyings)} | Capital=₹{capital:,.0f}")
-            self._log("INFO", f"LIVE orders via Fyers | Order window: 10:00 AM - 2:00 PM | Square-off: 3:00 PM | Max positions: {self._max_positions} (auto: ₹{OPTIONS_CAPITAL_PER_POSITION:,.0f}/slot)")
+            self._log("INFO", f"LIVE orders via broker | Order window: 10:00 AM - 2:00 PM | Square-off: 3:00 PM | Max positions: {self._max_positions} (auto: ₹{OPTIONS_CAPITAL_PER_POSITION:,.0f}/slot)")
 
             self._reconcile_positions()
             self._save_state()
@@ -493,8 +493,8 @@ class OptionsAutoTrader:
     def _square_off_all(self):
         if not self._active_positions:
             self._log("INFO", "No options positions to square off")
-            # Still check Fyers for orphaned options positions
-            self._force_close_fyers_options()
+            # Still check broker for orphaned options positions
+            self._force_close_broker_options()
             self._save_state()
             return
 
@@ -509,20 +509,20 @@ class OptionsAutoTrader:
             self._log("ALERT", f"{len(failed)} position(s) FAILED to close — they remain in active list for manual resolution")
         self._active_positions = failed
 
-        # SAFETY NET: Close any remaining options positions on Fyers
+        # SAFETY NET: Close any remaining options positions on broker
         # regardless of internal tracking. Prevents the Mar 27 bug where
-        # engine said "squared off" but positions were still open on Fyers.
-        self._force_close_fyers_options()
+        # engine said "squared off" but positions were still open on broker.
+        self._force_close_broker_options()
 
         self._log("ALERT", f"Square-off complete. Total P&L: {self._total_pnl:,.2f}")
         self._sleep_mgr.allow_sleep()
         self._save_state()
 
-    def _force_close_fyers_options(self):
-        """Safety net: close ANY open options positions on Fyers.
+    def _force_close_broker_options(self):
+        """Safety net: close ANY open options positions on broker.
         Called after normal square-off to catch positions that internal tracking missed."""
         try:
-            from services.fyers_client import get_positions
+            from services.broker_client import get_positions
             from services.options_client import place_option_order
             positions_data = get_positions()
             positions = positions_data.get("netPositions", [])
@@ -740,16 +740,16 @@ class OptionsAutoTrader:
     # ── Position Reconciliation ──────────────────────────────────────────
 
     def _reconcile_positions(self):
-        """Check Fyers for option positions not tracked in _active_positions.
+        """Check broker for option positions not tracked in _active_positions.
         Logs warnings for any untracked positions found."""
         try:
-            from services.fyers_client import get_positions
+            from services.broker_client import get_positions
             result = get_positions()
             if not result or "error" in result:
                 return
 
-            fyers_positions = result.get("netPositions", result.get("positions", []))
-            if not fyers_positions:
+            broker_positions = result.get("netPositions", result.get("positions", []))
+            if not broker_positions:
                 return
 
             tracked_symbols = set()
@@ -758,7 +758,7 @@ class OptionsAutoTrader:
                     tracked_symbols.add(leg.get("symbol", ""))
 
             untracked = []
-            for fp in fyers_positions:
+            for fp in broker_positions:
                 symbol = fp.get("symbol", "")
                 qty = fp.get("netQty", fp.get("qty", 0))
                 product = fp.get("productType", "")
@@ -783,7 +783,7 @@ class OptionsAutoTrader:
             if untracked:
                 for u in untracked:
                     self._log("ALERT", f"UNTRACKED option position found: {u['symbol']} qty={u['qty']} P&L={u['pnl']:.2f} — NOT managed by this trader. Check broker manually.")
-                self._log("WARN", f"{len(untracked)} untracked option position(s) found in Fyers. These may be from a previous session or manual trades.")
+                self._log("WARN", f"{len(untracked)} untracked option position(s) found in broker. These may be from a previous session or manual trades.")
         except Exception as e:
             self._log("WARN", f"Position reconciliation failed: {e}")
 

@@ -1,6 +1,6 @@
 """
 EOD Analyser — Built-in algorithmic trading strategist engine.
-Generates comprehensive end-of-day analysis from Fyers + auto-trader data.
+Generates comprehensive end-of-day analysis from broker + auto-trader data.
 Generates and applies parameter recommendations based on strategy performance.
 No external API dependencies.
 """
@@ -8,7 +8,7 @@ No external API dependencies.
 import json
 import os
 from datetime import datetime, timezone, timedelta
-from services import fyers_client
+from services import broker_client
 from services.auto_trader import auto_trader
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "strategy_config.json")
@@ -98,10 +98,10 @@ def get_current_config() -> dict:
 
 
 def _collect_trading_data(today_str: str) -> dict:
-    """Gather all trading data from Fyers and auto-trader."""
-    orders_raw = _safe_call(fyers_client.get_orderbook)
-    trades_raw = _safe_call(fyers_client.get_tradebook)
-    positions_raw = _safe_call(fyers_client.get_positions)
+    """Gather all trading data from broker and auto-trader."""
+    orders_raw = _safe_call(broker_client.get_orderbook)
+    trades_raw = _safe_call(broker_client.get_tradebook)
+    positions_raw = _safe_call(broker_client.get_positions)
 
     # Parse orders
     order_book = orders_raw.get("orderBook", []) if orders_raw else []
@@ -777,7 +777,7 @@ def _section_execution_issues(data: dict) -> str:
             elif "freeze" in msg:
                 lines.append(f"     Root Cause: Order freeze quantity exceeded. Split into smaller orders.")
             else:
-                lines.append(f"     Root Cause: Broker-side rejection. Check Fyers order requirements for this symbol.")
+                lines.append(f"     Root Cause: Broker-side rejection. Check broker order requirements for this symbol.")
             issue_num += 1
 
     if tight_sls:

@@ -30,7 +30,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
       : { play1_ema_crossover: '15m', play6_bb_contra: '15m' }
   )
   const [refreshing, setRefreshing] = useState(false)
-  const [fyersPositions, setFyersPositions] = useState([])
+  const [brokerPositions, setBrokerPositions] = useState([])
   const [autoMode, setAutoMode] = useState(true)
   const [regime, setRegime] = useState(null)
 
@@ -40,18 +40,18 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
   const isLive = mode === 'live'
   const accent = isLive ? 'orange' : 'blue'
   const accentGrad = isLive
-    ? 'from-orange-500 to-pink-500'
+    ? 'from-emerald-500 to-cyan-500'
     : 'from-blue-500 to-cyan-500'
-  const accentBorder = isLive ? 'border-orange-500/20' : 'border-blue-500/20'
+  const accentBorder = isLive ? 'border-emerald-500/20' : 'border-blue-500/20'
   const accentBg = isLive
-    ? 'from-orange-500/5 to-pink-500/5'
+    ? 'from-emerald-500/5 to-cyan-500/5'
     : 'from-blue-500/5 to-cyan-500/5'
   const accentDot = isLive ? 'bg-green-400' : 'bg-blue-400'
-  const accentText = isLive ? 'text-orange-400' : 'text-blue-400'
-  const accentCheck = isLive ? 'bg-orange-500 border-orange-500' : 'bg-blue-500 border-blue-500'
-  const accentSelected = isLive ? 'border-orange-500/30' : 'border-blue-500/30'
+  const accentText = isLive ? 'text-emerald-400' : 'text-blue-400'
+  const accentCheck = isLive ? 'bg-emerald-500 border-emerald-500' : 'bg-blue-500 border-blue-500'
+  const accentSelected = isLive ? 'border-emerald-500/30' : 'border-blue-500/30'
   const accentTfActive = isLive
-    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
     : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
 
   const pollStatus = useCallback(async () => {
@@ -73,7 +73,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
         } catch {}
       }
       setStatus(data)
-      // For live mode, also fetch Fyers positions as source of truth
+      // For live mode, also fetch TradeJini positions as source of truth
       if (isLive) {
         try {
           const posRes = await getPositions()
@@ -83,7 +83,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
             const sym = (p.symbol || '').toUpperCase()
             return !sym.includes('CE') && !sym.includes('PE') && !sym.includes('FUT')
           })
-          setFyersPositions(equityOnly)
+          setBrokerPositions(equityOnly)
         } catch {}
       }
     } catch {}
@@ -100,7 +100,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
   // Poll on mount and when mode switches
   useEffect(() => { pollStatus() }, [pollStatus])
 
-  // Poll every 10s — always for live (Fyers data), only when running for paper
+  // Poll every 10s — always for live (TradeJini data), only when running for paper
   useEffect(() => {
     if (running || isLive) {
       pollRef.current = setInterval(pollStatus, POLL_INTERVAL)
@@ -186,23 +186,23 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
   const squaredOff = status?.squared_off ?? false
   const runningStrategies = status?.strategies ?? []
 
-  // For live mode: use Fyers P&L (source of truth). For paper: use engine P&L.
-  const fyersTotalPnl = fyersPositions.reduce((s, p) => s + (p.pl || 0), 0)
-  const fyersOpenCount = fyersPositions.filter(p => (p.netQty || 0) !== 0).length
-  const fyersClosedCount = fyersPositions.filter(p => (p.netQty || 0) === 0).length
-  const totalPnl = isLive && fyersPositions.length > 0 ? fyersTotalPnl : (status?.total_pnl ?? 0)
+  // For live mode: use TradeJini P&L (source of truth). For paper: use engine P&L.
+  const brokerTotalPnl = brokerPositions.reduce((s, p) => s + (p.pl || 0), 0)
+  const brokerOpenCount = brokerPositions.filter(p => (p.netQty || 0) !== 0).length
+  const brokerClosedCount = brokerPositions.filter(p => (p.netQty || 0) === 0).length
+  const totalPnl = isLive && brokerPositions.length > 0 ? brokerTotalPnl : (status?.total_pnl ?? 0)
 
-  // For live mode: use Fyers closed positions for win/loss (source of truth)
-  const fyersClosed = fyersPositions.filter(p => (p.netQty || 0) === 0 && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
-  const allClosed = isLive && fyersClosed.length > 0
-    ? fyersClosed.map(p => ({ pnl: p.pl || p.realized_profit || 0, symbol: p.symbol }))
+  // For live mode: use TradeJini closed positions for win/loss (source of truth)
+  const brokerClosed = brokerPositions.filter(p => (p.netQty || 0) === 0 && ((p.buyQty || 0) > 0 || (p.sellQty || 0) > 0))
+  const allClosed = isLive && brokerClosed.length > 0
+    ? brokerClosed.map(p => ({ pnl: p.pl || p.realized_profit || 0, symbol: p.symbol }))
     : tradeHistory
   const winners = allClosed.filter(t => (t.pnl ?? 0) > 0)
   const losers = allClosed.filter(t => (t.pnl ?? 0) < 0)
   const winRate = allClosed.length > 0 ? Math.round((winners.length / allClosed.length) * 100) : 0
 
   // Charges estimate: each closed trade = ~Rs 65 (brokerage + STT + charges)
-  const closedTradeCount = isLive ? fyersClosedCount : tradeHistory.length
+  const closedTradeCount = isLive ? brokerClosedCount : tradeHistory.length
   const estCharges = closedTradeCount * 65
   const netAfterCharges = totalPnl - estCharges
 
@@ -212,7 +212,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
       <div className="flex items-center gap-3">
         <Zap size={18} className={accentText} />
         <p className="text-gray-400 text-xs">
-          {isLive ? 'Live auto-trading with real orders via Fyers' : 'Virtual auto-trading with no real money'}
+          {isLive ? 'Live auto-trading with real orders via TradeJini' : 'Virtual auto-trading with no real money'}
         </p>
         {running && <div className={`w-2.5 h-2.5 rounded-full ${accentDot} animate-pulse`} />}
         <button onClick={async () => { setRefreshing(true); await pollStatus(); setRefreshing(false) }} disabled={refreshing}
@@ -226,10 +226,10 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
         {/* ── Left: Trades + Stats ── */}
         <div className="flex-1 min-w-0 space-y-4">
           {/* Stats row */}
-          {(running || allClosed.length > 0 || activeTrades.length > 0 || (isLive && fyersPositions.length > 0)) && (
+          {(running || allClosed.length > 0 || activeTrades.length > 0 || (isLive && brokerPositions.length > 0)) && (
             <div className="grid grid-cols-7 gap-3">
               <StatCard label="Capital" value={status?.capital > 0 ? `₹${(status.capital >= 100000 ? (status.capital/100000).toFixed(1)+'L' : (status.capital/1000).toFixed(0)+'K')}` : '--'} color="text-white" />
-              <StatCard label={isLive ? 'P&L (Fyers)' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
+              <StatCard label={isLive ? 'P&L (TradeJini)' : 'Virtual P&L'} value={`${totalPnl >= 0 ? '+' : '-'}${formatINR(totalPnl)}`}
                 color={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'} />
               <StatCard label="Charges Est." value={closedTradeCount > 0 ? `₹${estCharges.toLocaleString('en-IN')}` : '--'}
                 sub={closedTradeCount > 0 ? `${closedTradeCount} trades x ₹65` : ''} color="text-yellow-400" />
@@ -238,17 +238,17 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
               <StatCard label="Win Rate" value={allClosed.length > 0 ? `${winRate}%` : '--'}
                 sub={allClosed.length > 0 ? `${winners.length}W / ${losers.length}L` : ''} />
               <StatCard label="Orders" value={status?.order_count ?? 0} />
-              <StatCard label="Open" value={isLive ? fyersOpenCount : activeTrades.length} color={accentText} />
+              <StatCard label="Open" value={isLive ? brokerOpenCount : activeTrades.length} color={accentText} />
             </div>
           )}
 
-          {/* Fyers Positions (Live mode — source of truth) */}
-          {isLive && fyersPositions.length > 0 && (
-            <div className="bg-dark-700 rounded-2xl border border-orange-500/20 p-5">
+          {/* TradeJini Positions (Live mode — source of truth) */}
+          {isLive && brokerPositions.length > 0 && (
+            <div className="bg-dark-700 rounded-2xl border border-emerald-500/20 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <Activity size={16} className="text-orange-400" />
-                Fyers Positions (Source of Truth)
-                <span className="text-[10px] text-gray-500 font-normal">{fyersOpenCount} open · {fyersClosedCount} closed · P&L: <span className={fyersTotalPnl >= 0 ? 'text-green-400' : 'text-red-400'}>{fyersTotalPnl >= 0 ? '+' : '-'}{formatINR(fyersTotalPnl)}</span></span>
+                <Activity size={16} className="text-emerald-400" />
+                TradeJini Positions (Source of Truth)
+                <span className="text-[10px] text-gray-500 font-normal">{brokerOpenCount} open · {brokerClosedCount} closed · P&L: <span className={brokerTotalPnl >= 0 ? 'text-green-400' : 'text-red-400'}>{brokerTotalPnl >= 0 ? '+' : '-'}{formatINR(brokerTotalPnl)}</span></span>
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -260,7 +260,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {fyersPositions.map((p, i) => {
+                    {brokerPositions.map((p, i) => {
                       const sym = (p.symbol || '').replace('NSE:', '').replace('-EQ', '')
                       const netQty = p.netQty || 0
                       const pnl = p.pl || 0
@@ -299,7 +299,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
             </div>
           )}
 
-          {/* Active trades — show for paper mode, hide for live (Fyers section above is source of truth) */}
+          {/* Active trades — show for paper mode, hide for live (TradeJini section above is source of truth) */}
           {!isLive && activeTrades.length > 0 && (
             <div className="bg-dark-700 rounded-2xl border border-dark-500 p-5">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -422,7 +422,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
               <h3 className="text-white font-semibold mb-1">Intraday Trading</h3>
               <p className="text-gray-500 text-xs max-w-md mx-auto">
                 {isLive
-                  ? 'Select strategies and click Start to begin live auto-trading with real orders via Fyers.'
+                  ? 'Select strategies and click Start to begin live auto-trading with real orders via TradeJini.'
                   : 'Select strategies and click Start to begin virtual auto-trading. Same rules as live — no money at risk.'}
               </p>
             </div>
@@ -458,7 +458,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                     <div className="bg-gradient-to-r from-dark-600 to-dark-700 rounded-xl px-3 py-2.5 mb-3 border border-dark-500/50">
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider">Live Regime</span>
+                          <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">Live Regime</span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                             regime.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
                             regime.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
@@ -526,7 +526,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     <MiniStat label="Scans" value={status?.scan_count ?? 0} />
                     <MiniStat label="Orders" value={status?.order_count ?? 0} />
-                    <MiniStat label={isLive ? 'Fyers P&L' : 'P&L'}
+                    <MiniStat label={isLive ? 'TradeJini P&L' : 'P&L'}
                       value={`${totalPnl >= 0 ? '+' : ''}\u20B9${Math.abs(totalPnl).toFixed(0)}`}
                       color={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'} />
                   </div>
@@ -659,7 +659,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                             <p className="text-amber-400 font-semibold mb-1">Auto Regime Mode</p>
                             <p>System detects NIFTY trend + VIX + ADX and picks the best strategies automatically.</p>
                             <p className="mt-1">Orders: 10:30 AM - 1:30 PM | Square-off: 3:15 PM | Max 2 orders/scan | SL min 1.2% | Trailing SL (paper) | Daily loss limit 5% | Drawdown breaker 15%/5d</p>
-                            {isLive && <p className="mt-1">VIX {'>'} 18: skips 5m, uses 15m only | Orders verified on Fyers before tracking</p>}
+                            {isLive && <p className="mt-1">VIX {'>'} 18: skips 5m, uses 15m only | Orders verified on TradeJini before tracking</p>}
                           </>
                         ) : (
                           <>
@@ -676,7 +676,7 @@ export default function IntradayTrade({ mode = 'live', capital, setCapital }) {
                     <div className="mt-2 flex items-start gap-2 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">
                       <ShieldAlert size={10} className="text-red-400 flex-shrink-0 mt-0.5" />
                       <p className="text-[9px] text-red-400 leading-relaxed">
-                        Live mode places real orders on Fyers. Real money at risk.
+                        Live mode places real orders on TradeJini. Real money at risk.
                       </p>
                     </div>
                   )}
@@ -749,7 +749,7 @@ function Badge({ color, text }) {
     yellow: 'bg-yellow-500/10 text-yellow-400',
     purple: 'bg-purple-500/10 text-purple-400',
     red: 'bg-red-500/10 text-red-400',
-    orange: 'bg-orange-500/10 text-orange-400',
+    orange: 'bg-emerald-500/10 text-emerald-400',
   }
   return (
     <span className={`text-[9px] font-medium px-2 py-0.5 rounded-full ${colors[color]}`}>

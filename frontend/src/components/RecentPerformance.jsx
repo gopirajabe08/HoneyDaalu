@@ -61,7 +61,7 @@ export default function RecentPerformance() {
       {/* Header */}
       <div className="px-5 py-3 bg-dark-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-orange-400" />
+          <Calendar size={16} className="text-emerald-400" />
           <h3 className="text-sm font-semibold text-white">Recent Performance</h3>
           <span className="text-[9px] bg-dark-600 text-gray-400 px-2 py-0.5 rounded">OFFLINE — saved data</span>
         </div>

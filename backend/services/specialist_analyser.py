@@ -10,8 +10,9 @@ import logging
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
-from services import fyers_client
-from services.auto_trader import auto_trader, MAX_OPEN_POSITIONS
+from services import broker_client
+from services.auto_trader import auto_trader
+from config import INTRADAY_MAX_POSITIONS_CAP as MAX_OPEN_POSITIONS
 from services.paper_trader import paper_trader
 from services import trade_logger
 from config import STRATEGY_TIMEFRAMES
@@ -279,10 +280,10 @@ def _collect_data() -> dict:
     paper_active_trades = paper_status.get("active_trades", [])
     paper_logs = paper_status.get("logs", [])
 
-    # ── Fyers broker data (today — graceful if not connected) ──
-    positions_raw = _safe_call(fyers_client.get_positions)
-    orderbook_raw = _safe_call(fyers_client.get_orderbook)
-    tradebook_raw = _safe_call(fyers_client.get_tradebook)
+    # ── Broker data (today — graceful if not connected) ──
+    positions_raw = _safe_call(broker_client.get_positions)
+    orderbook_raw = _safe_call(broker_client.get_orderbook)
+    tradebook_raw = _safe_call(broker_client.get_tradebook)
 
     # Parse positions
     net_positions = positions_raw.get("netPositions", []) if positions_raw else []
@@ -396,7 +397,7 @@ def _collect_data() -> dict:
         "paper_trade_history": paper_trade_history,
         "paper_active_trades": paper_active_trades,
         "paper_logs": paper_logs,
-        # Fyers broker data
+        # Broker data
         "positions": positions,
         "total_pl": round(total_pl, 2),
         "realized_pl": round(realized_pl, 2),
@@ -623,7 +624,7 @@ def _analyse_engineer(data: dict) -> dict:
         for reason, rej_list in rejection_reasons.items():
             if reason == "margin":
                 lowlights.append(f"{len(rej_list)} orders rejected due to insufficient margin")
-                improvements.append("Increase Fyers funds or reduce capital per trade to avoid margin rejections.")
+                improvements.append("Increase broker funds or reduce capital per trade to avoid margin rejections.")
             elif reason == "tick_size":
                 highlights.append(f"{len(rej_list)} tick-size rejections handled by auto-retry mechanism")
 
@@ -635,7 +636,7 @@ def _analyse_engineer(data: dict) -> dict:
         metrics["bo_orders"] = bo_count
         metrics["intraday_sl_orders"] = sl_count
         if sl_count > bo_count:
-            highlights.append(f"INTRADAY_SL fallback handled {sl_count}/{total_mode} orders correctly (BO rejected by Fyers for equity)")
+            highlights.append(f"INTRADAY_SL fallback handled {sl_count}/{total_mode} orders correctly (BO rejected by broker for equity)")
         elif bo_count > 0:
             highlights.append(f"{bo_count}/{total_mode} orders placed as Bracket Orders (BO)")
 
@@ -650,7 +651,7 @@ def _analyse_engineer(data: dict) -> dict:
         lowlights.append(f"{len(error_logs)} errors in auto-trader logs today")
         for el in error_logs[-3:]:
             lowlights.append(f"  ERROR: {el.get('message', '')[:100]}")
-        improvements.append("Investigate auto-trader errors — check Fyers auth, network, and order parameters.")
+        improvements.append("Investigate auto-trader errors — check broker auth, network, and order parameters.")
 
     if restore_logs:
         lowlights.append(f"{len(restore_logs)} auto-trader restart(s) detected today")
@@ -1067,7 +1068,7 @@ def _analyse_performance_analyst(data: dict) -> dict:
     # ── Live performance only ──
     live_closed = [t for t in data["auto_trade_history"] if t.get("status") == "CLOSED"]
     live_open = data["auto_active_trades"]
-    live_pnl = data["total_pl"]  # from Fyers (source of truth)
+    live_pnl = data["total_pl"]  # from broker (source of truth)
     live_realized = data["realized_pl"]
     live_unrealized = data["unrealized_pl"]
 

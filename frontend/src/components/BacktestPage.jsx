@@ -50,7 +50,7 @@ export default function BacktestPage({ capital }) {
   return (
     <div>
       <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-        <FlaskConical size={20} className="text-orange-400" />
+        <FlaskConical size={20} className="text-emerald-400" />
         Strategy Backtester
         <span className="text-xs text-gray-400 font-normal ml-1">Nifty 500 — Historical Simulation</span>
       </h2>
@@ -64,7 +64,7 @@ export default function BacktestPage({ capital }) {
             <select
               value={selectedStrategy}
               onChange={e => handleStrategyChange(e.target.value)}
-              className="w-full bg-dark-600 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500/50"
+              className="w-full bg-dark-600 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50"
             >
               <option value="">Select strategy...</option>
               {strategies.map(s => (
@@ -83,7 +83,7 @@ export default function BacktestPage({ capital }) {
                   onClick={() => setSelectedTimeframe(tf)}
                   className={`flex-1 px-2 py-2.5 rounded-xl text-xs font-medium transition-all ${
                     selectedTimeframe === tf
-                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                       : 'bg-dark-600 text-gray-500 border border-dark-500 hover:text-gray-300'
                   }`}
                 >
@@ -102,7 +102,7 @@ export default function BacktestPage({ capital }) {
                 type="number"
                 value={btCapital}
                 onChange={e => setBtCapital(Number(e.target.value) || 0)}
-                className="w-full bg-dark-600 border border-dark-500 rounded-xl pl-7 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500/50 tabular-nums"
+                className="w-full bg-dark-600 border border-dark-500 rounded-xl pl-7 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 tabular-nums"
               />
             </div>
           </div>
@@ -114,7 +114,7 @@ export default function BacktestPage({ capital }) {
               type="date"
               value={selectedDate}
               onChange={e => setSelectedDate(e.target.value)}
-              className="w-full bg-dark-600 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500/50 [color-scheme:dark]"
+              className="w-full bg-dark-600 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 [color-scheme:dark]"
             />
           </div>
 
@@ -122,7 +122,7 @@ export default function BacktestPage({ capital }) {
           <button
             onClick={handleRun}
             disabled={running || !selectedStrategy || !selectedTimeframe}
-            className="bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {running ? (
               <><Loader2 size={16} className="animate-spin" /> Running...</>
@@ -147,7 +147,7 @@ export default function BacktestPage({ capital }) {
       {/* Loading */}
       {running && (
         <div className="bg-dark-700 rounded-2xl border border-dark-500 p-10 flex flex-col items-center gap-3">
-          <Loader2 size={32} className="animate-spin text-orange-400" />
+          <Loader2 size={32} className="animate-spin text-emerald-400" />
           <p className="text-sm text-gray-400">Fetching data & simulating trades for ~500 stocks...</p>
           <p className="text-[10px] text-gray-600">This may take 1-2 minutes</p>
         </div>

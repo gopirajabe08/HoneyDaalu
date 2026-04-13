@@ -1,7 +1,7 @@
 """
-Paper Trading Engine for IntraTrading.
+Paper Trading Engine for LuckyNavi.
 
-Mirrors the Auto-Trader exactly but uses virtual positions instead of real Fyers orders.
+Mirrors the Auto-Trader exactly but uses virtual positions instead of real broker orders.
 Same rules: on-demand scan (initial + slot-open), max 10 positions, 2% risk, order cutoff 2 PM, square-off 3:15 PM.
 """
 
@@ -14,7 +14,7 @@ from typing import Optional
 from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.market_data import get_nifty_trend
 from services.trade_logger import log_trade, log_trades_batch
-from services.fyers_client import get_quotes, is_authenticated
+from services.broker_client import get_quotes, is_authenticated
 from utils.time_utils import now_ist, is_past_time, is_before_time
 from utils.state_manager import get_state_path, save_state, load_state
 from utils.trader_log import TraderLogger
@@ -56,7 +56,7 @@ class PaperTrader:
     """
     Virtual auto-trading engine.
     Same logic as AutoTrader but no real orders — tracks virtual positions
-    and uses Fyers quotes for live LTP.
+    and uses broker quotes for live LTP.
     """
 
     def __init__(self):
@@ -322,11 +322,11 @@ class PaperTrader:
             self._update_position_pnl()
             _monitor_tick += 1
 
-            # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
+            # Broker health check every ~5 minutes (every 5th tick at 60s intervals)
             if _monitor_tick % 5 == 0:
                 try:
                     if not is_authenticated():
-                        self._log("WARN", "Fyers disconnected — using delayed yfinance data. Reconnect via UI.")
+                        self._log("WARN", "Broker disconnected — using delayed yfinance data. Reconnect via UI.")
                 except Exception:
                     pass
 
@@ -638,7 +638,7 @@ class PaperTrader:
         else:  # SELL: fill slightly lower
             entry_price = round(entry_price - slippage, 2)
 
-        # Realistic Fyers brokerage + STT + other charges
+        # Realistic brokerage + STT + other charges
         capital_req = qty * entry_price
         turnover = qty * entry_price
         brokerage_per_leg = min(20, turnover * 0.0003)  # ₹20 or 0.03% (whichever lower)
@@ -834,7 +834,7 @@ class PaperTrader:
         self._save_state()
 
     def _fetch_ltp(self, symbols: list[str]) -> dict[str, float]:
-        """Get latest LTP from Fyers quotes API."""
+        """Get latest LTP from broker quotes API."""
         ltp_map = {}
         if not symbols:
             return ltp_map

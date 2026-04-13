@@ -1,10 +1,10 @@
 """
-Auto-Trading Engine for IntraTrading.
+Auto-Trading Engine for LuckyNavi.
 
 Rules:
   - Only starts during market hours (9:15 AM - 3:30 PM IST, weekdays)
   - Scans every 15 minutes
-  - Places bracket orders automatically via Fyers
+  - Places bracket orders automatically via broker
   - STOPS placing new orders after 2:00 PM IST
   - SQUARES OFF all open positions at 3:15 PM IST (before 3:30 close)
   - Max 4 open positions at a time
@@ -21,7 +21,7 @@ from typing import Optional
 from services.scanner import run_scan, is_market_open, _calc_conviction
 from services.market_data import get_nifty_trend
 from services.trade_logger import log_trade, log_trades_batch
-from services.fyers_client import (
+from services.broker_client import (
     place_bracket_order,
     place_order,
     cancel_order,
@@ -224,7 +224,7 @@ class AutoTrader:
 
     def _recover_orphaned_positions(self):
         """
-        Detect Fyers INTRADAY positions not tracked in active_trades.
+        Detect broker INTRADAY positions not tracked in active_trades.
         Adds them as monitored entries so they're visible and counted.
         Called after start/resume to reconcile state.
         """
@@ -237,12 +237,12 @@ class AutoTrader:
                 if prod not in ("INTRADAY", "BO"):
                     continue  # Skip CNC (swing) positions
 
-                fyers_sym = pos.get("symbol", "")
+                broker_sym = pos.get("symbol", "")
                 # Skip options/futures — equity engine only tracks equity (-EQ) positions
-                if "CE" in fyers_sym or "PE" in fyers_sym or "FUT" in fyers_sym:
+                if "CE" in broker_sym or "PE" in broker_sym or "FUT" in broker_sym:
                     continue
 
-                plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
+                plain = broker_sym.replace("NSE:", "").replace("-EQ", "")
                 qty = pos.get("netQty", pos.get("qty", 0))
 
                 if plain in tracked_symbols or qty == 0:
@@ -341,9 +341,9 @@ class AutoTrader:
             if _is_past_order_cutoff():
                 return {"error": "Cannot start after 2:00 PM IST. No new orders are placed after 2:00 PM."}
 
-            # Validate Fyers authentication
+            # Validate broker authentication
             if not is_authenticated():
-                return {"error": "Fyers is not authenticated. Please login first."}
+                return {"error": "Broker is not authenticated. Please login first."}
 
             if not strategies:
                 return {"error": "At least one strategy must be selected."}
@@ -389,7 +389,7 @@ class AutoTrader:
             else:
                 self._log("WARN", "Sleep prevention FAILED — Mac may sleep if idle or lid closed")
 
-            # Recover any Fyers positions not tracked (e.g. from previous run)
+            # Recover any broker positions not tracked (e.g. from previous run)
             self._recover_orphaned_positions()
 
             self._save_state()
@@ -494,7 +494,7 @@ class AutoTrader:
                 self._log("INFO", "Background thread exited")
                 return
             if not is_authenticated():
-                self._log("ERROR", "Fyers authentication lost — stopping auto-trader")
+                self._log("ERROR", "Broker authentication lost — stopping auto-trader")
                 self._running = False
                 self._log("INFO", "Background thread exited")
                 return
@@ -550,33 +550,32 @@ class AutoTrader:
             _monitor_tick += 1
             self._update_position_pnl(monitor_tick=_monitor_tick)
 
-            # Fyers health check every ~5 minutes (every 5th tick at 60s intervals)
+            # Broker health check every ~5 minutes (every 5th tick at 60s intervals)
             if _monitor_tick % 5 == 0:
                 try:
                     if not is_authenticated():
-                        _disconnect_ticks = getattr(self, '_fyers_disconnect_ticks', 0) + 1
-                        self._fyers_disconnect_ticks = _disconnect_ticks
-                        self._log("WARN", "Fyers disconnected — attempting reconnect...")
+                        _disconnect_ticks = getattr(self, '_broker_disconnect_ticks', 0) + 1
+                        self._broker_disconnect_ticks = _disconnect_ticks
+                        self._log("WARN", "Broker disconnected — attempting reconnect...")
                         try:
-                            telegram_notify.fyers_disconnected()
-                            # Alert after 2+ failed checks (~10 min down)
+                            telegram_notify.broker_disconnected()
                             if _disconnect_ticks >= 2:
-                                telegram_notify.fyers_still_disconnected(_disconnect_ticks * 5)
+                                telegram_notify.broker_still_disconnected(_disconnect_ticks * 5)
                         except Exception:
                             pass
-                        from services.fyers_client import headless_login
+                        from services.broker_client import headless_login
                         result = headless_login()
                         if "error" in result:
-                            self._log("ALERT", f"Fyers reconnect FAILED: {result['error']} — positions at risk!")
+                            self._log("ALERT", f"Broker reconnect FAILED: {result['error']} — positions at risk!")
                         else:
-                            self._log("INFO", "Fyers reconnected successfully")
-                            self._fyers_disconnect_ticks = 0
+                            self._log("INFO", "Broker reconnected successfully")
+                            self._broker_disconnect_ticks = 0
                             try:
-                                telegram_notify.fyers_reconnected()
+                                telegram_notify.broker_reconnected()
                             except Exception:
                                 pass
                     else:
-                        self._fyers_disconnect_ticks = 0
+                        self._broker_disconnect_ticks = 0
                 except Exception:
                     pass
 
@@ -606,7 +605,7 @@ class AutoTrader:
                         self._execute_scan_cycle()
                         current_open_count = len([t for t in self._active_trades if t["status"] == "OPEN"])
                     elif not is_authenticated():
-                        self._log("ERROR", "Fyers authentication lost — cannot scan for new trades")
+                        self._log("ERROR", "Broker authentication lost — cannot scan for new trades")
                 elif _is_past_order_cutoff():
                     self._log("INFO", "Past 2:00 PM — no new orders. Monitoring until square-off.")
 
@@ -744,7 +743,7 @@ class AutoTrader:
 
         # Margin check — skip ALL orders if available funds are insufficient
         try:
-            from services.fyers_client import get_funds as _get_funds
+            from services.broker_client import get_funds as _get_funds
             funds = _get_funds()
             for f in funds.get("fund_limit", []):
                 if f.get("id") == 10:
@@ -768,14 +767,14 @@ class AutoTrader:
         num_strategies = len(self._strategy_keys)
         self._log("SCAN", f"Scan #{self._scan_count} starting — {num_strategies} strateg{'y' if num_strategies == 1 else 'ies'}...")
 
-        # Check open positions — use internal trades as authority (Fyers has settlement delay)
+        # Check open positions — use internal trades as authority (broker has settlement delay)
         internal_open = [t for t in self._active_trades if t["status"] == "OPEN"]
-        open_symbols_fyers, _ = self._get_open_positions_detail()
-        # Combine both: internal OPEN trades + any Fyers positions not yet tracked
-        open_symbols = {t["symbol"] for t in internal_open} | open_symbols_fyers
-        # Use MAX of internal count and Fyers count as the authority
-        fyers_open_count = len(open_symbols_fyers)
-        open_count = max(len(internal_open), fyers_open_count)
+        open_symbols_broker, _ = self._get_open_positions_detail()
+        # Combine both: internal OPEN trades + any broker positions not yet tracked
+        open_symbols = {t["symbol"] for t in internal_open} | open_symbols_broker
+        # Use MAX of internal count and broker count as the authority
+        broker_open_count = len(open_symbols_broker)
+        open_count = max(len(internal_open), broker_open_count)
 
         if open_count >= self.max_open_positions:
             self._log("INFO", f"Max positions reached ({open_count}/{self.max_open_positions}) — skipping order placement")
@@ -1017,9 +1016,9 @@ class AutoTrader:
 
         self._log("ORDER", f"Placing {signal_type} order: {symbol} | Qty={qty} | Entry=₹{entry_price} | SL=₹{stop_loss} | Target=₹{target} | R:R={rr} | Capital=₹{capital_req:,.0f}")
 
-        # Dynamic margin check — verify Fyers has enough funds for this order
+        # Dynamic margin check — verify broker has enough funds for this order
         try:
-            from services.fyers_client import get_funds as _check_funds
+            from services.broker_client import get_funds as _check_funds
             funds_resp = _check_funds()
             avail = 0
             for f in funds_resp.get("fund_limit", []):
@@ -1079,14 +1078,14 @@ class AutoTrader:
             else:
                 self._log("ORDER", f"{symbol} — INTRADAY entry PLACED (ID: {order_id}) + SL-M (ID: {sl_order_id or 'N/A'})")
 
-            # Wait and verify order actually filled on Fyers (not rejected)
+            # Wait and verify order actually filled on broker (not rejected)
             time.sleep(3)
             order_status = self._get_order_status(order_id)
             if order_status == "rejected":
-                self._log("ERROR", f"{symbol} — order REJECTED by Fyers (ID: {order_id}). NOT tracking.")
+                self._log("ERROR", f"{symbol} — order REJECTED by broker (ID: {order_id}). NOT tracking.")
                 return False
             elif order_status == "cancelled":
-                self._log("WARN", f"{symbol} — order CANCELLED on Fyers (ID: {order_id}). NOT tracking.")
+                self._log("WARN", f"{symbol} — order CANCELLED on broker (ID: {order_id}). NOT tracking.")
                 return False
             elif order_status == "pending":
                 self._log("INFO", f"{symbol} — order PENDING (ID: {order_id}). Will verify on next check.")
@@ -1143,9 +1142,9 @@ class AutoTrader:
     # ── Order Verification ─────────────────────────────────────────────
 
     def _get_order_status(self, order_id: str) -> str:
-        """Check order status from Fyers orderbook. Returns: 'filled', 'pending', 'rejected', 'cancelled', 'unknown'."""
+        """Check order status from broker orderbook. Returns: 'filled', 'pending', 'rejected', 'cancelled', 'unknown'."""
         try:
-            from services.fyers_client import get_orderbook
+            from services.broker_client import get_orderbook
             orderbook = get_orderbook()
             orders = orderbook.get("orderBook", [])
             if not orders:
@@ -1155,7 +1154,7 @@ class AutoTrader:
             for order in orders:
                 if order.get("id", "") == order_id:
                     status = order.get("status", 0)
-                    # Fyers: 1=cancelled, 2=traded/filled, 4=transit, 5=rejected, 6=pending
+                    # Broker: 1=cancelled, 2=traded/filled, 4=transit, 5=rejected, 6=pending
                     if status == 2:
                         return "filled"
                     elif status == 5:
@@ -1169,9 +1168,9 @@ class AutoTrader:
             return "unknown"
 
     def _get_fill_price(self, order_id: str) -> float:
-        """Get actual fill price from Fyers orderbook."""
+        """Get actual fill price from broker orderbook."""
         try:
-            from services.fyers_client import get_orderbook
+            from services.broker_client import get_orderbook
             orderbook = get_orderbook()
             orders = orderbook.get("orderBook", [])
             if not orders:
@@ -1227,8 +1226,8 @@ class AutoTrader:
 
         # Step 3: Close all open positions with market orders
         for pos in positions:
-            symbol_fyers = pos.get("symbol", "")
-            symbol_plain = symbol_fyers.replace("NSE:", "").replace("-EQ", "")
+            symbol_broker = pos.get("symbol", "")
+            symbol_plain = symbol_broker.replace("NSE:", "").replace("-EQ", "")
             net_qty = pos.get("netQty", pos.get("qty", 0))
             pnl = pos.get("pl", pos.get("unrealized_profit", 0))
 
@@ -1310,7 +1309,7 @@ class AutoTrader:
         """Refresh P&L for active trades, trail SL on winners, check target exits.
 
         Trailing SL for INTRADAY_SL mode: cancels old SL-M, places new one at trailed price.
-        BO mode: Fyers manages SL on-exchange (no trailing for BO).
+        BO mode: broker manages SL on-exchange (no trailing for BO).
         """
         _, positions = self._get_open_positions_detail()
 
@@ -1335,7 +1334,7 @@ class AutoTrader:
             if symbol in ltp_map and ltp_map[symbol] > 0:
                 trade["ltp"] = ltp_map[symbol]
 
-            # For INTRADAY_SL mode: actively close at target (entry + SL + target limit all on Fyers)
+            # For INTRADAY_SL mode: actively close at target (entry + SL + target limit all on broker)
             if trade.get("order_mode") == "INTRADAY_SL" and trade["status"] == "OPEN":
                 ltp = ltp_map.get(symbol, 0)
                 target = trade.get("target", 0)
@@ -1347,7 +1346,7 @@ class AutoTrader:
                         trades_to_close.append(trade)
 
             # For BO mode: track LTP vs target to properly label exit reason
-            # (Fyers handles BO exits, but we need to distinguish TARGET_HIT vs SL_HIT)
+            # (broker handles BO exits, but we need to distinguish TARGET_HIT vs SL_HIT)
             if trade.get("order_mode") == "BO" and trade["status"] == "OPEN":
                 ltp = ltp_map.get(symbol, 0)
                 target = trade.get("target", 0)
@@ -1357,9 +1356,9 @@ class AutoTrader:
                     if target_hit:
                         trade["_bo_target_reached"] = True
 
-            # Check if SL was hit (position no longer exists on Fyers)
+            # Check if SL was hit (position no longer exists on broker)
             if trade["status"] == "OPEN" and symbol not in pnl_map:
-                # Grace period: newly placed orders may take time to appear in Fyers positions.
+                # Grace period: newly placed orders may take time to appear in broker positions.
                 # Don't mark as closed if placed less than 2 minutes ago.
                 placed_at_str = trade.get("placed_at", "")
                 if placed_at_str:
@@ -1400,7 +1399,7 @@ class AutoTrader:
                         except Exception:
                             pass
 
-                # Calculate P&L from actual prices if not already set by Fyers
+                # Calculate P&L from actual prices if not already set by broker
                 if trade["pnl"] == 0.0 and trade["exit_price"] > 0:
                     entry = trade.get("entry_price", 0)
                     exit_p = trade["exit_price"]
@@ -1471,7 +1470,7 @@ class AutoTrader:
                     self._log("ERROR", f"{trade['symbol']} — emergency exit FAILED: {e}")
 
         # ── Trailing SL for INTRADAY_SL mode (every 3rd tick ~60s) ──
-        # BO mode: Fyers manages SL on-exchange, no trailing.
+        # BO mode: broker manages SL on-exchange, no trailing.
         # INTRADAY_SL mode: cancel old SL-M, place new at trailed price.
         if monitor_tick > 0 and monitor_tick % 3 == 0:
             for trade in self._active_trades:
@@ -1604,7 +1603,7 @@ class AutoTrader:
         self._save_state()
 
     def _check_sl_order_health(self):
-        """Verify SL orders are still pending on Fyers for all active trades.
+        """Verify SL orders are still pending on broker for all active trades.
 
         If an SL order was cancelled/rejected (e.g. by exchange glitch), re-place it.
         Called every ~5 minutes (every 15th monitoring tick).
@@ -1613,9 +1612,9 @@ class AutoTrader:
         if getattr(self, '_margin_exhausted', False):
             return
 
-        # Additional: check actual Fyers funds
+        # Additional: check actual broker funds
         try:
-            from services.fyers_client import get_funds as _sl_check_funds
+            from services.broker_client import get_funds as _sl_check_funds
             funds_resp = _sl_check_funds()
             for f in funds_resp.get("fund_limit", []):
                 if f.get("id") == 10:
@@ -1633,7 +1632,7 @@ class AutoTrader:
             return
 
         try:
-            from services.fyers_client import get_orderbook
+            from services.broker_client import get_orderbook
             orderbook = get_orderbook()
             orders = orderbook.get("orderBook", [])
             if not orders:
@@ -1662,7 +1661,7 @@ class AutoTrader:
                     continue
 
                 status = order_status_map.get(sl_oid, None)
-                # Fyers status: 1=cancelled, 2=traded/filled, 4=transit, 5=rejected, 6=pending
+                # Broker status: 1=cancelled, 2=traded/filled, 4=transit, 5=rejected, 6=pending
                 if status is None:
                     # Order not found in orderbook — might be too old or system issue
                     continue
@@ -1680,7 +1679,7 @@ class AutoTrader:
                 # Only re-place if we haven't already failed due to margin
                 sl_retry_key = f"_sl_retry_failed_{symbol}"
                 if getattr(self, sl_retry_key, False):
-                    continue  # Already tried and failed — don't spam Fyers
+                    continue  # Already tried and failed — don't spam broker
 
                 self._log("WARN", f"{symbol} — SL order {sl_oid} is {status_label}! Re-placing SL...")
 
@@ -1725,7 +1724,7 @@ class AutoTrader:
     def _exit_trade_at_target(self, trade: dict):
         """Close a position that has hit its target price. Cancel SL order first.
 
-        SAFETY: Verifies the position still exists on Fyers before placing exit.
+        SAFETY: Verifies the position still exists on broker before placing exit.
         If the SL already triggered (closing the position), placing an exit order
         would create an unwanted OPPOSITE position.
         """
@@ -1760,12 +1759,12 @@ class AutoTrader:
             except Exception as e:
                 self._log("WARN", f"{symbol} — target cancel exception: {e}")
 
-        # SAFETY: Verify position still exists on Fyers before placing exit order.
+        # SAFETY: Verify position still exists on broker before placing exit order.
         # If the SL triggered before we could cancel it, the position is already closed.
         # Placing an exit order would create an UNWANTED opposite position.
         open_symbols, positions = self._get_open_positions_detail()
         if symbol not in open_symbols:
-            self._log("WARN", f"{symbol} — position no longer on Fyers (SL likely triggered). "
+            self._log("WARN", f"{symbol} — position no longer on broker (SL likely triggered). "
                        f"Skipping exit to avoid creating opposite position.")
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
@@ -1773,7 +1772,7 @@ class AutoTrader:
             # Use last known LTP as exit price, fallback to stop_loss
             last_ltp = trade.get("ltp", 0)
             trade["exit_price"] = last_ltp if last_ltp > 0 else trade.get("stop_loss", 0)
-            # Calculate P&L from actual prices if Fyers didn't provide it
+            # Calculate P&L from actual prices if broker didn't provide it
             pnl = trade.get("pnl", 0)
             if pnl == 0.0 and trade["exit_price"] > 0:
                 entry = trade.get("entry_price", 0)
@@ -1796,7 +1795,7 @@ class AutoTrader:
                 actual_direction = 1 if net_qty > 0 else -1
                 if actual_direction != expected_direction:
                     self._log("WARN", f"{symbol} — position direction mismatch! Expected {'LONG' if side==1 else 'SHORT'} "
-                               f"but Fyers shows NetQty={net_qty}. Skipping exit to avoid error.")
+                               f"but broker shows NetQty={net_qty}. Skipping exit to avoid error.")
                     return
                 break
 
@@ -1834,7 +1833,7 @@ class AutoTrader:
             self._log("ERROR", f"{symbol} — target exit exception: {e}")
 
     def _get_open_positions_detail(self) -> tuple[set, list]:
-        """Get open INTRADAY/BO position symbols and full position data from Fyers.
+        """Get open INTRADAY/BO position symbols and full position data from broker.
         Excludes CNC (swing) positions so they don't consume intraday slots."""
         try:
             positions_data = get_positions()
@@ -1857,12 +1856,12 @@ class AutoTrader:
                     if prod == "CNC":
                         continue
 
-                    fyers_sym = pos.get("symbol", "")
+                    broker_sym = pos.get("symbol", "")
                     # Skip options/futures — equity engine only counts equity positions
-                    if "CE" in fyers_sym or "PE" in fyers_sym or "FUT" in fyers_sym:
+                    if "CE" in broker_sym or "PE" in broker_sym or "FUT" in broker_sym:
                         continue
 
-                    plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
+                    plain = broker_sym.replace("NSE:", "").replace("-EQ", "")
                     open_symbols.add(plain)
                     open_positions.append(pos)
 

@@ -1,7 +1,7 @@
 """
-Options Paper Trading Engine for IntraTrading.
+Options Paper Trading Engine for LuckyNavi.
 
-Mirrors the Options Auto-Trader exactly but uses virtual positions instead of real Fyers orders.
+Mirrors the Options Auto-Trader exactly but uses virtual positions instead of real broker orders.
 Same rules: 10 AM - 2 PM order window, max 3 positions, square-off 3 PM.
 """
 
@@ -19,7 +19,7 @@ from services.scanner import is_market_open
 from services.options_scanner import scan_options
 from services.options_client import get_ltp
 from services.trade_logger import log_trade
-from services.fyers_client import is_authenticated
+from services.broker_client import is_authenticated
 from strategies.options_registry import OPTIONS_STRATEGY_MAP
 from config import (
     OPTIONS_MAX_POSITIONS,
@@ -54,7 +54,7 @@ class OptionsPaperTrader:
     """
     Virtual options trading engine.
     Same logic as OptionsAutoTrader but no real orders — tracks virtual positions
-    and uses Fyers quotes for live LTP.
+    and uses broker quotes for live LTP.
     """
 
     def __init__(self):

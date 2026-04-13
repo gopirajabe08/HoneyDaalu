@@ -17,7 +17,7 @@ from services.futures_scanner import run_futures_scan
 from services.futures_oi_analyser import analyse_batch
 from services.futures_client import get_futures_ltp_batch, days_to_expiry
 from services.trade_logger import log_trade
-from services.fyers_client import is_authenticated
+from services.broker_client import is_authenticated
 from fno_stocks import get_fno_symbols
 from utils.time_utils import now_ist
 from utils.state_manager import get_state_path, save_state, load_state
@@ -330,7 +330,7 @@ class FuturesSwingPaperTrader:
         slippage = entry * 0.001
         entry = round(entry + slippage if side == 1 else entry - slippage, 2)
 
-        # Realistic Fyers brokerage + STT + other charges (futures)
+        # Realistic brokerage + STT + other charges (futures)
         turnover = entry * qty
         brokerage_per_leg = min(20, turnover * 0.0003)  # ₹20 or 0.03% (whichever lower)
         brokerage = round(brokerage_per_leg * 2, 2)  # Entry + Exit = 2 legs
