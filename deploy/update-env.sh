@@ -26,9 +26,9 @@ fi
 echo "Uploading .env to EC2 at $EC2_IP..."
 scp -i "$PEM_KEY" "$LOCAL_ENV" ubuntu@"$EC2_IP":/tmp/.env.upload
 ssh -i "$PEM_KEY" ubuntu@"$EC2_IP" "
-    sudo mv /tmp/.env.upload /opt/luckynavi/app/backend/.env
-    sudo chown luckynavi:luckynavi /opt/luckynavi/app/backend/.env
-    sudo chmod 600 /opt/luckynavi/app/backend/.env
+    sudo mv /tmp/.env.upload /opt/honeydaalu/app/backend/.env
+    sudo chown honeydaalu:honeydaalu /opt/honeydaalu/app/backend/.env
+    sudo chmod 600 /opt/honeydaalu/app/backend/.env
     echo '.env updated on server'
 "
 echo "Done. Credentials updated securely."

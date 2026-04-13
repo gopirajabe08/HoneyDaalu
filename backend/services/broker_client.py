@@ -30,7 +30,7 @@ TRADEJINI_PASSWORD = os.getenv("TRADEJINI_PASSWORD", "")
 TRADEJINI_TOTP_SECRET = os.getenv("TRADEJINI_TOTP_SECRET", "")
 TRADEJINI_REDIRECT_URI = os.getenv("TRADEJINI_REDIRECT_URI", "http://localhost:8001/api/broker/callback")
 
-BASE_URL = "https://api.tradejini.com"
+BASE_URL = "https://api.tradejini.com/v2"
 TOKEN_FILE = Path(__file__).parent.parent / ".tradejini_token"
 
 # ── Product type mapping (Fyers names → TradeJini names) ─────────────────

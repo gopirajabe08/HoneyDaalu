@@ -1,15 +1,15 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════════
-# LuckyNavi — Deploy script (runs on EC2 server)
+# HoneyDaalu — Deploy script (runs on EC2 server)
 #
 # Called by GitHub Actions on every push to main.
-# Can also be run manually: ssh -i key.pem ubuntu@<ip> 'bash /opt/luckynavi/deploy.sh'
+# Can also be run manually: ssh -i key.pem ubuntu@<ip> 'bash /opt/honeydaalu/deploy.sh'
 # ═══════════════════════════════════════════════════════════════════════
 
 set -e
 
-APP_DIR="/opt/luckynavi/app"
-LOG="/var/log/luckynavi/deploy.log"
+APP_DIR="/opt/honeydaalu/app"
+LOG="/var/log/honeydaalu/deploy.log"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG"
@@ -45,15 +45,15 @@ fi
 
 # ── Restart backend ONLY if it's currently running ──
 # Don't start it outside market hours — the cron handles that
-if systemctl is-active --quiet luckynavi-backend; then
+if systemctl is-active --quiet honeydaalu-backend; then
     log "Backend is running — restarting with new code..."
-    sudo systemctl restart luckynavi-backend
+    sudo systemctl restart honeydaalu-backend
     sleep 3
-    if systemctl is-active --quiet luckynavi-backend; then
+    if systemctl is-active --quiet honeydaalu-backend; then
         log "Backend restarted successfully"
     else
         log "ERROR: Backend failed to start after deploy!"
-        log "Check: journalctl -u luckynavi-backend -n 50"
+        log "Check: journalctl -u honeydaalu-backend -n 50"
     fi
 else
     log "Backend is not running (market closed) — code updated, will start at 9:00 AM"

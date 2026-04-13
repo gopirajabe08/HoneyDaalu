@@ -1,12 +1,12 @@
 #!/bin/bash
-# ── Start LuckyNavi only on trading days ──
+# ── Start HoneyDaalu only on trading days ──
 # Called by cron at 9:00 AM IST (3:30 AM UTC) Mon-Fri.
 # Skips NSE holidays by checking backend/config.py's NSE_HOLIDAYS dict.
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-APP_DIR="/opt/luckynavi/app"
-LOG="/var/log/luckynavi/cron.log"
+APP_DIR="/opt/honeydaalu/app"
+LOG="/var/log/honeydaalu/cron.log"
 
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
@@ -36,8 +36,8 @@ if [ -n "$IS_HOLIDAY" ]; then
     exit 0
 fi
 
-echo "[$TODAY] Trading day — starting LuckyNavi backend" >> "$LOG"
-/usr/bin/sudo /usr/bin/systemctl start luckynavi-backend >> "$LOG" 2>&1
+echo "[$TODAY] Trading day — starting HoneyDaalu backend" >> "$LOG"
+/usr/bin/sudo /usr/bin/systemctl start honeydaalu-backend >> "$LOG" 2>&1
 
 if [ $? -eq 0 ]; then
     echo "[$TODAY] Service started successfully" >> "$LOG"

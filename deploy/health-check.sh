@@ -8,7 +8,7 @@
 IP="${1:-localhost}"
 API="http://$IP:8001"
 
-echo "═══ LuckyNavi Health Check ($IP) ═══"
+echo "═══ HoneyDaalu Health Check ($IP) ═══"
 echo ""
 
 # 1. Server reachable?

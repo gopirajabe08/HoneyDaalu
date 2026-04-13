@@ -18,4 +18,4 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}        # Contents of your .pem file
           script: |
-            bash /opt/luckynavi/app/deploy/deploy.sh
+            bash /opt/honeydaalu/app/deploy/deploy.sh
