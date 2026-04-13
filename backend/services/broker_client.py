@@ -254,15 +254,8 @@ def _set_token(token: str):
 
 
 def _load_scripmaster_async():
-    """Load ScripMaster data in background after authentication."""
-    import threading
-    def _load():
-        try:
-            from services.scripmaster import load_instruments
-            load_instruments(_access_token, TRADEJINI_API_KEY, ["NSE", "NFO"])
-        except Exception as e:
-            logger.error(f"[Broker] ScripMaster load failed: {e}")
-    threading.Thread(target=_load, daemon=True, name="ScripMasterLoad").start()
+    """ScripMaster not needed — CubePlus Individual mode uses EQT_{SYMBOL}_EQ_NSE format directly."""
+    pass
 
 
 def is_authenticated() -> bool:
@@ -988,30 +981,26 @@ def _place_order_with_tick_retry(order_data: dict, max_retries: int = 2) -> dict
 
 def format_broker_symbol(nse_symbol: str) -> str:
     """
-    Convert NSE symbol to TradeJini broker format.
+    Convert NSE symbol to TradeJini CubePlus symId format.
 
-    If ScripMaster is loaded, returns exchangeToken_NSE (e.g., "2885_NSE").
-    Otherwise, returns the symbol as-is with _NSE suffix.
+    CubePlus format: EQT_{SYMBOL}_EQ_NSE (for equities)
+    Example: RELIANCE → EQT_RELIANCE_EQ_NSE
     """
-    from services.scripmaster import is_loaded, build_broker_symbol
-
-    # Clean input: remove Fyers-style formatting
-    clean = nse_symbol.replace(".NS", "").replace("NSE:", "").replace("-EQ", "")
-
-    if is_loaded():
-        return build_broker_symbol(clean)
-
-    # Fallback without ScripMaster
-    return f"{clean}_NSE"
+    nse_symbol = nse_symbol.replace(".NS", "")
+    # Already in CubePlus format
+    if nse_symbol.startswith("EQT_") or nse_symbol.startswith("FUTSTK_") or nse_symbol.startswith("OPTSTK_"):
+        return nse_symbol
+    # Strip old format if present
+    nse_symbol = nse_symbol.replace("NSE:", "").replace("-EQ", "")
+    return f"EQT_{nse_symbol}_EQ_NSE"
 
 
 def nse_from_broker(broker_symbol: str) -> str:
-    """Convert TradeJini broker symbol back to plain NSE symbol."""
-    from services.scripmaster import is_loaded, nse_from_broker as sm_nse_from_broker
-
-    if is_loaded():
-        return sm_nse_from_broker(broker_symbol)
-
+    """Convert TradeJini symId back to plain NSE symbol.
+    EQT_RELIANCE_EQ_NSE → RELIANCE
+    """
+    if broker_symbol.startswith("EQT_") and broker_symbol.endswith("_EQ_NSE"):
+        return broker_symbol[4:-7]  # Strip EQT_ prefix and _EQ_NSE suffix
     # Fallback
     parts = broker_symbol.rsplit("_", 1)
     return parts[0] if parts else broker_symbol
