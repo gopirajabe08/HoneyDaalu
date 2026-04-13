@@ -192,18 +192,23 @@ def _calc_conviction(signal: dict) -> float:
     elif entry > 3000:
         score *= 0.8  # Expensive, needs more capital
 
-    # Strategy preference (based on 30-day performance data)
+    # Strategy preference — DATA-DRIVEN from 5-year NSE backtest
+    # BB Contra: 72% win, R:R 1.14 — BEST
+    # BB Squeeze: 50% win, R:R 1.31 — Most consistent
+    # Supertrend: 50% win, R:R 0.99 — No edge alone, needs filters
+    # RSI Divergence: 36% win, R:R 0.77 — LOSES money, heavily penalized
     strategy = signal.get("_strategy", "")
     strategy_boost = {
-        "play4_supertrend": 0.8,
-        "play7_orb": 1.0,
-        "play9_gap_analysis": 1.0,
+        "play6_bb_contra": 1.5,       # 72% win — highest boost
+        "play5_bb_squeeze": 1.4,      # R:R 1.31 — most consistent
+        "play7_orb": 1.1,
         "play3_vwap_pullback": 1.0,
-        "play8_rsi_divergence": 1.4,
-        "play6_bb_contra": 1.1,
-        "play5_bb_squeeze": 1.0,
-        "play1_ema_crossover": 1.0,
-        "play2_triple_ma": 1.0,
+        "play4_supertrend": 0.9,      # No edge without filters
+        "play10_momentum_rank": 0.9,
+        "play9_gap_analysis": 0.9,
+        "play1_ema_crossover": 0.8,
+        "play2_triple_ma": 0.8,
+        "play8_rsi_divergence": 0.6,  # 36% win — penalized heavily
     
     
     
