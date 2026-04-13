@@ -415,7 +415,7 @@ def get_profile() -> dict:
         return result
 
     # Normalize to Fyers-compatible shape
-    data = result.get("data", result)
+    data = result.get("d", result.get("data", result))
     return {
         "s": "ok",
         "data": {
@@ -475,7 +475,7 @@ def is_nfo_enabled() -> bool:
     # Try placing a small test or checking segments via profile
     try:
         profile = _api_get("/api/account/details")
-        exchanges = profile.get("data", {}).get("exchanges", [])
+        exchanges = profile.get("d", {}).get("exchanges", profile.get("data", {}).get("exchanges", []))
         if isinstance(exchanges, list):
             return "NFO" in exchanges
     except Exception:
@@ -599,7 +599,7 @@ def _place_intraday_with_sl(
 
     entry_order_id = str(
         entry_resp.get("orderId")
-        or entry_resp.get("data", {}).get("orderId")
+        or entry_resp.get("d", {}).get("orderId", "") or entry_resp.get("data", {}).get("orderId")
         or entry_resp.get("id", "")
     )
 
@@ -634,7 +634,7 @@ def _place_intraday_with_sl(
 
     sl_order_id = str(
         sl_resp.get("orderId")
-        or sl_resp.get("data", {}).get("orderId")
+        or sl_resp.get("d", {}).get("orderId", "") or sl_resp.get("data", {}).get("orderId")
         or sl_resp.get("id", "")
     )
 
@@ -715,7 +715,7 @@ def _place_raw_order(data: dict) -> dict:
     result = _api_post("/api/oms/place-order", order_payload)
 
     # Normalize response to Fyers format
-    order_id = str(result.get("orderId") or result.get("data", {}).get("orderId") or "")
+    order_id = str(result.get("d", {}).get("orderId", "") or result.get("orderId", "") or result.get("data", {}).get("orderId", "") or "")
     if order_id and order_id != "None":
         return {"s": "ok", "id": order_id}
     return result
@@ -762,7 +762,7 @@ def get_orderbook() -> dict:
         return result
 
     # Normalize to Fyers format
-    orders = result.get("data", result.get("orderBook", []))
+    orders = result.get("d", result.get("data", result.get("orderBook", [])))
     if not isinstance(orders, list):
         orders = []
 
@@ -775,7 +775,7 @@ def get_positions() -> dict:
     if "error" in result:
         return result
 
-    positions = result.get("data", result.get("netPositions", []))
+    positions = result.get("d", result.get("data", result.get("netPositions", [])))
     if not isinstance(positions, list):
         positions = []
 
@@ -805,7 +805,7 @@ def get_holdings() -> dict:
     if "error" in result:
         return result
 
-    holdings = result.get("data", result.get("holdings", []))
+    holdings = result.get("d", result.get("data", result.get("holdings", [])))
     if not isinstance(holdings, list):
         holdings = []
 
@@ -818,7 +818,7 @@ def get_tradebook() -> dict:
     if "error" in result:
         return result
 
-    trades = result.get("data", result.get("tradeBook", []))
+    trades = result.get("d", result.get("data", result.get("tradeBook", [])))
     if not isinstance(trades, list):
         trades = []
 
@@ -948,8 +948,9 @@ def _place_order_with_tick_retry(order_data: dict, max_retries: int = 2) -> dict
         response = _api_post("/api/oms/place-order", order_data)
 
         order_id = str(
-            response.get("orderId")
-            or response.get("data", {}).get("orderId")
+            response.get("d", {}).get("orderId", "")
+            or response.get("orderId", "")
+            or response.get("data", {}).get("orderId", "")
             or response.get("id", "")
         )
 
