@@ -271,7 +271,7 @@ def is_authenticated() -> bool:
     if session is None:
         return False
     try:
-        resp = _api_get("/rest/UserProfile")
+        resp = _api_get("/api/account/details")
         return "error" not in resp and resp.get("status") != "error"
     except Exception:
         _clear_token()
@@ -412,7 +412,7 @@ class _BrokerCompat:
 
 def get_profile() -> dict:
     """Get user profile. Returns Fyers-compatible format."""
-    result = _api_get("/rest/UserProfile")
+    result = _api_get("/api/account/details")
     if "error" in result:
         return result
 
@@ -431,7 +431,7 @@ def get_profile() -> dict:
 
 def get_funds() -> dict:
     """Get fund limits. Returns Fyers-compatible format."""
-    result = _api_get("/rest/FundsAndLimits")
+    result = _api_get("/api/oms/limits")
     if "error" in result:
         return result
 
@@ -479,7 +479,7 @@ def is_nfo_enabled() -> bool:
 
     # Try placing a small test or checking segments via profile
     try:
-        profile = _api_get("/rest/UserProfile")
+        profile = _api_get("/api/account/details")
         exchanges = profile.get("data", {}).get("exchanges", [])
         if isinstance(exchanges, list):
             return "NFO" in exchanges
@@ -605,7 +605,7 @@ def _place_intraday_with_sl(
     }
 
     _enforce_order_rate_limit()
-    entry_resp = _api_post("/rest/PlaceOrder", entry_data)
+    entry_resp = _api_post("/api/oms/place-order", entry_data)
 
     if "error" in entry_resp:
         return {"error": f"Entry order failed: {entry_resp['error']}"}
@@ -643,7 +643,7 @@ def _place_intraday_with_sl(
     }
 
     _enforce_order_rate_limit()
-    sl_resp = _api_post("/rest/PlaceOrder", sl_data)
+    sl_resp = _api_post("/api/oms/place-order", sl_data)
 
     sl_order_id = str(
         sl_resp.get("orderId")
@@ -664,7 +664,7 @@ def _place_intraday_with_sl(
         try:
             exit_side_str = SIDE_MAP.get(-1 if side == 1 else 1)
             _enforce_order_rate_limit()
-            _api_post("/rest/PlaceOrder", {
+            _api_post("/api/oms/place-order", {
                 "exchangeName": exchange,
                 "exchangeToken": exchange_token,
                 "transactionType": exit_side_str,
@@ -725,7 +725,7 @@ def _place_raw_order(data: dict) -> dict:
     }
 
     _enforce_order_rate_limit()
-    result = _api_post("/rest/PlaceOrder", order_payload)
+    result = _api_post("/api/oms/place-order", order_payload)
 
     # Normalize response to Fyers format
     order_id = str(result.get("orderId") or result.get("data", {}).get("orderId") or "")
@@ -747,7 +747,7 @@ def modify_order(order_id: str, **kwargs) -> dict:
     if "type" in kwargs:
         data["orderType"] = ORDER_TYPE_MAP.get(kwargs["type"], kwargs["type"])
 
-    result = _api_put("/rest/ModifyOrder", data)
+    result = _api_put("/api/oms/modify-order", data)
 
     # Normalize
     if result.get("status") == "success" or result.get("s") == "ok":
@@ -757,7 +757,7 @@ def modify_order(order_id: str, **kwargs) -> dict:
 
 def cancel_order(order_id: str) -> dict:
     """Cancel an order."""
-    result = _api_delete("/rest/CancelOrder", params={"orderId": order_id})
+    result = _api_delete("/api/oms/cancel-order", params={"orderId": order_id})
 
     # Normalize
     if result.get("status") == "success" or result.get("s") == "ok":
@@ -770,7 +770,7 @@ def cancel_order(order_id: str) -> dict:
 
 def get_orderbook() -> dict:
     """Get all orders. Returns Fyers-compatible format."""
-    result = _api_get("/rest/OrderBook")
+    result = _api_get("/api/oms/orders")
     if "error" in result:
         return result
 
@@ -784,7 +784,7 @@ def get_orderbook() -> dict:
 
 def get_positions() -> dict:
     """Get net positions. Returns Fyers-compatible format."""
-    result = _api_get("/rest/PositionBook")
+    result = _api_get("/api/oms/positions")
     if "error" in result:
         return result
 
@@ -814,7 +814,7 @@ def get_positions() -> dict:
 
 def get_holdings() -> dict:
     """Get delivery holdings."""
-    result = _api_get("/rest/Holdings")
+    result = _api_get("/api/oms/holdings")
     if "error" in result:
         return result
 
@@ -827,7 +827,7 @@ def get_holdings() -> dict:
 
 def get_tradebook() -> dict:
     """Get trade book (executed trades)."""
-    result = _api_get("/rest/TradeBook")
+    result = _api_get("/api/oms/trades")
     if "error" in result:
         return result
 
@@ -860,7 +860,7 @@ def get_quotes(symbols: list[str]) -> dict:
     # Build comma-separated token list for API
     # TradeJini expects: exchangeToken_exchangeName format
     try:
-        result = _api_get("/rest/MarketData", params={
+        result = _api_get("/api/market/quote", params={
             "symbols": ",".join(broker_symbols),
             "mode": "LTP",
         })
@@ -904,7 +904,7 @@ def get_quotes_raw(symbols: list[str]) -> dict:
     Used by _BrokerCompat for direct calls.
     """
     try:
-        result = _api_get("/rest/MarketData", params={
+        result = _api_get("/api/market/quote", params={
             "symbols": ",".join(symbols),
             "mode": "LTP",
         })
@@ -916,7 +916,7 @@ def get_quotes_raw(symbols: list[str]) -> dict:
 def get_market_depth(symbol: str) -> dict:
     """Get market depth (Level 2 data) for a symbol."""
     broker_symbol = format_broker_symbol(symbol)
-    result = _api_get("/rest/MarketData", params={
+    result = _api_get("/api/market/quote", params={
         "symbols": broker_symbol,
         "mode": "FULL",
     })
@@ -958,7 +958,7 @@ def _place_order_with_tick_retry(order_data: dict, max_retries: int = 2) -> dict
     last_response = {}
     for attempt in range(max_retries + 1):
         _enforce_order_rate_limit()
-        response = _api_post("/rest/PlaceOrder", order_data)
+        response = _api_post("/api/oms/place-order", order_data)
 
         order_id = str(
             response.get("orderId")

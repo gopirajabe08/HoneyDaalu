@@ -75,7 +75,7 @@ def download_scripmaster(access_token: str, api_key: str, exchange: str = "NSE")
             "Authorization": f"Bearer {api_key}:{access_token}",
             "Content-Type": "application/json",
         }
-        url = f"https://api.tradejini.com/rest/ScripMasterData?exchangeName={exchange}"
+        url = f"https://api.tradejini.com/v2/api/market/scrip-master?exchangeName={exchange}"
         resp = requests.get(url, headers=headers, timeout=30)
         resp.raise_for_status()
         data = resp.json()
