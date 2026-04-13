@@ -59,15 +59,22 @@ def notify_shutdown():
         pass
 
 
-_startup_done = False
-
 @app.on_event("startup")
 def auto_connect_broker():
     """Auto-connect broker on server startup — fresh TOTP login daily."""
-    global _startup_done
-    if _startup_done:
-        return
-    _startup_done = True
+    from pathlib import Path
+    lock = Path(__file__).parent / ".startup_lock"
+    import os, time as _t
+    pid = os.getpid()
+    if lock.exists():
+        # Check if lock is from THIS process (same PID) — skip duplicate
+        try:
+            lock_pid = int(lock.read_text().strip())
+            if lock_pid == pid:
+                return
+        except Exception:
+            pass
+    lock.write_text(str(pid))
     # C10: Auto-setup sleep prevention
     try:
         import subprocess
