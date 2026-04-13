@@ -385,8 +385,9 @@ def auto_connect_broker():
                         _log(f"BTST Live FAILED: {e}")
                         traceback.print_exc()
 
-                threading.Thread(target=_start_btst_deferred, daemon=True, name="BTSTDeferredStart").start()
-                _log("BTST Live: scheduled for 1:50 PM (deferred start)")
+                # BTST Live disabled for Phase 1 — prove equity first, then enable
+                # threading.Thread(target=_start_btst_deferred, daemon=True, name="BTSTDeferredStart").start()
+                _log("BTST Live: DISABLED (Phase 1 — equity only)")
 
                 # Start Equity Live — FIRST priority
                 if eq_capital >= 20000:
