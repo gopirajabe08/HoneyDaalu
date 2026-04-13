@@ -146,13 +146,11 @@ class RSIDivergence(BaseStrategy):
         if not is_green and not has_bullish_reversal(last, prev):
             return None
 
-        # ── Volume confirmation — relaxed for low-volume sessions ──
+        # ── Volume confirmation — must have above-average volume ──
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            threshold = 0.8 if len(df) < 60 else 1.1
-            # If market-wide volume is extremely low (<50% avg), don't filter
-            if not pd.isna(vol_sma) and vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
-                if df["Volume"].iloc[-1] < vol_sma * threshold:
+            if not pd.isna(vol_sma) and vol_sma > 0:
+                if df["Volume"].iloc[-1] < vol_sma * 1.0:  # Minimum 1x average volume
                     return None
 
         # ── Find at least 2 swing lows to compare ──
@@ -214,10 +212,8 @@ class RSIDivergence(BaseStrategy):
         # ── Volume confirmation — relaxed for low-volume sessions ──
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            threshold = 0.8 if len(df) < 60 else 1.1
-            # If market-wide volume is extremely low (<50% avg), don't filter
-            if not pd.isna(vol_sma) and vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
-                if df["Volume"].iloc[-1] < vol_sma * threshold:
+            if not pd.isna(vol_sma) and vol_sma > 0:
+                if df["Volume"].iloc[-1] < vol_sma * 1.0:  # Minimum 1x average volume
                     return None
 
         # ── Find at least 2 swing highs to compare ──

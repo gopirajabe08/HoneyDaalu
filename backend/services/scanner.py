@@ -2525,8 +2525,9 @@ def _calc_conviction(signal: dict) -> float:
                     score *= 1.1  # Near pivot level = higher conviction
                     break
 
-    # Multi-timeframe confirmation: daily trend alignment boost
-    # Only applies to intraday timeframes (5m, 15m, etc.) — not 1d signals
+    # Multi-timeframe confirmation: daily trend alignment
+    # HARD GATE: counter-trend signals are BLOCKED (score = 0), not just penalized
+    # Aligned signals get 1.4x boost
     sig_tf = signal.get("timeframe", "")
     sig_type = signal.get("signal_type", "")
     symbol = signal.get("symbol", "") or signal.get("name", "")
@@ -2534,12 +2535,18 @@ def _calc_conviction(signal: dict) -> float:
         try:
             daily_trend = _get_daily_trend(symbol)
             if daily_trend == "BULLISH":
-                score *= _MTF_ALIGNED_BOOST if sig_type == "BUY" else _MTF_COUNTER_PENALTY
+                if sig_type == "BUY":
+                    score *= _MTF_ALIGNED_BOOST  # Aligned — boost
+                else:
+                    score = 0  # Counter-trend — BLOCK
             elif daily_trend == "BEARISH":
-                score *= _MTF_ALIGNED_BOOST if sig_type == "SELL" else _MTF_COUNTER_PENALTY
-            # NEUTRAL → no boost, no penalty
+                if sig_type == "SELL":
+                    score *= _MTF_ALIGNED_BOOST  # Aligned — boost
+                else:
+                    score = 0  # Counter-trend — BLOCK
+            # NEUTRAL → no boost, no penalty (either direction OK)
         except Exception:
-            pass  # Skip boost on any error — fail open
+            pass  # Skip on error — fail open
 
     return round(score, 3)
 
@@ -2750,7 +2757,18 @@ def run_scan(strategy_key: str, timeframe: str, capital: float = 100000, max_wor
             signals = [s for s in signals if s.get("signal_type") != "BUY"]
 
     # Sort by conviction score (best first)
-    signals.sort(key=lambda s: _calc_conviction(s), reverse=True)
+    for s in signals:
+        s["conviction"] = _calc_conviction(s)
+    signals.sort(key=lambda s: s.get("conviction", 0), reverse=True)
+
+    # ── INSTITUTIONAL QUALITY GATE: minimum conviction threshold ──
+    # Only trade signals with conviction >= 1.2 (volume + trend + R:R aligned)
+    # Prevents weak signals from reaching auto_trader
+    MIN_CONVICTION = 1.2
+    before = len(signals)
+    signals = [s for s in signals if s.get("conviction", 0) >= MIN_CONVICTION]
+    if before > 0 and len(signals) < before:
+        logger.info(f"[Scanner] Conviction filter: {before} → {len(signals)} signals (min={MIN_CONVICTION})")
 
     elapsed = round(time.time() - start_time, 2)
 

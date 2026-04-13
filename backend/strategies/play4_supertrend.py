@@ -106,13 +106,11 @@ class SupertrendPowerTrend(BaseStrategy):
         if not is_green and not has_bullish_reversal(last, prev):
             return None
 
-        # Volume confirmation — relaxed: skip filter if volume data is very low (Friday afternoon etc.)
+        # Volume confirmation — must have above-average volume
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            threshold = 0.8 if len(df) < 60 else 1.1
-            # If market-wide volume is extremely low (<50% avg), don't filter
-            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
-                if df["Volume"].iloc[-1] < vol_sma * threshold:
+            if vol_sma > 0:
+                if df["Volume"].iloc[-1] < vol_sma * 1.0:  # Minimum 1x average volume
                     return None
 
         # ── Entry & Targets ──
@@ -179,9 +177,8 @@ class SupertrendPowerTrend(BaseStrategy):
         # Volume confirmation — relaxed for low-volume sessions
         if len(df) >= 20:
             vol_sma = df["Volume"].rolling(20).mean().iloc[-1]
-            threshold = 0.8 if len(df) < 60 else 1.1
-            if vol_sma > 0 and df["Volume"].iloc[-1] / vol_sma > 0.5:
-                if df["Volume"].iloc[-1] < vol_sma * threshold:
+            if vol_sma > 0:
+                if df["Volume"].iloc[-1] < vol_sma * 1.0:
                     return None
 
         # ── Entry & Targets ──
