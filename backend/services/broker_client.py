@@ -519,20 +519,24 @@ def place_order(
     type_map = {1: "limit", 2: "market", 3: "stoplimit", 4: "stopmarket"}
     product_map = {"INTRADAY": "intraday", "CNC": "delivery", "MARGIN": "normal", "DELIVERY": "delivery", "MIS": "intraday"}
 
+    # CubePlus requires ALL values as strings in form-encoded POST
     order_data = {
         "symId": broker_symbol,
-        "qty": qty,
+        "qty": str(qty),
         "side": side_map.get(side, "buy"),
         "type": type_map.get(order_type, "market"),
         "product": product_map.get(product_type.upper(), "intraday"),
         "validity": "day",
-        "discQty": 0,
+        "discQty": "0",
+        "mktProt": "5",
     }
 
     if order_type in (1, 3) and limit_price > 0:
-        order_data["limitPrice"] = round(limit_price, 2)
+        order_data["limitPrice"] = str(round(limit_price, 2))
     if order_type in (3, 4) and stop_price > 0:
-        order_data["trigPrice"] = round(stop_price, 2)
+        order_data["trigPrice"] = str(round(stop_price, 2))
+    if order_tag:
+        order_data["remarks"] = order_tag[:10]
 
     return _place_order_with_tick_retry(order_data)
 
