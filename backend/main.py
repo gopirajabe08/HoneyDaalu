@@ -708,9 +708,11 @@ def auto_connect_broker():
                 if _log_only:
                     _recon_msg += f"Log-only (not in broker): {', '.join(sorted(_log_only)[:5])}\n"
                 _recon_msg += "\nReview trade log manually!"
-                telegram_notify.send(_recon_msg)
+                from services.telegram_notify import send as _recon_send
+                _recon_send(_recon_msg)
             else:
-                telegram_notify.send(
+                from services.telegram_notify import send as _recon_send
+                _recon_send(
                     f"✅ <b>Reconciliation OK</b>\n"
                     f"Broker={len(_broker_order_ids)} | Log={len(_internal_order_ids)} | No mismatches"
                 )
@@ -734,9 +736,9 @@ def auto_connect_broker():
 
         print("[AutoShutdown] Server shutting down. Trading day complete.", flush=True)
         try:
-            from services import telegram_notify
-            telegram_notify.send("🔴 <b>System Shutdown</b>\nTrading day complete. Auto-start at 9:00 AM tomorrow.")
-            import time as _t; _t.sleep(2)  # let message send before exit
+            from services.telegram_notify import send as _shutdown_send
+            _shutdown_send("🔴 <b>System Shutdown</b>\nTrading day complete. Auto-start at 9:00 AM tomorrow.")
+            import time as _t; _t.sleep(2)
         except Exception:
             pass
 
