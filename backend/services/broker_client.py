@@ -588,26 +588,23 @@ def _place_intraday_with_sl(
     target: float,
 ) -> dict:
     """
-    Place MIS market entry, then a SL-M protective order.
+    Place intraday market entry, then a SL-M protective order.
     Returns combined result with both order IDs.
+    Uses CubePlus form-encoded format with string values.
     """
-    parts = broker_symbol.split("_")
-    exchange_token = parts[0] if len(parts) >= 2 else broker_symbol
-    exchange = parts[1] if len(parts) >= 2 else "NSE"
-    tj_side = SIDE_MAP.get(side, "BUY")
+    side_map = {1: "buy", -1: "sell"}
+    tj_side = side_map.get(side, "buy")
 
     # Step 1: Market entry order
     entry_data = {
-        "exchangeName": exchange,
-        "exchangeToken": exchange_token,
-        "transactionType": tj_side,
-        "orderType": "MARKET",
-        "productType": "MIS",
-        "quantity": qty,
-        "price": 0,
-        "triggerPrice": 0,
-        "validity": "DAY",
-        "disclosedQty": 0,
+        "symId": broker_symbol,
+        "qty": str(qty),
+        "side": tj_side,
+        "type": "market",
+        "product": "intraday",
+        "validity": "day",
+        "discQty": "0",
+        "mktProt": "5",
     }
 
     _enforce_order_rate_limit()
@@ -617,8 +614,8 @@ def _place_intraday_with_sl(
         return {"error": f"Entry order failed: {entry_resp['error']}"}
 
     entry_order_id = str(
-        entry_resp.get("orderId")
-        or entry_resp.get("d", {}).get("orderId", "") or entry_resp.get("data", {}).get("orderId")
+        entry_resp.get("d", {}).get("orderId", "")
+        or entry_resp.get("orderId", "")
         or entry_resp.get("id", "")
     )
 
@@ -629,36 +626,30 @@ def _place_intraday_with_sl(
 
     # Step 2: SL-M protective order (opposite side)
     sl_side_int = -1 if side == 1 else 1
-    sl_side_str = SIDE_MAP.get(sl_side_int)
-    if sl_side_int == -1:
-        sl_limit = _round_to_tick(stop_loss - max(stop_loss * 0.02, 1))
-    else:
-        sl_limit = _round_to_tick(stop_loss + max(stop_loss * 0.02, 1))
+    sl_side_str = side_map.get(sl_side_int, "sell")
 
     sl_data = {
-        "exchangeName": exchange,
-        "exchangeToken": exchange_token,
-        "transactionType": sl_side_str,
-        "orderType": "SL-M",
-        "productType": "MIS",
-        "quantity": qty,
-        "price": round(sl_limit, 2),
-        "triggerPrice": round(stop_loss, 2),
-        "validity": "DAY",
-        "disclosedQty": 0,
+        "symId": broker_symbol,
+        "qty": str(qty),
+        "side": sl_side_str,
+        "type": "stopmarket",
+        "product": "intraday",
+        "validity": "day",
+        "discQty": "0",
+        "trigPrice": str(round(stop_loss, 2)),
     }
 
     _enforce_order_rate_limit()
     sl_resp = _api_post("/api/oms/place-order", sl_data)
 
     sl_order_id = str(
-        sl_resp.get("orderId")
-        or sl_resp.get("d", {}).get("orderId", "") or sl_resp.get("data", {}).get("orderId")
+        sl_resp.get("d", {}).get("orderId", "")
+        or sl_resp.get("orderId", "")
         or sl_resp.get("id", "")
     )
 
     if not sl_order_id or sl_order_id == "None" or "error" in sl_resp:
-        sl_error = sl_resp.get("message", sl_resp.get("error", str(sl_resp)))
+        sl_error = sl_resp.get("msg", sl_resp.get("error", str(sl_resp)))
         logger.error(f"SL-M order FAILED for {broker_symbol}: {sl_error}")
         # Cancel entry to avoid unprotected position
         logger.error(f"Cancelling entry {entry_order_id} — SL failed, position unprotected")
@@ -668,18 +659,17 @@ def _place_intraday_with_sl(
             pass
         # Try emergency market exit
         try:
-            exit_side_str = SIDE_MAP.get(-1 if side == 1 else 1)
+            exit_side_str = side_map.get(-1 if side == 1 else 1, "sell")
             _enforce_order_rate_limit()
             _api_post("/api/oms/place-order", {
-                "exchangeName": exchange,
-                "exchangeToken": exchange_token,
-                "transactionType": exit_side_str,
-                "orderType": "MARKET",
-                "productType": "MIS",
-                "quantity": qty,
-                "price": 0,
-                "triggerPrice": 0,
-                "validity": "DAY",
+                "symId": broker_symbol,
+                "qty": str(qty),
+                "side": exit_side_str,
+                "type": "market",
+                "product": "intraday",
+                "validity": "day",
+                "discQty": "0",
+                "mktProt": "5",
             })
             logger.info(f"Emergency exit placed for {broker_symbol}")
         except Exception:
