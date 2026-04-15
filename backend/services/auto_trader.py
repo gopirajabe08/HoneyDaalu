@@ -1016,7 +1016,7 @@ class AutoTrader:
 
         self._log("ORDER", f"Placing {signal_type} order: {symbol} | Qty={qty} | Entry=₹{entry_price} | SL=₹{stop_loss} | Target=₹{target} | R:R={rr} | Capital=₹{capital_req:,.0f}")
 
-        # Dynamic margin check — verify broker has enough funds for this order
+        # Dynamic margin check — adjust qty to fit available funds
         try:
             from services.broker_client import get_funds as _check_funds
             funds_resp = _check_funds()
@@ -1025,11 +1025,17 @@ class AutoTrader:
                 if f.get("id") == 10:
                     avail = f.get("equityAmount", 0)
                     break
-            estimated_margin = qty * entry_price * 1.5  # 1.5x for entry + SL + target margin
-            if avail < estimated_margin:
-                self._log("WARN", f"{symbol} — Insufficient margin: available ₹{avail:,.0f} < needed ₹{estimated_margin:,.0f}")
+            # Use 60% of available funds max per position (leave buffer for SL margin)
+            max_position_value = avail * 0.6
+            max_qty = int(max_position_value / entry_price) if entry_price > 0 else 0
+            if max_qty <= 0:
+                self._log("WARN", f"{symbol} — Cannot afford even 1 share (available ₹{avail:,.0f}, price ₹{entry_price:.2f})")
                 self._margin_exhausted = True
                 return False
+            if qty > max_qty:
+                self._log("INFO", f"{symbol} — Reducing qty from {qty} to {max_qty} (margin: ₹{avail:,.0f}, 60% = ₹{max_position_value:,.0f})")
+                qty = max_qty
+                signal["quantity"] = qty
         except Exception:
             pass  # Funds check failed, proceed cautiously
 
