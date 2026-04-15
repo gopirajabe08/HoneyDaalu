@@ -263,17 +263,36 @@ def _load_scripmaster_async():
     pass
 
 
+_auth_verified_at: float = 0
+
 def is_authenticated() -> bool:
-    """Check if we have a valid TradeJini session."""
+    """Check if we have a valid TradeJini session.
+    Caches result for 5 minutes to avoid rate limiting.
+    Only clears token on 401 (expired), NOT on 429 (rate limit)."""
+    global _auth_verified_at
+    import time as _t
+
     session = _get_session()
     if session is None:
         return False
+
+    # If we have a token and verified recently, skip API call
+    if _access_token and (_t.time() - _auth_verified_at) < 300:
+        return True
+
     try:
         resp = _api_get("/api/account/details")
-        return "error" not in resp and resp.get("status") != "error"
-    except Exception:
-        _clear_token()
+        if "error" not in resp and resp.get("s") != "error":
+            _auth_verified_at = _t.time()
+            return True
+        # Check if it's a 429 rate limit — don't clear token
+        err_msg = str(resp.get("error", ""))
+        if "429" in err_msg or "Too Many" in err_msg:
+            return True  # Assume still authenticated, just rate limited
         return False
+    except Exception:
+        # Don't clear token on network errors — might be temporary
+        return bool(_access_token)
 
 
 def logout():
