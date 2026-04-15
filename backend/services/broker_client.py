@@ -637,6 +637,7 @@ def _place_intraday_with_sl(
         "validity": "day",
         "discQty": "0",
         "trigPrice": str(round(stop_loss, 2)),
+        "mktProt": "5",
     }
 
     _enforce_order_rate_limit()
