@@ -1012,6 +1012,25 @@ class AutoTrader:
                 target = round(entry_price - adjusted_target_distance, 2)
             self._log("VIX", f"{symbol} — SL/target widened by {vix_mult/2.5:.1f}x (VIX mult {vix_mult}): SL=₹{stop_loss} Target=₹{target}")
 
+        # Net R:R filter after charges — skip trades where charges eat the profit
+        # Uses original qty (before any test mode override) to evaluate trade quality
+        # Approximate round-trip charges: brokerage + STT + exchange + GST + SEBI ≈ ₹65
+        _charges = 65
+        _net_profit = abs(target - entry_price) * qty - _charges
+        _net_loss = abs(entry_price - stop_loss) * qty + _charges
+        if _net_loss > 0:
+            _net_rr = _net_profit / _net_loss
+            if _net_rr < 1.5:
+                self._log("SKIP", f"{symbol} — net R:R {_net_rr:.2f} after charges (need >= 1.5) | "
+                          f"profit=₹{_net_profit:.0f} loss=₹{_net_loss:.0f} charges=₹{_charges}")
+                return False
+
+        # Phase 1 test mode: override qty to 1 share for safety
+        from config import PHASE1_TEST_MODE, PHASE1_TEST_QTY
+        if PHASE1_TEST_MODE:
+            qty = PHASE1_TEST_QTY
+            signal["quantity"] = qty
+
         capital_req = qty * entry_price
 
         self._log("ORDER", f"Placing {signal_type} order: {symbol} | Qty={qty} | Entry=₹{entry_price} | SL=₹{stop_loss} | Target=₹{target} | R:R={rr} | Capital=₹{capital_req:,.0f}")
@@ -1427,13 +1446,24 @@ class AutoTrader:
                 # Cancel orphaned target/SL orders for the closed trade
                 _target_oid = trade.get("target_order_id", "")
                 _sl_oid = trade.get("sl_order_id", "")
-                if trade.get("_bo_target_reached"):
+
+                # Determine exit reason: check if target order was filled on exchange
+                target_filled = False
+                if _target_oid:
+                    try:
+                        target_status = self._get_order_status(_target_oid)
+                        target_filled = (target_status == "filled")
+                    except Exception:
+                        pass
+
+                if trade.get("_bo_target_reached") or target_filled:
                     trade["exit_reason"] = "TARGET_HIT"
                     trade["exit_price"] = trade.get("target", 0)
-                    # Target hit — cancel the SL order if it exists
+                    # Target hit — cancel the SL order
                     if _sl_oid:
                         try:
                             cancel_order(_sl_oid)
+                            self._log("INFO", f"{symbol} — target filled, cancelled SL order (ID: {_sl_oid})")
                         except Exception:
                             pass
                 else:
@@ -1441,10 +1471,11 @@ class AutoTrader:
                     # Use last known LTP as exit price (more accurate than theoretical SL)
                     last_ltp = trade.get("ltp", 0)
                     trade["exit_price"] = last_ltp if last_ltp > 0 else trade.get("stop_loss", 0)
-                    # SL hit — cancel the target order if it exists
+                    # SL hit — cancel the target order
                     if _target_oid:
                         try:
                             cancel_order(_target_oid)
+                            self._log("INFO", f"{symbol} — SL hit, cancelled target order (ID: {_target_oid})")
                         except Exception:
                             pass
 
@@ -1830,14 +1861,26 @@ class AutoTrader:
         # Placing an exit order would create an UNWANTED opposite position.
         open_symbols, positions = self._get_open_positions_detail()
         if symbol not in open_symbols:
-            self._log("WARN", f"{symbol} — position no longer on broker (SL likely triggered). "
+            # Position already closed — determine if target or SL filled
+            _tgt_filled = False
+            if target_order_id:
+                try:
+                    _tgt_status = self._get_order_status(target_order_id)
+                    _tgt_filled = (_tgt_status == "filled")
+                except Exception:
+                    pass
+            exit_reason = "TARGET_HIT" if _tgt_filled else "SL_HIT"
+            self._log("WARN", f"{symbol} — position no longer on broker ({exit_reason}). "
                        f"Skipping exit to avoid creating opposite position.")
             trade["status"] = "CLOSED"
             trade["closed_at"] = now_ist().isoformat()
-            trade["exit_reason"] = "SL_HIT"
-            # Use last known LTP as exit price, fallback to stop_loss
-            last_ltp = trade.get("ltp", 0)
-            trade["exit_price"] = last_ltp if last_ltp > 0 else trade.get("stop_loss", 0)
+            trade["exit_reason"] = exit_reason
+            # Use target price if target filled, otherwise last LTP or stop_loss
+            if _tgt_filled:
+                trade["exit_price"] = trade.get("target", trade.get("ltp", 0))
+            else:
+                last_ltp = trade.get("ltp", 0)
+                trade["exit_price"] = last_ltp if last_ltp > 0 else trade.get("stop_loss", 0)
             # Calculate P&L from actual prices if broker didn't provide it
             pnl = trade.get("pnl", 0)
             if pnl == 0.0 and trade["exit_price"] > 0:

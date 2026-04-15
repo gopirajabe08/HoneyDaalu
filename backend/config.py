@@ -259,3 +259,9 @@ VIX_SL_ADJUSTMENTS = {
     "elevated": {"threshold": 22, "atr_mult": 3.0},  # Elevated: wider SL
     "high": {"threshold": 99, "atr_mult": 3.5},      # High VIX: widest SL
 }
+
+# ── Phase 1 Test Mode ──────────────────────────────────────────────────────
+# Override quantity to 1 share for all trades until the 3-order execution
+# model is proven in live market. Set PHASE1_TEST_MODE = False once verified.
+PHASE1_TEST_MODE = True   # 1-share only until proven
+PHASE1_TEST_QTY = 1       # Override qty to 1 share

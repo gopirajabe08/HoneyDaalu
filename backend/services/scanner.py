@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import requests as _req
 import yfinance as yf
 import pandas as pd
 from nifty500 import get_nifty500_symbols
@@ -35,6 +36,87 @@ MARKET_CLOSE_HOUR, MARKET_CLOSE_MIN = 15, 30
 
 # Weekdays: Monday=0 to Friday=4
 TRADING_DAYS = {0, 1, 2, 3, 4}
+
+# ── NSE Intraday Momentum Filter ────────────────────────────────────────────
+# Shared session for NSE API (reused to avoid repeated cookie handshakes)
+_nse_momentum_session: _req.Session | None = None
+_nse_momentum_session_created: float = 0
+
+# Cache: symbol -> (intraday_change_pct, timestamp)
+_nse_intraday_cache: dict[str, tuple[float, float]] = {}
+_NSE_CACHE_TTL = 300  # 5 minutes
+
+_NSE_MOMENTUM_THRESHOLD = 0.3  # Block if stock is moving >0.3% against signal direction
+
+
+def _get_nse_momentum_session() -> _req.Session:
+    """Get or create a shared NSE session with cookies for API access."""
+    global _nse_momentum_session, _nse_momentum_session_created
+    now = time.time()
+    # Recreate session every 10 minutes (cookies expire)
+    if _nse_momentum_session is None or (now - _nse_momentum_session_created) > 600:
+        s = _req.Session()
+        s.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.nseindia.com/",
+        })
+        try:
+            s.get("https://www.nseindia.com", timeout=10)
+        except Exception:
+            pass
+        _nse_momentum_session = s
+        _nse_momentum_session_created = now
+    return _nse_momentum_session
+
+
+def _get_intraday_change(symbol: str) -> float | None:
+    """
+    Fetch intraday price change for a stock from NSE API.
+
+    Returns:
+        Percentage change from open to current price, or None on error.
+        Positive = stock is UP today, Negative = stock is DOWN today.
+    """
+    # Strip .NS suffix if present
+    clean_sym = symbol.replace(".NS", "")
+
+    # Check cache
+    now = time.time()
+    if clean_sym in _nse_intraday_cache:
+        cached_val, cached_at = _nse_intraday_cache[clean_sym]
+        if (now - cached_at) < _NSE_CACHE_TTL:
+            return cached_val
+
+    try:
+        s = _get_nse_momentum_session()
+        resp = s.get(
+            f"https://www.nseindia.com/api/quote-equity?symbol={clean_sym}",
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return None
+
+        data = resp.json()
+        price_info = data.get("priceInfo", {})
+        open_price = price_info.get("open", 0)
+        last_price = price_info.get("lastPrice", 0)
+
+        if open_price <= 0 or last_price <= 0:
+            return None
+
+        intraday_change = (last_price - open_price) / open_price * 100
+        _nse_intraday_cache[clean_sym] = (intraday_change, now)
+        return intraday_change
+
+    except Exception as e:
+        logger.debug(f"[Scanner] NSE momentum fetch failed for {clean_sym}: {e}")
+        return None
+
 
 # ── Multi-timeframe daily trend cache ────────────────────────────────────────
 # Key: (symbol, date_str) → value: "BULLISH" | "BEARISH" | "NEUTRAL"
@@ -2555,6 +2637,21 @@ def _calc_conviction(signal: dict) -> float:
             # NEUTRAL → no boost, no penalty (either direction OK)
         except Exception:
             pass  # Skip on error — fail open
+
+    # Intraday momentum filter: block signals against today's price direction
+    # Only for intraday timeframes — don't trade against intraday momentum
+    if score > 0 and sig_tf in _MTF_INTRADAY_INTERVALS and symbol and sig_type in ("BUY", "SELL"):
+        try:
+            intraday_chg = _get_intraday_change(symbol)
+            if intraday_chg is not None:
+                if sig_type == "BUY" and intraday_chg < -_NSE_MOMENTUM_THRESHOLD:
+                    logger.info(f"[Scanner] BLOCKED {sig_type} {symbol} — stock DOWN {intraday_chg:+.2f}% today (against momentum)")
+                    score = 0
+                elif sig_type == "SELL" and intraday_chg > _NSE_MOMENTUM_THRESHOLD:
+                    logger.info(f"[Scanner] BLOCKED {sig_type} {symbol} — stock UP {intraday_chg:+.2f}% today (against momentum)")
+                    score = 0
+        except Exception:
+            pass  # Fail open — allow trade if momentum check errors
 
     return round(score, 3)
 

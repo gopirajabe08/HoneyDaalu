@@ -631,6 +631,16 @@ class PaperTrader:
 
         side = 1 if signal_type == "BUY" else -1
 
+        # Net R:R filter after charges — parity with live auto_trader
+        _charges = 65
+        _net_profit = abs(target - entry_price) * qty - _charges
+        _net_loss = abs(entry_price - stop_loss) * qty + _charges
+        if _net_loss > 0:
+            _net_rr = _net_profit / _net_loss
+            if _net_rr < 1.5:
+                self._log("SKIP", f"{symbol} — net R:R {_net_rr:.2f} after charges (need >= 1.5)")
+                return False
+
         # Simulate realistic slippage (0.1% worse entry — matches live market orders)
         slippage = entry_price * 0.001
         if side == 1:  # BUY: fill slightly higher

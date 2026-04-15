@@ -679,13 +679,46 @@ def _place_intraday_with_sl(
 
     logger.info(f"SL-M placed: {broker_symbol} SL@{stop_loss} (ID: {sl_order_id})")
 
+    # Step 3: Target limit order (opposite side, exits at profit)
+    target_order_id = ""
+    if target > 0:
+        target_side_int = -1 if side == 1 else 1
+        target_side_str = side_map.get(target_side_int, "sell")
+
+        target_data = {
+            "symId": broker_symbol,
+            "qty": str(qty),
+            "side": target_side_str,
+            "type": "limit",
+            "product": "intraday",
+            "validity": "day",
+            "discQty": "0",
+            "limitPrice": str(round(target, 2)),
+        }
+
+        _enforce_order_rate_limit()
+        target_resp = _api_post("/api/oms/place-order", target_data)
+
+        target_order_id = str(
+            target_resp.get("d", {}).get("orderId", "")
+            or target_resp.get("orderId", "")
+            or target_resp.get("id", "")
+        )
+
+        if not target_order_id or target_order_id == "None" or "error" in target_resp:
+            target_error = target_resp.get("msg", target_resp.get("error", str(target_resp)))
+            logger.warning(f"Target limit order FAILED for {broker_symbol}: {target_error} — will monitor LTP for exit")
+            target_order_id = ""
+        else:
+            logger.info(f"Target limit placed: {broker_symbol} target@{target} (ID: {target_order_id})")
+
     return {
         "s": "ok",
         "id": entry_order_id,
         "order_mode": "INTRADAY_SL",
         "entry_order_id": entry_order_id,
         "sl_order_id": sl_order_id,
-        "target_order_id": "",
+        "target_order_id": target_order_id,
         "target_price": round(target, 2),
     }
 
