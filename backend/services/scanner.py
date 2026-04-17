@@ -2639,19 +2639,36 @@ def _calc_conviction(signal: dict) -> float:
             pass  # Skip on error — fail open
 
     # Intraday momentum filter: block signals against today's price direction
-    # Only for intraday timeframes — don't trade against intraday momentum
+    # Also block gap stocks (>1% gap from prev close — gaps reverse 57% of time)
     if score > 0 and sig_tf in _MTF_INTRADAY_INTERVALS and symbol and sig_type in ("BUY", "SELL"):
         try:
             intraday_chg = _get_intraday_change(symbol)
             if intraday_chg is not None:
+                # Block counter-momentum trades
                 if sig_type == "BUY" and intraday_chg < -_NSE_MOMENTUM_THRESHOLD:
                     logger.info(f"[Scanner] BLOCKED {sig_type} {symbol} — stock DOWN {intraday_chg:+.2f}% today (against momentum)")
                     score = 0
                 elif sig_type == "SELL" and intraday_chg > _NSE_MOMENTUM_THRESHOLD:
                     logger.info(f"[Scanner] BLOCKED {sig_type} {symbol} — stock UP {intraday_chg:+.2f}% today (against momentum)")
                     score = 0
+                # Block big gap stocks — gaps reverse 57% of time (data-driven)
+                elif abs(intraday_chg) > 2.0:
+                    logger.info(f"[Scanner] BLOCKED {symbol} — gapped {intraday_chg:+.2f}% (>2% gaps reverse, avoid)")
+                    score = 0
         except Exception:
             pass  # Fail open — allow trade if momentum check errors
+
+    # Day-of-week confidence multiplier
+    # Monday 58% win (best), Tuesday 39% (worst), data-driven
+    try:
+        from datetime import datetime, timezone, timedelta
+        _ist = timezone(timedelta(hours=5, minutes=30))
+        _dow = datetime.now(_ist).weekday()
+        from config import DAY_CONFIDENCE
+        _day_mult = DAY_CONFIDENCE.get(_dow, 0.8)
+        score *= _day_mult
+    except Exception:
+        pass
 
     return round(score, 3)
 

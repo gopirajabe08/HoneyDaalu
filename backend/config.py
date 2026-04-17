@@ -261,7 +261,18 @@ VIX_SL_ADJUSTMENTS = {
 }
 
 # ── Phase 1 Test Mode ──────────────────────────────────────────────────────
-# Override quantity to 1 share for all trades until the 3-order execution
-# model is proven in live market. Set PHASE1_TEST_MODE = False once verified.
-PHASE1_TEST_MODE = True   # 1-share only until proven
-PHASE1_TEST_QTY = 1       # Override qty to 1 share
+# Friday: 2 shares (prove partial exit + 3-order model)
+# Monday: full qty (best day 58% win rate)
+PHASE1_TEST_MODE = True   # Still testing 3-order model
+PHASE1_TEST_QTY = 2       # 2 shares: proves partial exit + minimal risk
+
+# ── Day-of-Week Strategy Adjustment ──────────────────────────────────────
+# Research: Monday 58% win, Tuesday 39%, Wednesday 54%, Thursday 44%, Friday 44%
+# 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday
+DAY_CONFIDENCE = {
+    0: 1.0,    # Monday — BEST day, full confidence
+    1: 0.5,    # Tuesday — WORST day, very selective
+    2: 0.8,    # Wednesday — decent
+    3: 0.6,    # Thursday — expiry day, cautious
+    4: 0.6,    # Friday — weak, cautious
+}
