@@ -804,16 +804,8 @@ class AutoTrader:
         for strategy_key in self._strategy_keys:
             timeframe = self._timeframes.get(strategy_key, "15m")
 
-            # Skip 5m in high VIX — use 15m fallback if available
-            if vix > 18 and timeframe == "5m":
-                from config import STRATEGY_TIMEFRAMES
-                available_tfs = STRATEGY_TIMEFRAMES.get(strategy_key, [])
-                if "15m" in available_tfs:
-                    timeframe = "15m"
-                    self._log("FILTER", f"  {strategy_key}: 5m → 15m (VIX={vix:.1f})")
-                else:
-                    self._log("FILTER", f"  {strategy_key}: skipped (5m only, no 15m available)")
-                    continue
+            # All strategies run on their native timeframe
+            # Conviction scoring + momentum filter handle risk, not timeframe restriction
 
             # High VIX → half position size (reduce risk in volatile markets)
             scan_capital = self._capital * 0.5 if vix > 20 else self._capital

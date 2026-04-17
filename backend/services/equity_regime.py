@@ -270,10 +270,20 @@ def _get_vix() -> float:
 
 REGIME_STRATEGY_MAP = {
     # ═══════════════════════════════════════════════════════════════════════
-    # DATA-DRIVEN REGIME MAP — ALL 10 strategies backtested on 5 years.
-    # 6,574 trades across 20 Nifty stocks (2021-2026).
+    # ALL 5 PROVEN WINNERS — EVERY REGIME
+    #
+    # Research finding: single strategy = too few signals (BB Contra = 7/year)
+    # All 5 combined = 850+/year. Conviction filter picks the BEST one.
     #
     # PROVEN WINNERS (positive P&L over 5 years):
+    #   #1 VWAP Pullback:  +Rs.13,043 | 360 signals/year
+    #   #2 ORB Breakout:   +Rs.10,818 | 385 signals/year
+    #   #3 EMA Crossover:  +Rs.2,751  | 72 signals/year
+    #   #4 BB Contra:      +Rs.2,039  | 7 signals/year (rare but powerful)
+    #   #5 BB Squeeze:     +Rs.721    | 31 signals/year
+    #
+    # Conviction scoring + momentum filter + net R:R + day-of-week
+    # ensures only the BEST signal gets traded regardless of strategy.
     #   #1 VWAP Pullback:  +Rs.13,043 | 50% win | R:R 1.12 | BUY: +Rs.20,760
     #   #2 ORB Breakout:   +Rs.10,818 | 47% win | R:R 1.21 | BUY: +Rs.12,756
     #   #3 EMA Crossover:  +Rs.2,751  | 51% win | R:R 1.07 | BUY: +Rs.5,602
@@ -288,75 +298,68 @@ REGIME_STRATEGY_MAP = {
     # DIRECTION: BUY dominates. SELL only via BB Contra (66% SELL win).
     # ═══════════════════════════════════════════════════════════════════════
 
-    # Bullish — full winner arsenal
+    # ALL 5 PROVEN WINNERS — EVERY REGIME
+    # Conviction scoring picks the best. Day-of-week + momentum + R:R filter the rest.
+    # No more idle days waiting for 1 strategy to fire.
+
     ("bullish", "low_vol"):     [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
-    ("bullish", "normal"):      [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m")],
-    ("bullish", "elevated"):    [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m"), ("play7_orb", "15m")],
-    ("bullish", "high_vol"):    [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
+    ("bullish", "normal"):      [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("bullish", "elevated"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("bullish", "high_vol"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Bearish — VWAP + BB Contra (both proven in bear years)
-    ("bearish", "low_vol"):     [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play6_bb_contra", "15m"), ("play1_ema_crossover", "15m")],
-    ("bearish", "normal"):      [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m"), ("play7_orb", "15m")],
-    ("bearish", "elevated"):    [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
-    ("bearish", "high_vol"):    [("play6_bb_contra", "15m")],
+    ("bearish", "low_vol"):     [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("bearish", "normal"):      [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("bearish", "elevated"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("bearish", "high_vol"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Pullback — VWAP Pullback is literally built for this
-    ("pullback_in_uptrend", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m")],
-    ("pullback_in_uptrend", "normal"):    [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m"), ("play7_orb", "15m")],
-    ("pullback_in_uptrend", "elevated"):  [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("pullback_in_uptrend", "high_vol"):  [("play6_bb_contra", "15m")],
+    ("pullback_in_uptrend", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("pullback_in_uptrend", "normal"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("pullback_in_uptrend", "elevated"):  [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("pullback_in_uptrend", "high_vol"):  [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    ("bounce_in_downtrend", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m"), ("play7_orb", "15m")],
-    ("bounce_in_downtrend", "normal"):    [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("bounce_in_downtrend", "elevated"):  [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
-    ("bounce_in_downtrend", "high_vol"):  [("play6_bb_contra", "15m")],
+    ("bounce_in_downtrend", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("bounce_in_downtrend", "normal"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("bounce_in_downtrend", "elevated"):  [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("bounce_in_downtrend", "high_vol"):  [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Sideways — BB Squeeze breakout + ORB
-    ("sideways", "low_vol"):    [("play5_bb_squeeze", "15m"), ("play7_orb", "15m"), ("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
-    ("sideways", "normal"):     [("play5_bb_squeeze", "15m"), ("play6_bb_contra", "15m"), ("play7_orb", "15m")],
-    ("sideways", "elevated"):   [("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
-    ("sideways", "high_vol"):   [("play6_bb_contra", "15m")],
+    ("sideways", "low_vol"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("sideways", "normal"):     [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("sideways", "elevated"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("sideways", "high_vol"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Reversal — BB Contra + VWAP
-    ("reversal", "low_vol"):    [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m"), ("play7_orb", "15m")],
-    ("reversal", "normal"):     [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
-    ("reversal", "elevated"):   [("play6_bb_contra", "15m")],
-    ("reversal", "high_vol"):   [("play6_bb_contra", "15m")],
+    ("reversal", "low_vol"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("reversal", "normal"):     [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("reversal", "elevated"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("reversal", "high_vol"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Neutral — all 5 winners
     ("neutral", "low_vol"):     [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
-    ("neutral", "normal"):      [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play6_bb_contra", "15m"), ("play1_ema_crossover", "15m")],
-    ("neutral", "elevated"):    [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m"), ("play7_orb", "15m")],
-    ("neutral", "high_vol"):    [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
+    ("neutral", "normal"):      [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("neutral", "elevated"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("neutral", "high_vol"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Squeeze — BB Squeeze + ORB (breakout strategies)
-    ("squeeze", "low_vol"):     [("play5_bb_squeeze", "15m"), ("play7_orb", "15m"), ("play6_bb_contra", "15m")],
-    ("squeeze", "normal"):      [("play5_bb_squeeze", "15m"), ("play7_orb", "15m"), ("play6_bb_contra", "15m")],
-    ("squeeze", "elevated"):    [("play5_bb_squeeze", "15m"), ("play6_bb_contra", "15m")],
-    ("squeeze", "high_vol"):    [("play5_bb_squeeze", "15m")],
+    ("squeeze", "low_vol"):     [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("squeeze", "normal"):      [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("squeeze", "elevated"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("squeeze", "high_vol"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Trend exhaustion — BB Contra + VWAP catch reversals
-    ("trend_exhaustion", "low_vol"):  [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
-    ("trend_exhaustion", "normal"):   [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
-    ("trend_exhaustion", "elevated"): [("play6_bb_contra", "15m")],
-    ("trend_exhaustion", "high_vol"): [("play6_bb_contra", "15m")],
+    ("trend_exhaustion", "low_vol"):  [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("trend_exhaustion", "normal"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("trend_exhaustion", "elevated"): [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("trend_exhaustion", "high_vol"): [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Oversold bounce — VWAP + BB Contra
-    ("oversold_bounce", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
-    ("oversold_bounce", "normal"):    [("play3_vwap_pullback", "5m"), ("play6_bb_contra", "15m")],
-    ("oversold_bounce", "elevated"):  [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
-    ("oversold_bounce", "high_vol"):  [("play6_bb_contra", "15m")],
+    ("oversold_bounce", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("oversold_bounce", "normal"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("oversold_bounce", "elevated"):  [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("oversold_bounce", "high_vol"):  [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Expiry day — BB Contra (75% win) + ORB (R:R 1.21)
-    ("expiry_day", "low_vol"):    [("play6_bb_contra", "15m"), ("play7_orb", "15m")],
-    ("expiry_day", "normal"):     [("play6_bb_contra", "15m"), ("play7_orb", "15m")],
-    ("expiry_day", "elevated"):   [("play6_bb_contra", "15m")],
-    ("expiry_day", "high_vol"):   [("play6_bb_contra", "15m")],
+    ("expiry_day", "low_vol"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("expiry_day", "normal"):     [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("expiry_day", "elevated"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("expiry_day", "high_vol"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
 
-    # Pre-holiday — only highest conviction
-    ("pre_holiday", "low_vol"):   [("play6_bb_contra", "15m"), ("play3_vwap_pullback", "5m")],
-    ("pre_holiday", "normal"):    [("play6_bb_contra", "15m")],
-    ("pre_holiday", "elevated"):  [("play6_bb_contra", "15m")],
+    ("pre_holiday", "low_vol"):   [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("pre_holiday", "normal"):    [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
+    ("pre_holiday", "elevated"):  [("play3_vwap_pullback", "5m"), ("play7_orb", "15m"), ("play1_ema_crossover", "15m"), ("play6_bb_contra", "15m"), ("play5_bb_squeeze", "15m")],
     ("pre_holiday", "high_vol"):  [("play6_bb_contra", "15m")],
 }
 
