@@ -522,7 +522,13 @@ def auto_connect_broker():
             print(f"[AutoStart] FATAL: {e}", flush=True)
             traceback.print_exc()
 
-    threading.Thread(target=_auto_start_engines, daemon=True, name="AutoStartEngines").start()
+    # Prevent duplicate threads — check if already running
+    import threading as _th
+    existing = [t.name for t in _th.enumerate()]
+    if "AutoStartEngines" not in existing:
+        _th.Thread(target=_auto_start_engines, daemon=True, name="AutoStartEngines").start()
+    else:
+        print("[AutoStart] Thread already running — skipping duplicate", flush=True)
 
     # C9: Auto-shutdown after market close
     def _auto_shutdown():

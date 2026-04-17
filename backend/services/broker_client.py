@@ -628,16 +628,24 @@ def _place_intraday_with_sl(
     sl_side_int = -1 if side == 1 else 1
     sl_side_str = side_map.get(sl_side_int, "sell")
 
+    # Use stoplimit with tight limit price (more reliable than stopmarket on NSE)
+    # For BUY SL: limitPrice = trigPrice * 1.01 (1% slippage buffer)
+    # For SELL SL: limitPrice = trigPrice * 0.99
+    if sl_side_int == 1:  # BUY SL (protecting SHORT)
+        sl_limit = round(stop_loss * 1.01, 2)
+    else:  # SELL SL (protecting LONG)
+        sl_limit = round(stop_loss * 0.99, 2)
+
     sl_data = {
         "symId": broker_symbol,
         "qty": str(qty),
         "side": sl_side_str,
-        "type": "stopmarket",
+        "type": "stoplimit",
         "product": "intraday",
         "validity": "day",
         "discQty": "0",
         "trigPrice": str(round(stop_loss, 2)),
-        "mktProt": "5",
+        "limitPrice": str(sl_limit),
     }
 
     _enforce_order_rate_limit()

@@ -698,8 +698,49 @@ class AutoTrader:
         return False
 
     def _execute_scan_cycle(self):
-        """Run one scan across all selected strategies: find signals and place orders."""
-        # Re-detect regime on each scan cycle (strategies adapt to intraday shifts)
+        """Run one scan — Winning Horse approach (data-proven 71% win rate).
+
+        Primary: Market direction + 20-SMA support + VWAP pullback
+        Fallback: Technical strategies if Winning Horse finds nothing
+        """
+        # Step 1: Try Winning Horse Scanner (71% win rate, data-proven)
+        try:
+            from services.winning_horse import scan_winning_horse
+            wh_result = scan_winning_horse(self._capital)
+
+            if not wh_result.get("trade_today"):
+                self._log("INFO", f"[WinningHorse] {wh_result.get('reason', 'No trade today')}")
+                self._scan_count += 1
+                return
+
+            best = wh_result.get("best")
+            if best:
+                self._log("SCAN", f"[WinningHorse] {best['signal_type']} {best['symbol']} @ Rs.{best['entry_price']} | "
+                         f"SL={best['stop_loss']} | Target={best['target']} | Score={best['score']} | "
+                         f"SMA dist={best['dist_to_sma_pct']}% | Net R:R={best['net_rr']}")
+                self._scan_count += 1
+
+                # Place the winning horse trade
+                success = self._place_order_for_signal({
+                    "symbol": best["symbol"],
+                    "signal_type": "BUY",
+                    "entry_price": best["entry_price"],
+                    "stop_loss": best["stop_loss"],
+                    "target_1": best["target"],
+                    "quantity": best["quantity"],
+                    "risk_reward_ratio": f"1:{best['net_rr']}",
+                    "_strategy": "winning_horse",
+                    "_placed_via": "winning_horse",
+                })
+                if success:
+                    self._log("ORDER", f"[WinningHorse] {best['symbol']} BUY PLACED — riding the winning horse!")
+                    return
+                else:
+                    self._log("WARN", f"[WinningHorse] {best['symbol']} order failed — falling back to strategies")
+        except Exception as e:
+            self._log("WARN", f"[WinningHorse] Scanner error: {e} — falling back to strategies")
+
+        # Fallback: Re-detect regime on each scan cycle (strategies adapt to intraday shifts)
         try:
             from services.equity_regime import detect_equity_regime
             new_regime = detect_equity_regime()
