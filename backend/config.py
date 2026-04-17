@@ -260,11 +260,11 @@ VIX_SL_ADJUSTMENTS = {
     "high": {"threshold": 99, "atr_mult": 3.5},      # High VIX: widest SL
 }
 
-# ── Phase 1 Test Mode ──────────────────────────────────────────────────────
-# Friday: 2 shares (prove partial exit + 3-order model)
-# Monday: full qty (best day 58% win rate)
-PHASE1_TEST_MODE = True   # Still testing 3-order model
-PHASE1_TEST_QTY = 2       # 2 shares: proves partial exit + minimal risk
+# ── Phase 1: Full Capital Mode ─────────────────────────────────────────────
+# Winning Horse approach: 71% win rate, BUY only, 1 position, full qty
+# Safety: SL on exchange, daily loss breaker 5%, square-off 3:20 PM
+PHASE1_TEST_MODE = False  # Full qty — system is ready
+PHASE1_TEST_QTY = 0       # Not used when test mode is off
 
 # ── Day-of-Week Strategy Adjustment ──────────────────────────────────────
 # Research: Monday 58% win, Tuesday 39%, Wednesday 54%, Thursday 44%, Friday 44%
