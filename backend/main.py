@@ -255,6 +255,12 @@ def auto_connect_broker():
                 except Exception as e:
                     _log(f"{name}: FAILED — {e}")
 
+            # ── Kill-switch: skip all live engines if HONEYDAALU_DISABLE_LIVE is set ──
+            # Paper engines already started above; this only blocks live.
+            if os.getenv("HONEYDAALU_DISABLE_LIVE", "").strip().lower() in ("1", "true", "yes", "on"):
+                _log("Live engines DISABLED by HONEYDAALU_DISABLE_LIVE env var — paper engines continue")
+                return
+
             # ── Wait for market open before starting live engines ──
             from services.scanner import is_market_open
             if not is_market_open():

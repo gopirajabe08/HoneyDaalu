@@ -1422,7 +1422,9 @@ class AutoTrader:
         pnl_map = {}
         ltp_map = {}
         for pos in positions:
-            sym = pos.get("symbol", "").replace("NSE:", "").replace("-EQ", "")
+            sym = self._extract_symbol(pos)
+            if not sym:
+                continue
             pnl_map[sym] = pos.get("pl", pos.get("unrealized_profit", 0))
             ltp_map[sym] = pos.get("ltp", 0)
 
@@ -1974,6 +1976,19 @@ class AutoTrader:
         except Exception as e:
             self._log("ERROR", f"{symbol} — target exit exception: {e}")
 
+    @staticmethod
+    def _extract_symbol(pos: dict) -> str:
+        # TradeJini returns "symbol": "" and puts the real identifier in "symId"
+        # (e.g. EQT_IEX_EQ_NSE for equity, NFO_NIFTY_... for options/futures).
+        sym = pos.get("symbol", "").replace("NSE:", "").replace("-EQ", "")
+        if sym:
+            return sym
+        sym_id = pos.get("symId", "") or ""
+        parts = sym_id.split("_")
+        if len(parts) >= 3 and parts[0] == "EQT":
+            return parts[1]
+        return ""
+
     def _get_open_positions_detail(self) -> tuple[set, list]:
         """Get open INTRADAY/BO position symbols and full position data from broker.
         Excludes CNC (swing) positions so they don't consume intraday slots."""
@@ -1998,12 +2013,14 @@ class AutoTrader:
                     if prod == "CNC":
                         continue
 
-                    broker_sym = pos.get("symbol", "")
+                    sym_id = pos.get("symId", "") or ""
                     # Skip options/futures — equity engine only counts equity positions
-                    if "CE" in broker_sym or "PE" in broker_sym or "FUT" in broker_sym:
+                    if "CE" in sym_id or "PE" in sym_id or "FUT" in sym_id or sym_id.startswith("NFO_"):
                         continue
 
-                    plain = broker_sym.replace("NSE:", "").replace("-EQ", "")
+                    plain = self._extract_symbol(pos)
+                    if not plain:
+                        continue
                     open_symbols.add(plain)
                     open_positions.append(pos)
 
