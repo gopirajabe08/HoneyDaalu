@@ -879,86 +879,113 @@ def get_tradebook() -> dict:
 # ── Market Data ────────────────────────────────────────────────────────────
 
 
+_QUOTE_CACHE: dict = {}
+_QUOTE_CACHE_TTL = 5  # seconds
+
+
+def _latest_bar_from_chart(broker_symbol: str) -> dict | None:
+    # TradeJini v2 has no live-quote REST endpoint. Derive LTP from the latest
+    # 1-minute chart bar via /api/mkt-data/chart/interval-data.
+    import time
+    now_ts = int(time.time())
+    cached = _QUOTE_CACHE.get(broker_symbol)
+    if cached and now_ts - cached[0] < _QUOTE_CACHE_TTL:
+        return cached[1]
+    try:
+        result = _api_get("/api/mkt-data/chart/interval-data", params={
+            "from": now_ts - 600,
+            "to": now_ts,
+            "interval": "1",
+            "id": broker_symbol,
+        })
+    except Exception:
+        return None
+    if not isinstance(result, dict) or result.get("s") != "ok":
+        return None
+    d = result.get("d") or {}
+    bars = d.get("bars") or []
+    points = []
+    for b in bars:
+        if isinstance(b, list):
+            points.extend(b)
+        elif isinstance(b, dict):
+            points.append(b)
+    if not points:
+        return None
+    latest = points[-1]
+    _QUOTE_CACHE[broker_symbol] = (now_ts, latest)
+    return latest
+
+
 def get_quotes(symbols: list[str]) -> dict:
     """
-    Get live quotes for symbols.
-    Accepts NSE symbols (e.g., ["RELIANCE", "TCS"]) — auto-converts to broker format.
-    Returns Fyers-compatible quote format.
+    Get latest 1-min bar close as LTP for a list of symbols.
+    Accepts NSE symbols (e.g., ["RELIANCE"]) — auto-converts to broker format.
+    Returns Fyers-compatible quote format: {"s":"ok","d":[{"n":..., "v":{"lp":..., ...}}]}
     """
     session = _get_session()
     if session is None:
         return {"error": "Not authenticated"}
 
-    # Convert symbols to broker format
-    broker_symbols = []
-    for s in symbols:
-        bs = format_broker_symbol(s)
-        broker_symbols.append(bs)
-
-    # Build comma-separated token list for API
-    # TradeJini expects: exchangeToken_exchangeName format
-    try:
-        result = _api_get("/api/market/quote", params={
-            "symbols": ",".join(broker_symbols),
-            "mode": "LTP",
+    fyers_quotes = []
+    for orig_symbol in symbols:
+        bs = format_broker_symbol(orig_symbol)
+        latest = _latest_bar_from_chart(bs)
+        if not latest:
+            continue
+        lp = float(latest.get("close", 0) or 0)
+        fyers_symbol = f"NSE:{orig_symbol}-EQ" if ":" not in orig_symbol else orig_symbol
+        fyers_quotes.append({
+            "n": fyers_symbol,
+            "v": {
+                "lp": lp,
+                "open_price": float(latest.get("open", 0) or 0),
+                "high_price": float(latest.get("high", 0) or 0),
+                "low_price": float(latest.get("low", 0) or 0),
+                "close_price": lp,
+                "volume": int(latest.get("volume", 0) or 0),
+                "ch": 0.0,
+                "chp": 0.0,
+            },
         })
 
-        if "error" in result:
-            return result
-
-        # Normalize to Fyers quote format: {"d": [{"n": symbol, "v": {"lp": price, ...}}]}
-        quotes_data = result.get("data", [])
-        if not isinstance(quotes_data, list):
-            quotes_data = [quotes_data] if quotes_data else []
-
-        fyers_quotes = []
-        for i, q in enumerate(quotes_data):
-            orig_symbol = symbols[i] if i < len(symbols) else ""
-            fyers_symbol = f"NSE:{orig_symbol}-EQ" if ":" not in orig_symbol else orig_symbol
-
-            fyers_quotes.append({
-                "n": fyers_symbol,
-                "v": {
-                    "lp": float(q.get("ltp", q.get("lp", q.get("lastPrice", 0)))),
-                    "open_price": float(q.get("open", q.get("open_price", 0))),
-                    "high_price": float(q.get("high", q.get("high_price", 0))),
-                    "low_price": float(q.get("low", q.get("low_price", 0))),
-                    "close_price": float(q.get("close", q.get("close_price", q.get("prevClose", 0)))),
-                    "volume": int(q.get("volume", q.get("vol", 0))),
-                    "ch": float(q.get("change", q.get("ch", 0))),
-                    "chp": float(q.get("changePercent", q.get("chp", 0))),
-                },
-            })
-
-        return {"s": "ok", "d": fyers_quotes}
-
-    except Exception as e:
-        return {"error": str(e)}
+    return {"s": "ok", "d": fyers_quotes}
 
 
 def get_quotes_raw(symbols: list[str]) -> dict:
     """
-    Get quotes with raw broker symbols (already formatted).
+    Get quotes with raw broker symbols (already formatted as EQT_*_EQ_NSE).
     Used by _BrokerCompat for direct calls.
     """
-    try:
-        result = _api_get("/api/market/quote", params={
-            "symbols": ",".join(symbols),
-            "mode": "LTP",
-        })
-        return result if "error" not in result else {"s": "error", "d": []}
-    except Exception as e:
-        return {"error": str(e)}
+    results = []
+    for bs in symbols:
+        latest = _latest_bar_from_chart(bs)
+        if latest:
+            results.append({
+                "symId": bs,
+                "ltp": float(latest.get("close", 0) or 0),
+                "open": float(latest.get("open", 0) or 0),
+                "high": float(latest.get("high", 0) or 0),
+                "low": float(latest.get("low", 0) or 0),
+                "volume": int(latest.get("volume", 0) or 0),
+            })
+    return {"s": "ok", "data": results}
 
 
 def get_market_depth(symbol: str) -> dict:
-    """Get market depth (Level 2 data) for a symbol."""
+    """Level-2 depth is not exposed via TradeJini v2 REST. Returns latest 1-min bar only."""
     broker_symbol = format_broker_symbol(symbol)
-    result = _api_get("/api/market/quote", params={
-        "symbols": broker_symbol,
-        "mode": "FULL",
-    })
-    return result
+    latest = _latest_bar_from_chart(broker_symbol)
+    if not latest:
+        return {"s": "no-data"}
+    return {"s": "ok", "data": {
+        "symId": broker_symbol,
+        "ltp": float(latest.get("close", 0) or 0),
+        "open": float(latest.get("open", 0) or 0),
+        "high": float(latest.get("high", 0) or 0),
+        "low": float(latest.get("low", 0) or 0),
+        "volume": int(latest.get("volume", 0) or 0),
+    }}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────

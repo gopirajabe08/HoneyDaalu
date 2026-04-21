@@ -227,6 +227,39 @@ def auto_connect_broker():
                         btst_strats.append({"strategy": key, "timeframe": tfs[0]})
                 return btst_strats
 
+            # ── Clean stale state (live AND paper) BEFORE any engine start ──
+            # Without this, yesterday's running=True flag causes start() to no-op
+            # with "already running", leaving engines silently dead for the whole day.
+            _stale_engines_all = [
+                ("Equity Live", auto_trader),
+                ("Options Live", options_auto_trader),
+                ("BTST Live", btst_trader),
+                ("Equity Paper", paper_trader),
+                ("Options Paper", options_paper_trader),
+                ("BTST Paper", btst_paper_trader),
+            ]
+            for _stale_name, _stale_engine in _stale_engines_all:
+                try:
+                    if getattr(_stale_engine, '_running', False):
+                        _stale_engine.stop()
+                        _log(f"{_stale_name}: stopped stale state — will restart with fresh capital")
+                except Exception:
+                    pass
+            import os as _os
+            for _sf in ['.auto_trader_state.json', '.options_auto_trader_state.json', '.btst_trader_state.json',
+                        '.paper_trader_state.json', '.options_paper_trader_state.json', '.btst_paper_trader_state.json']:
+                _sf_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), _sf)
+                if _os.path.exists(_sf_path):
+                    try:
+                        import json as _json
+                        with open(_sf_path) as _f:
+                            _sd = _json.load(_f)
+                        if _sd.get('date') != now_ist().strftime('%Y-%m-%d'):
+                            _os.remove(_sf_path)
+                            _log(f"Deleted stale state file: {_sf} (from {_sd.get('date')})")
+                    except Exception:
+                        pass
+
             # Auto-start only engines with proven edge or clear potential
             # Others are hidden (not auto-started) but still available via UI/API
             paper_configs = [
@@ -271,38 +304,8 @@ def auto_connect_broker():
                         continue
                 _log("Market is OPEN — starting live engines")
 
-            # ── STOP stale engines restored from old state files ──
-            # State files may have running=True from yesterday → engines auto-restore
-            # with wrong capital. Kill them so we can restart with correct allocation.
-            _stale_engines = [
-                ("Equity Live", auto_trader),
-                ("Options Live", options_auto_trader),
-                ("BTST Live", btst_trader),
-            ]
-            for _stale_name, _stale_engine in _stale_engines:
-                try:
-                    if getattr(_stale_engine, '_running', False):
-                        _stale_engine.stop()
-                        _log(f"{_stale_name}: stopped stale state — will restart with fresh capital")
-                except Exception:
-                    pass
-            # Also delete stale state files to prevent re-restore
-            import os as _os
-            for _sf in ['.auto_trader_state.json', '.options_auto_trader_state.json', '.btst_trader_state.json',
-                        '.paper_trader_state.json', '.options_paper_trader_state.json', '.btst_paper_trader_state.json']:
-                _sf_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), _sf)
-                if _os.path.exists(_sf_path):
-                    try:
-                        import json as _json
-                        with open(_sf_path) as _f:
-                            _sd = _json.load(_f)
-                        if _sd.get('date') != now_ist().strftime('%Y-%m-%d'):
-                            _os.remove(_sf_path)
-                            _log(f"Deleted stale state file: {_sf} (from {_sd.get('date')})")
-                    except Exception:
-                        pass
-
             # ── Live engines: Equity Intraday + Options Intraday ONLY ──
+            # Stale-state cleanup already ran above (before paper engines started).
             # Futures Live and all Swing Live stay paper-only until proven profitable.
             # A2: Verify broker is truly connected (retry up to 5 times, re-login if needed)
             for _broker_check in range(5):
@@ -1392,14 +1395,25 @@ def btst_start(req: BTSTStartRequest):
     )
 
 
+def _build_btst_strategies() -> list[dict]:
+    """BTST strategies need daily/hourly timeframes, not intraday 5m/15m."""
+    from services.equity_regime import detect_equity_regime
+    from config import BTST_STRATEGY_TIMEFRAMES
+    regime_ids = detect_equity_regime().get("strategy_ids", [])
+    btst_strats = [{"strategy": k, "timeframe": BTST_STRATEGY_TIMEFRAMES[k][0]}
+                   for k in regime_ids if k in BTST_STRATEGY_TIMEFRAMES]
+    if not btst_strats:
+        btst_strats = [{"strategy": k, "timeframe": tfs[0]}
+                       for k, tfs in BTST_STRATEGY_TIMEFRAMES.items()]
+    return btst_strats
+
+
 @app.post("/api/btst/start-auto")
 def btst_start_regime(req: EquityAutoStartRequest):
     """Start BTST live with auto strategy selection from regime."""
-    from services.equity_regime import detect_equity_regime
-    regime = detect_equity_regime()
-    strategies = regime.get("strategies", [])
+    strategies = _build_btst_strategies()
     if not strategies:
-        return {"error": "No strategies selected by regime detector"}
+        return {"error": "No BTST strategies available"}
     result = btst_trader.start(strategies=strategies, capital=req.capital)
     result["auto_regime"] = True
     result["strategies_count"] = len(strategies)
@@ -1441,11 +1455,9 @@ def btst_paper_start(req: BTSTStartRequest):
 @app.post("/api/btst-paper/start-auto")
 def btst_paper_start_regime(req: EquityAutoStartRequest):
     """Start BTST paper with auto strategy selection."""
-    from services.equity_regime import detect_equity_regime
-    regime = detect_equity_regime()
-    strategies = regime.get("strategies", [])
+    strategies = _build_btst_strategies()
     if not strategies:
-        return {"error": "No strategies selected by regime detector"}
+        return {"error": "No BTST strategies available"}
     result = btst_paper_trader.start(strategies=strategies, capital=req.capital)
     result["auto_regime"] = True
     result["strategies_count"] = len(strategies)
