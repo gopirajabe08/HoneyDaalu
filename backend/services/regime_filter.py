@@ -23,10 +23,12 @@ All data via yfinance (^NSEI, ^INDIAVIX). No broker auth required.
 """
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -41,6 +43,12 @@ GAP_FLOOR_PCT = -0.3
 VIX_CEILING = 20.0
 TREND_LOOKBACK_DAYS = 3
 FLASH_CRASH_FLOOR_PCT = -1.0
+
+# Safety net (spec: "paper P&L > ₹10K/day multiple times → auto-stop, report")
+DAILY_LOSS_THRESHOLD = -10_000.0
+CONSECUTIVE_BREACH_LIMIT = 2  # two days in a row trips the safety
+_SAFETY_STATE_FILE = Path(__file__).resolve().parent.parent / "tracking" / "regime_safety_state.json"
+_safety_lock = threading.Lock()
 
 
 @dataclass
@@ -178,6 +186,15 @@ def _check_flash_crash() -> tuple[bool, float]:
 
 def should_trade_long_today() -> FilterResult:
     """Main entry point. Returns FilterResult with allow/reason/gate values."""
+    # Safety net first — if tripped, block unconditionally until manual reset
+    tripped, state = safety_tripped()
+    if tripped:
+        return FilterResult(
+            allow=False,
+            reason=f"SAFETY tripped — {state.get('consecutive_breaches', 0)} consecutive days ≤ ₹{DAILY_LOSS_THRESHOLD:.0f}. Manual reset required.",
+            detail={"gate": "safety", "tripped_at": state.get("tripped_at"), "state": state},
+        )
+
     snap = _get_daily_gates()
     if snap.error:
         return FilterResult(
@@ -235,3 +252,108 @@ def reset_cache() -> None:
     global _daily_snapshot
     with _daily_lock:
         _daily_snapshot = None
+
+
+# ── Safety net: auto-stop after N consecutive ≤-₹10k paper days ──────────
+def _load_safety_state() -> dict:
+    if not _SAFETY_STATE_FILE.exists():
+        return {"consecutive_breaches": 0, "last_date": None, "last_pnl": 0.0,
+                "tripped": False, "history": []}
+    try:
+        with open(_SAFETY_STATE_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {"consecutive_breaches": 0, "last_date": None, "last_pnl": 0.0,
+                "tripped": False, "history": []}
+
+
+def _save_safety_state(state: dict) -> None:
+    _SAFETY_STATE_FILE.parent.mkdir(exist_ok=True)
+    with open(_SAFETY_STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2, default=str)
+
+
+def safety_tripped() -> tuple[bool, dict]:
+    """Returns (tripped, state). Paper engine should block entries when tripped."""
+    with _safety_lock:
+        state = _load_safety_state()
+        return bool(state.get("tripped")), state
+
+
+def record_daily_result(pnl: float, on_date: date | None = None) -> dict:
+    """Hook called from paper_trader EOD square-off. Updates breach counter.
+
+    Paper only — auto-stop just flips a flag in the state file that causes
+    should_trade_long_today() to return False. Real money is already blocked
+    by HONEYDAALU_DISABLE_LIVE; this just stops *paper* from adding more
+    losing data to the 60-day experiment until we investigate.
+    """
+    if on_date is None:
+        on_date = now_ist().date()
+    on_date_str = str(on_date)
+
+    with _safety_lock:
+        state = _load_safety_state()
+
+        # Idempotent: if already recorded today, no-op
+        if state.get("last_date") == on_date_str:
+            return state
+
+        breaches = state.get("consecutive_breaches", 0)
+        if pnl <= DAILY_LOSS_THRESHOLD:
+            breaches += 1
+            logger.warning(
+                f"[RegimeFilter] SAFETY breach #{breaches}: day {on_date_str} P&L=₹{pnl:.0f} "
+                f"≤ threshold ₹{DAILY_LOSS_THRESHOLD:.0f}"
+            )
+        else:
+            breaches = 0
+
+        tripped = breaches >= CONSECUTIVE_BREACH_LIMIT
+        state["consecutive_breaches"] = breaches
+        state["last_date"] = on_date_str
+        state["last_pnl"] = round(pnl, 2)
+        hist = state.setdefault("history", [])
+        hist.append({"date": on_date_str, "pnl": round(pnl, 2), "breach": pnl <= DAILY_LOSS_THRESHOLD})
+        # Keep last 60 days only
+        state["history"] = hist[-60:]
+
+        if tripped and not state.get("tripped"):
+            state["tripped"] = True
+            state["tripped_at"] = now_ist().isoformat()
+            logger.error(
+                f"[RegimeFilter] SAFETY TRIPPED — {CONSECUTIVE_BREACH_LIMIT} consecutive days "
+                f"≤ ₹{DAILY_LOSS_THRESHOLD:.0f}. Paper engine will block all regime entries "
+                f"until reset_safety() is called."
+            )
+            # Send Telegram alert (override silence — this is a genuine alert)
+            try:
+                from services import telegram_notify
+                telegram_notify.send(
+                    "🚨 <b>Regime Filter: SAFETY TRIPPED</b>\n\n"
+                    f"{CONSECUTIVE_BREACH_LIMIT} consecutive paper days ≤ ₹{abs(DAILY_LOSS_THRESHOLD):,.0f}.\n"
+                    f"Last: {on_date_str} = ₹{pnl:,.0f}\n"
+                    "Regime filter auto-stopped until manual reset.\n"
+                    "Review decisions file + call reset_safety() when ready."
+                )
+            except Exception:
+                pass
+
+        _save_safety_state(state)
+        return state
+
+
+def reset_safety() -> dict:
+    """Manual owner action — clears tripped state so regime filter can run again."""
+    with _safety_lock:
+        state = {
+            "consecutive_breaches": 0,
+            "last_date": None,
+            "last_pnl": 0.0,
+            "tripped": False,
+            "reset_at": now_ist().isoformat(),
+            "history": _load_safety_state().get("history", []),
+        }
+        _save_safety_state(state)
+        logger.info("[RegimeFilter] SAFETY reset — regime filter re-armed")
+        return state

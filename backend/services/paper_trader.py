@@ -841,6 +841,23 @@ class PaperTrader:
         self._log("ALERT", f"Virtual square-off complete. Total P&L: ₹{self._total_pnl:,.2f}")
         self._save_state()
 
+        # Regime-filter safety-net hook: record today's P&L, auto-trip if ≤ -₹10k 2 days running
+        if _regime_enabled():
+            try:
+                today = now_ist().date()
+                todays_pnl = sum(
+                    t.get("pnl", 0.0) for t in self._trade_history
+                    if str(t.get("closed_at", ""))[:10] == today.isoformat()
+                )
+                from services.regime_filter import record_daily_result
+                state = record_daily_result(todays_pnl, on_date=today)
+                if state.get("tripped"):
+                    self._log("ALERT", f"Regime safety TRIPPED after {state.get('consecutive_breaches')} consecutive days ≤ ₹-10k. Manual reset required.")
+                elif state.get("consecutive_breaches", 0) > 0:
+                    self._log("WARN", f"Regime safety: breach #{state.get('consecutive_breaches')} today (₹{todays_pnl:,.0f} ≤ ₹-10k). Another breach trips the filter.")
+            except Exception as e:
+                self._log("WARN", f"Regime safety record failed: {e}")
+
         # End-of-day pipeline: daily report + auto-tune + QA (runs once per day)
         try:
             from services.auto_tuner import run_eod_pipeline
