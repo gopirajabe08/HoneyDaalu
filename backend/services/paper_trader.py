@@ -864,7 +864,8 @@ class PaperTrader:
                 if sym and lp:
                     ltp_map[sym] = lp
         except Exception as e:
-            logger.warning(f"[PaperTrader] Failed to fetch LTP: {e}")
+            import traceback as _tb
+            logger.warning(f"[PaperTrader] Failed to fetch LTP: {type(e).__name__}: {e}\n{_tb.format_exc()}")
         return ltp_map
 
     # ── Logging ───────────────────────────────────────────────────────────
