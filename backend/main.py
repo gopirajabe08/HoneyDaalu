@@ -227,6 +227,18 @@ def auto_connect_broker():
                         btst_strats.append({"strategy": key, "timeframe": tfs[0]})
                 return btst_strats
 
+            # ── Wait for market open BEFORE any engine start ──
+            # cron fires at 9:00 AM IST but market opens 9:15. paper_trader.start()
+            # rejects with "Market is closed" if called before 9:15, and historically
+            # AutoStart masked this error as "already running or restored from state",
+            # leaving paper engines silently dead from 9:00 → user-manual-restart.
+            from services.scanner import is_market_open
+            if not is_market_open():
+                _log("Market not open yet — waiting for 9:15 AM IST before starting engines...")
+                while not is_market_open():
+                    time.sleep(30)
+                _log("Market is OPEN — proceeding with engine start")
+
             # ── Clean stale state (live AND paper) BEFORE any engine start ──
             # Without this, yesterday's running=True flag causes start() to no-op
             # with "already running", leaving engines silently dead for the whole day.
@@ -284,7 +296,8 @@ def auto_connect_broker():
                     if result and not result.get("error"):
                         _log(f"{name}: started")
                     else:
-                        _log(f"{name}: already running or restored from state")
+                        err = (result or {}).get("error", "unknown — empty result")
+                        _log(f"{name}: NOT STARTED — {err}")
                 except Exception as e:
                     _log(f"{name}: FAILED — {e}")
 
@@ -294,18 +307,8 @@ def auto_connect_broker():
                 _log("Live engines DISABLED by HONEYDAALU_DISABLE_LIVE env var — paper engines continue")
                 return
 
-            # ── Wait for market open before starting live engines ──
-            from services.scanner import is_market_open
-            if not is_market_open():
-                _log("Market not open yet — waiting for 9:15 AM IST...")
-                while not is_market_open():
-                    time.sleep(30)
-                    if not is_market_open():
-                        continue
-                _log("Market is OPEN — starting live engines")
-
             # ── Live engines: Equity Intraday + Options Intraday ONLY ──
-            # Stale-state cleanup already ran above (before paper engines started).
+            # Market-open wait + stale-state cleanup already ran above (before paper).
             # Futures Live and all Swing Live stay paper-only until proven profitable.
             # A2: Verify broker is truly connected (retry up to 5 times, re-login if needed)
             for _broker_check in range(5):
