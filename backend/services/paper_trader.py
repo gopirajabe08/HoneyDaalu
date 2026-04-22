@@ -5,10 +5,13 @@ Mirrors the Auto-Trader exactly but uses virtual positions instead of real broke
 Same rules: on-demand scan (initial + slot-open), max 10 positions, 2% risk, order cutoff 2 PM, square-off 3:15 PM.
 """
 
+import json
+import os
 import threading
 import logging
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from services.scanner import run_scan, is_market_open, _calc_conviction
@@ -26,6 +29,42 @@ from config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ── Regime filter integration ─────────────────────────────────────────────
+# Enabled via env var LUCKYNAVI_REGIME_FILTER=1. When enabled, the paper
+# engine gates all entries through the 4-gate filter and applies hard rules
+# from the 2026-04-22 autonomous-task spec:
+#   - LONG-only (reject SELL signals)
+#   - Universe: NIFTY 100 only (Nifty 50 + Next 50)
+#   - Position size: ₹50k fixed
+#   - SL: 0.7% below entry, target: 1.5% above
+#   - Max 7 concurrent, entry window 09:45–13:30 IST
+# All decisions (allow/skip + reason) logged to tracking/regime_decisions_YYYYMMDD.jsonl.
+REGIME_FILTER_CAPITAL = 50_000
+REGIME_FILTER_SL_PCT = 0.007    # 0.7%
+REGIME_FILTER_TARGET_PCT = 0.015  # 1.5%
+REGIME_FILTER_MAX_POS = 7
+REGIME_FILTER_START_HOUR, REGIME_FILTER_START_MIN = 9, 45
+REGIME_FILTER_CUTOFF_HOUR, REGIME_FILTER_CUTOFF_MIN = 13, 30
+
+
+def _regime_enabled() -> bool:
+    return os.getenv("LUCKYNAVI_REGIME_FILTER", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _log_regime_decision(decision: dict) -> None:
+    """Append one JSONL line to tracking/regime_decisions_YYYYMMDD.jsonl."""
+    try:
+        today = now_ist().strftime("%Y-%m-%d")
+        tracking_dir = Path(__file__).resolve().parent.parent / "tracking"
+        tracking_dir.mkdir(exist_ok=True)
+        path = tracking_dir / f"regime_decisions_{today}.jsonl"
+        decision = {"ts": now_ist().isoformat(), **decision}
+        with open(path, "a") as f:
+            f.write(json.dumps(decision, default=str) + "\n")
+    except Exception as e:
+        logger.warning(f"[RegimeFilter] decision log write failed: {e}")
 
 # Basic sector mapping for concentration limit
 SECTOR_MAP = {
@@ -419,14 +458,46 @@ class PaperTrader:
         num_strategies = len(self._strategy_keys)
         self._log("SCAN", f"Scan #{self._scan_count} starting — {num_strategies} strateg{'y' if num_strategies == 1 else 'ies'}...")
 
+        # ── Regime filter day-level gate (when LUCKYNAVI_REGIME_FILTER=1) ──
+        if _regime_enabled():
+            from services.regime_filter import should_trade_long_today
+            _r = should_trade_long_today()
+            if not _r.allow:
+                self._log("FILTER", f"Regime gate BLOCK: {_r.reason} — skipping scan cycle")
+                _log_regime_decision({
+                    "event": "scan_blocked", "reason": _r.reason,
+                    "gap_pct": _r.gap_pct, "vix": _r.vix,
+                    "trend_change": _r.trend_change, "flash_pct": _r.flash_pct,
+                })
+                self._update_position_pnl()
+                return
+            # Allowed — also log
+            _log_regime_decision({
+                "event": "scan_allowed", "reason": _r.reason,
+                "gap_pct": _r.gap_pct, "vix": _r.vix,
+                "trend_change": _r.trend_change, "flash_pct": _r.flash_pct,
+            })
+            # Enforce regime entry window 09:45–13:30 IST
+            _now = now_ist()
+            if _now.hour < REGIME_FILTER_START_HOUR or (_now.hour == REGIME_FILTER_START_HOUR and _now.minute < REGIME_FILTER_START_MIN):
+                self._log("FILTER", f"Regime window: before 09:45 IST — holding entries")
+                self._update_position_pnl()
+                return
+            if _now.hour > REGIME_FILTER_CUTOFF_HOUR or (_now.hour == REGIME_FILTER_CUTOFF_HOUR and _now.minute >= REGIME_FILTER_CUTOFF_MIN):
+                self._log("FILTER", f"Regime window: after 13:30 IST — no new entries")
+                self._update_position_pnl()
+                return
+
         open_count = len(self._active_trades)
 
-        if open_count >= INTRADAY_PAPER_MAX_POSITIONS:
-            self._log("INFO", f"Max positions reached ({open_count}/{INTRADAY_PAPER_MAX_POSITIONS}) — skipping order placement")
+        # Regime filter tightens concurrent-position cap to 7
+        _eff_max = REGIME_FILTER_MAX_POS if _regime_enabled() else INTRADAY_PAPER_MAX_POSITIONS
+        if open_count >= _eff_max:
+            self._log("INFO", f"Max positions reached ({open_count}/{_eff_max}) — skipping order placement")
             self._update_position_pnl()
             return
 
-        slots_available = INTRADAY_PAPER_MAX_POSITIONS - open_count
+        slots_available = _eff_max - open_count
 
         # VIX check — skip 5m strategies in high VIX
         try:
@@ -625,8 +696,37 @@ class PaperTrader:
         qty = signal.get("quantity", 0)
         rr = signal.get("risk_reward_ratio", "")
 
-        if not all([symbol, signal_type, entry_price, stop_loss, target, qty]):
+        if not all([symbol, signal_type, entry_price]):
             self._log("WARN", f"{symbol} — incomplete signal data, skipping")
+            return False
+
+        # ── Regime filter per-signal gates + overrides ────────────────────
+        if _regime_enabled():
+            # LONG-only
+            if signal_type != "BUY":
+                self._log("FILTER", f"{symbol} — regime: SELL rejected (LONG-only)")
+                _log_regime_decision({
+                    "event": "signal_rejected", "symbol": symbol,
+                    "reason": "side_not_buy", "signal_type": signal_type,
+                })
+                return False
+            # NIFTY 100 universe
+            from nifty100 import is_in_nifty100
+            if not is_in_nifty100(symbol):
+                self._log("FILTER", f"{symbol} — regime: not in NIFTY 100")
+                _log_regime_decision({
+                    "event": "signal_rejected", "symbol": symbol,
+                    "reason": "outside_nifty100",
+                })
+                return False
+            # Overrides: qty (~₹50k), SL (0.7%), target (1.5%)
+            qty = max(1, int(REGIME_FILTER_CAPITAL / entry_price))
+            stop_loss = round(entry_price * (1 - REGIME_FILTER_SL_PCT), 2)
+            target = round(entry_price * (1 + REGIME_FILTER_TARGET_PCT), 2)
+            rr = "1:2.14"
+
+        if not all([stop_loss, target, qty]):
+            self._log("WARN", f"{symbol} — incomplete signal data after regime override, skipping")
             return False
 
         side = 1 if signal_type == "BUY" else -1
@@ -687,6 +787,12 @@ class PaperTrader:
         self._active_trades.append(trade)
         self._order_count += 1
         self._save_state()
+        if _regime_enabled():
+            _log_regime_decision({
+                "event": "entry_placed", "symbol": symbol, "side": "BUY",
+                "qty": qty, "entry": entry_price, "sl": stop_loss, "target": target,
+                "capital": capital_req, "strategy": signal.get("_strategy", ""),
+            })
         return True
 
     # ── Square Off ────────────────────────────────────────────────────────
