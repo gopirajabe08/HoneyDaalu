@@ -33,12 +33,18 @@ else
 fi
 
 # ── Frontend build (only if frontend changed) ──
+# Nginx serves from /opt/honeydaalu/frontend/dist (NOT $APP_DIR/frontend/dist).
+# After building, sync the output to the nginx doc root.
+NGINX_FRONTEND_DIR="/opt/honeydaalu/frontend/dist"
 if git diff HEAD~1 --name-only | grep -q "frontend/"; then
     log "Frontend changed — rebuilding..."
     cd "$APP_DIR/frontend"
     npm install --silent
     npm run build
-    log "Frontend built"
+    log "Frontend built — syncing to $NGINX_FRONTEND_DIR"
+    sudo mkdir -p "$NGINX_FRONTEND_DIR"
+    sudo rsync -a --delete "$APP_DIR/frontend/dist/" "$NGINX_FRONTEND_DIR/"
+    log "Frontend deployed to nginx root"
 else
     log "No frontend changes — skipping build"
 fi
