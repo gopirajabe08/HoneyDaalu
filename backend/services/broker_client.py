@@ -880,7 +880,7 @@ def get_tradebook() -> dict:
 
 
 _QUOTE_CACHE: dict = {}
-_QUOTE_CACHE_TTL = 5  # seconds
+_QUOTE_CACHE_TTL = 20  # seconds — LTP derived from 1-min bars, sub-20s refresh is wasted
 
 
 def _latest_bar_from_chart(broker_symbol: str) -> dict | None:

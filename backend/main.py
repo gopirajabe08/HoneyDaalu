@@ -278,11 +278,15 @@ def auto_connect_broker():
                 ("Equity Intraday Paper", lambda: paper_trader.start(
                     strategies=detect_equity_regime().get("strategies", []),
                     capital=75000)),
-                ("Options Intraday Paper", lambda: options_paper_trader.start(
-                    capital=25000, underlyings=["NIFTY", "BANKNIFTY"])),
                 ("BTST Paper", lambda: btst_paper_trader.start(
                     strategies=_btst_strategies(),
                     capital=50000)),
+                # PAUSED 2026-04-22 — TradeJini options symbol format + NFO spot price
+                # endpoint not yet supported. Scanner hammers chart endpoint with bad
+                # symbols → 429 rate limits. Not in current strategic path (equity
+                # swing via Option 1 plan). Re-enable after Fix 11 lands.
+                # ("Options Intraday Paper", lambda: options_paper_trader.start(
+                #     capital=25000, underlyings=["NIFTY", "BANKNIFTY"])),
                 # Hidden — no proven edge yet. Can start manually from UI if needed:
                 # ("Equity Swing Paper", lambda: swing_paper_trader.start(...)),
                 # ("Options Swing Paper", lambda: options_swing_paper_trader.start(...)),
