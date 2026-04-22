@@ -49,9 +49,15 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="LuckyNavi", version="1.0.0")
 
 
+def _live_enabled() -> bool:
+    return os.getenv("HONEYDAALU_DISABLE_LIVE", "").strip().lower() not in ("1", "true", "yes", "on")
+
+
 @app.on_event("shutdown")
 def notify_shutdown():
     """Send Telegram alert when server stops (manual stop, crash, or systemctl stop)."""
+    if not _live_enabled():
+        return  # Paper-only mode — routine restarts don't need Telegram spam
     try:
         from services import telegram_notify
         telegram_notify.send("⚠️ <b>System Stopped</b>\nBackend process exited. Will auto-start at 9:00 AM next trading day.")
@@ -92,11 +98,12 @@ def auto_connect_broker():
             profile = broker_client.get_profile()
             name = profile.get("data", {}).get("name", "Unknown")
             print(f"[Startup] Broker connected: {name} (attempt {attempt})", flush=True)
-            try:
-                from services import telegram_notify
-                telegram_notify.send(f"✅ <b>TradeJini Login SUCCESS</b>\n{name}\nAttempt {attempt}/3")
-            except Exception:
-                pass
+            if _live_enabled():
+                try:
+                    from services import telegram_notify
+                    telegram_notify.send(f"✅ <b>TradeJini Login SUCCESS</b>\n{name}\nAttempt {attempt}/3")
+                except Exception:
+                    pass
             break
         else:
             print(f"[Startup] Login attempt {attempt}/3 — not authenticated yet, retrying...", flush=True)
@@ -160,13 +167,15 @@ def auto_connect_broker():
         }
         _all_ok = _broker_ok and _strat_count > 0
 
-        _check_lines = "\n".join(f"  {'✅' if v not in ('FAIL','WARN') else ('🚨' if v=='FAIL' else '⚠️')} {k}: {v}" for k, v in _checks.items())
-        _audit_msg = (
-            f"{'🟢' if _all_ok else '🔴'} <b>Pre-Market Audit</b>\n\n"
-            f"{_check_lines}\n\n"
-            f"{'System READY — all checks passed.' if _all_ok else 'WARNING: One or more checks failed!'}"
-        )
-        telegram_notify.send(_audit_msg)
+        # Only send audit Telegram when live is enabled, OR audit has failures (always alert on failures)
+        if _live_enabled() or not _all_ok:
+            _check_lines = "\n".join(f"  {'✅' if v not in ('FAIL','WARN') else ('🚨' if v=='FAIL' else '⚠️')} {k}: {v}" for k, v in _checks.items())
+            _audit_msg = (
+                f"{'🟢' if _all_ok else '🔴'} <b>Pre-Market Audit</b>\n\n"
+                f"{_check_lines}\n\n"
+                f"{'System READY — all checks passed.' if _all_ok else 'WARNING: One or more checks failed!'}"
+            )
+            telegram_notify.send(_audit_msg)
         print(f"[Startup] Pre-market audit: {'PASS' if _all_ok else 'WARN'}", flush=True)
     except Exception as _pma_err:
         print(f"[Startup] Pre-market audit error: {_pma_err}", flush=True)

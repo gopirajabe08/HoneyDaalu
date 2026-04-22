@@ -904,15 +904,23 @@ def _latest_bar_from_chart(broker_symbol: str) -> dict | None:
         return None
     d = result.get("d") or {}
     bars = d.get("bars") or []
-    points = []
+    # TradeJini format: bars is list of [time_ms, open, high, low, close, volume]
+    # (NOT list of dicts as OpenAPI spec might suggest)
+    latest = None
     for b in bars:
-        if isinstance(b, list):
-            points.extend(b)
+        if isinstance(b, list) and len(b) >= 5:
+            latest = {
+                "time": b[0],
+                "open": b[1],
+                "high": b[2],
+                "low": b[3],
+                "close": b[4],
+                "volume": b[5] if len(b) > 5 else 0,
+            }
         elif isinstance(b, dict):
-            points.append(b)
-    if not points:
+            latest = b
+    if latest is None:
         return None
-    latest = points[-1]
     _QUOTE_CACHE[broker_symbol] = (now_ts, latest)
     return latest
 
