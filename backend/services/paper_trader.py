@@ -308,19 +308,26 @@ class PaperTrader:
           4. At 3:15 PM — square off everything.
         """
         self._log("INFO", "Background thread started")
-        self._log("INFO", "Scan mode: ON-DEMAND — scan at 10:30 AM, then re-scan only when a slot opens")
+        # Regime filter (when enabled) opens entries at 09:45 IST per spec.
+        # Default paper behaviour waits until 10:30 IST.
+        if _regime_enabled():
+            _start_h, _start_m = REGIME_FILTER_START_HOUR, REGIME_FILTER_START_MIN
+            self._log("INFO", f"Scan mode: ON-DEMAND — initial scan at {_start_h:02d}:{_start_m:02d} (regime filter active)")
+        else:
+            _start_h, _start_m = INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN
+            self._log("INFO", f"Scan mode: ON-DEMAND — initial scan at {_start_h:02d}:{_start_m:02d}")
 
-        # ── Wait for 10:30 AM order window ──
-        while self._running and is_before_time(INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN):
-            self._log("INFO", "Waiting for 10:30 AM order window...")
+        # ── Wait for configured order window ──
+        while self._running and is_before_time(_start_h, _start_m):
+            self._log("INFO", f"Waiting for {_start_h:02d}:{_start_m:02d} order window...")
             for _ in range(60):
-                if not self._running or not is_before_time(INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN):
+                if not self._running or not is_before_time(_start_h, _start_m):
                     break
                 time.sleep(1)
 
         # ── Initial full scan ──
         if not _is_past_order_cutoff() and is_market_open() and self._running:
-            self._log("SCAN", "10:30 AM — initial scan to fill all slots")
+            self._log("SCAN", f"{_start_h:02d}:{_start_m:02d} — initial scan to fill all slots")
             self._execute_scan_cycle()
         elif not is_market_open():
             self._log("INFO", "Market closed — stopping paper trader")
