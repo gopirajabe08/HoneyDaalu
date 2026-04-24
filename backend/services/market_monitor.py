@@ -14,14 +14,12 @@ This daemon ACTS, not just logs. It's the system's immune system.
 import logging
 import time
 import threading
-import requests
 from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 
 CHECK_INTERVAL = 300  # 5 minutes
-API = "http://localhost:8001"
 _monitor_thread = None
 _running = False
 
@@ -51,20 +49,23 @@ def _log(level, msg):
         pass
 
 
-def _api_get(endpoint, timeout=5):
-    try:
-        return requests.get(f"{API}{endpoint}", timeout=timeout).json()
-    except Exception:
-        return None
+def _engine_singletons():
+    """All engine singletons as (name, engine, is_live). Used by every monitor
+    check to read state directly, avoiding unauthed HTTP calls that previously
+    generated 401 spam and blinded the dashboard to regime/VIX/P&L."""
+    from services.auto_trader import auto_trader
+    from services.paper_trader import paper_trader
+    from services.options_auto_trader import options_auto_trader
+    from services.options_paper_trader import options_paper_trader
+    from services.futures_paper_trader import futures_paper_trader
 
-
-def _api_post(endpoint, data=None, timeout=10):
-    try:
-        if data:
-            return requests.post(f"{API}{endpoint}", json=data, timeout=timeout).json()
-        return requests.post(f"{API}{endpoint}", timeout=timeout).json()
-    except Exception:
-        return None
+    return [
+        ("Equity Live", auto_trader, True),
+        ("Equity Paper", paper_trader, False),
+        ("Options Live", options_auto_trader, True),
+        ("Options Paper", options_paper_trader, False),
+        ("Futures Paper", futures_paper_trader, False),
+    ]
 
 
 def _check_and_fix_broker():
@@ -86,36 +87,20 @@ def _check_and_fix_broker():
 
 def _check_and_fix_engines():
     """Check all engines directly via singletons (no HTTP calls needed)."""
-    try:
-        from services.auto_trader import auto_trader
-        from services.paper_trader import paper_trader
-        from services.options_auto_trader import options_auto_trader
-        from services.options_paper_trader import options_paper_trader
+    for name, engine, _is_live in _engine_singletons():
+        try:
+            running = getattr(engine, '_running', False)
+            scans = getattr(engine, '_scan_count', 0)
+            orders = getattr(engine, '_order_count', 0)
+            pnl = getattr(engine, '_total_pnl', 0)
+            active = len([t for t in getattr(engine, '_active_trades', getattr(engine, '_active_positions', [])) if t.get("status") == "OPEN"])
 
-        engines = [
-            ("Equity Live", auto_trader),
-            ("Equity Paper", paper_trader),
-            ("Options Live", options_auto_trader),
-            ("Options Paper", options_paper_trader),
-        ]
-
-        for name, engine in engines:
-            try:
-                running = getattr(engine, '_running', False)
-                scans = getattr(engine, '_scan_count', 0)
-                orders = getattr(engine, '_order_count', 0)
-                pnl = getattr(engine, '_total_pnl', 0)
-                active = len([t for t in getattr(engine, '_active_trades', getattr(engine, '_active_positions', [])) if t.get("status") == "OPEN"])
-
-                if running:
-                    _log("OK", f"{name}: S:{scans} O:{orders} A:{active} P&L:₹{pnl:,.0f}")
-                else:
-                    _log("INFO", f"{name}: not running")
-            except Exception as e:
-                _log("ERROR", f"{name}: {e}")
-
-    except Exception as e:
-        _log("ERROR", f"Engine check failed: {e}")
+            if running:
+                _log("OK", f"{name}: S:{scans} O:{orders} A:{active} P&L:₹{pnl:,.0f}")
+            else:
+                _log("INFO", f"{name}: not running")
+        except Exception as e:
+            _log("ERROR", f"{name}: {e}")
 
 
 def _check_signal_health():
@@ -124,37 +109,32 @@ def _check_signal_health():
     if now.hour < 11 or now.hour >= 14:
         return
 
-    for name, ep in [("Equity Paper", "/api/paper/status"), ("Futures Paper", "/api/futures/paper/status")]:
-        d = _api_get(ep)
-        if d and d.get("is_running"):
-            scans = d.get("scan_count", 0)
-            orders = d.get("order_count", 0)
+    for name, engine, _is_live in _engine_singletons():
+        try:
+            if not getattr(engine, '_running', False):
+                continue
+            scans = getattr(engine, '_scan_count', 0)
+            orders = getattr(engine, '_order_count', 0)
             if scans >= 5 and orders == 0:
                 _log("WARN", f"{name}: {scans} scans, 0 orders — strategies may need adjustment")
-
-    # Options should be generating trades
-    d = _api_get("/api/options/paper/status")
-    if d and d.get("is_running"):
-        scans = d.get("scan_count", 0)
-        orders = d.get("order_count", 0)
-        if scans >= 5 and orders == 0:
-            _log("WARN", f"Options Paper: {scans} scans, 0 orders — check lot size / margin")
+        except Exception:
+            pass
 
 
 def _check_pnl_health():
     """Track P&L across all engines. Alert on significant losses."""
-    total_paper = 0
-    total_live = 0
+    total_paper = 0.0
+    total_live = 0.0
 
-    for ep in ["/api/paper/status", "/api/options/paper/status", "/api/futures/paper/status"]:
-        d = _api_get(ep)
-        if d:
-            total_paper += d.get("total_pnl", 0)
-
-    for ep in ["/api/auto/status", "/api/options/auto/status"]:
-        d = _api_get(ep)
-        if d:
-            total_live += d.get("total_pnl", 0)
+    for _name, engine, is_live in _engine_singletons():
+        try:
+            pnl = getattr(engine, '_total_pnl', 0) or 0
+            if is_live:
+                total_live += pnl
+            else:
+                total_paper += pnl
+        except Exception:
+            pass
 
     _log("OK", f"P&L — Paper: ₹{total_paper:,.0f} | Live: ₹{total_live:,.0f}")
 
@@ -166,13 +146,17 @@ def _check_pnl_health():
 
 def _check_regime():
     """Log current regime for audit trail."""
-    d = _api_get("/api/equity/regime", timeout=10)
-    if d:
-        regime = d.get("regime", "?")
-        vix = d.get("components", {}).get("vix", 0)
-        confidence = d.get("confidence", "?")
-        strats = d.get("strategy_ids", [])
-        _log("OK", f"Regime: {regime} | VIX:{vix} | Conf:{confidence} | Strategies:{len(strats)}")
+    try:
+        from services.equity_regime import detect_equity_regime
+        d = detect_equity_regime()
+    except Exception as e:
+        _log("ERROR", f"Regime check: {e}")
+        return
+    regime = d.get("regime", "?")
+    vix = d.get("components", {}).get("vix", 0)
+    confidence = d.get("confidence", "?")
+    strats = d.get("strategy_ids", [])
+    _log("OK", f"Regime: {regime} | VIX:{vix} | Conf:{confidence} | Strategies:{len(strats)}")
 
 
 def _run_monitor_loop():
