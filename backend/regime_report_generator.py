@@ -9,8 +9,12 @@ Data sources:
   - backend/tracking/regime_decisions_*.jsonl  (per-day decision logs)
   - backend/tracking/regime_safety_state.json  (safety breach counter)
 
-Pushes the report to main branch + sends a Telegram summary (bypasses
-paper-mode silence since these are genuine scheduled status updates).
+Writes the report to disk + sends a Telegram summary (bypasses paper-mode
+silence since these are genuine scheduled status updates). The file stays
+untracked in reports/ — surviving deploy.sh's `git reset --hard` because
+untracked files are not touched. Earlier versions also tried git-push from
+EC2; that failed silently (no GitHub auth on the box) and the local commit
+got wiped on next deploy, losing every Friday's report. Removed.
 
 Usage (manual / testing):
   python regime_report_generator.py                  # auto-decide by calendar
@@ -22,7 +26,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -337,18 +340,6 @@ def send_telegram(msg: str) -> bool:
         return False
 
 
-def git_commit_push(paths: list[Path], message: str) -> bool:
-    try:
-        for p in paths:
-            subprocess.run(["git", "add", str(p)], cwd=str(ROOT), check=True)
-        subprocess.run(["git", "commit", "-m", message], cwd=str(ROOT), check=True)
-        subprocess.run(["git", "push", "origin", "main"], cwd=str(ROOT), check=True)
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"[report] git commit/push failed: {e}", flush=True)
-        return False
-
-
 def decide_report_type(today: date | None = None) -> str | None:
     today = today or now_ist().date()
     d = phase3_day_number(today)
@@ -380,8 +371,7 @@ def build_date_range(report_type: str, today: date | None = None) -> tuple[date,
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--type", choices=("weekly", "day30", "day60", "auto"), default="auto")
-    ap.add_argument("--dry-run", action="store_true", help="Skip git commit + telegram")
-    ap.add_argument("--no-push", action="store_true", help="Write file but skip git push")
+    ap.add_argument("--dry-run", action="store_true", help="Print report; skip file write + telegram")
     ap.add_argument("--no-telegram", action="store_true")
     args = ap.parse_args()
 
@@ -407,10 +397,6 @@ def main() -> int:
         "day30": "day30_memo.md",
         "day60": "day60_memo.md",
     }
-    out = REPORTS_DIR / filename_map[report_type]
-    out.write_text(report)
-    print(f"[report] wrote {out}", flush=True)
-
     if args.dry_run:
         print("--- REPORT ---")
         print(report)
@@ -418,9 +404,9 @@ def main() -> int:
         print(telegram_msg)
         return 0
 
-    if not args.no_push:
-        commit_msg = f"Auto-report: {report_type} ({date_range[1].isoformat()})"
-        git_commit_push([out], commit_msg)
+    out = REPORTS_DIR / filename_map[report_type]
+    out.write_text(report)
+    print(f"[report] wrote {out}", flush=True)
 
     if not args.no_telegram:
         send_telegram(telegram_msg)
