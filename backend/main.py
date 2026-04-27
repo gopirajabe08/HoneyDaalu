@@ -281,26 +281,42 @@ def auto_connect_broker():
                     except Exception:
                         pass
 
-            # Option 1 (approved 2026-04-21): swing on 4 backtested winners only.
-            # Replaces prior intraday + BTST configs. Backtest 2026-04-21 with
-            # charges showed these 4 earned +₹2,087/yr net on 1d bars (32 trades,
-            # 60-69% win rate). The dropped strategies (play3_vwap_pullback,
-            # play7_orb, play4_supertrend, etc.) lost money in the same backtest.
-            # Capital ₹8,000 = the 30% algo lab share; the 70% (~₹19k) is in
-            # NIFTY BEES already (owner-managed, executed 2026-04-22).
+            # Owner directive 2026-04-27: run BOTH swing (1d) and intraday (15m)
+            # paper this week — same 3 winners on different timeframes for
+            # apples-to-apples comparison. Swing gets the 4th winner play2 too
+            # (triple_ma needs longer lookback than 15m allows).
+            #
+            # Backtest 2026-04-21 (charges-aware but DP-charge missing):
+            #   play2_triple_ma:   +₹1,248 (1d) — swing only
+            #   play1_ema_crossover:+₹584  (proven on 1d AND 15m)
+            #   play5_bb_squeeze:  +₹122  (proven on 1d AND 15m, small sample)
+            #   play6_bb_contra:   +₹133  (proven on 1d AND 15m, small sample)
+            # Dropped (proven losers): play3_vwap_pullback (-₹3,160),
+            #   play7_orb (-₹429), play4_supertrend (-₹591), play8/9/10/winning_horse
+            #
+            # Both engines run paper-only (HONEYDAALU_DISABLE_LIVE=1 stays on).
+            # LUCKYNAVI_REGIME_FILTER removed from .env — intraday runs clean to
+            # produce real-trade data this week (filter ON = 0 trades again).
             SWING_WINNERS = [
                 {"strategy": "play2_triple_ma",     "timeframe": "1d"},
                 {"strategy": "play1_ema_crossover", "timeframe": "1d"},
                 {"strategy": "play6_bb_contra",     "timeframe": "1d"},
                 {"strategy": "play5_bb_squeeze",    "timeframe": "1d"},
             ]
+            INTRADAY_WINNERS = [
+                {"strategy": "play1_ema_crossover", "timeframe": "15m"},
+                {"strategy": "play6_bb_contra",     "timeframe": "15m"},
+                {"strategy": "play5_bb_squeeze",    "timeframe": "15m"},
+            ]
             paper_configs = [
                 ("Equity Swing Paper", lambda: swing_paper_trader.start(
                     strategies=SWING_WINNERS,
                     capital=8000,
                     scan_interval_minutes=0)),  # 0 -> daily mode (9:20 + 15:35 IST)
-                # Discontinued per Option 1 plan:
-                # ("Equity Intraday Paper", paper_trader, 75000) — losers play3/play7
+                ("Equity Intraday Paper", lambda: paper_trader.start(
+                    strategies=INTRADAY_WINNERS,
+                    capital=8000)),
+                # Discontinued (proven losers in 2026-04-21 backtest):
                 # ("BTST Paper", btst_paper_trader, 50000) — overlaps with swing on 1d
                 # PAUSED 2026-04-22 (TradeJini scrip-master gap, not on critical path):
                 # ("Options Intraday Paper", options_paper_trader, 25000)
