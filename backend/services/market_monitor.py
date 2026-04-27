@@ -55,13 +55,15 @@ def _engine_singletons():
     generated 401 spam and blinded the dashboard to regime/VIX/P&L."""
     from services.auto_trader import auto_trader
     from services.paper_trader import paper_trader
+    from services.swing_paper_trader import swing_paper_trader
     from services.options_auto_trader import options_auto_trader
     from services.options_paper_trader import options_paper_trader
     from services.futures_paper_trader import futures_paper_trader
 
     return [
         ("Equity Live", auto_trader, True),
-        ("Equity Paper", paper_trader, False),
+        ("Equity Swing Paper", swing_paper_trader, False),  # primary per Option 1
+        ("Equity Paper", paper_trader, False),               # intraday — discontinued, kept for manual UI start
         ("Options Live", options_auto_trader, True),
         ("Options Paper", options_paper_trader, False),
         ("Futures Paper", futures_paper_trader, False),

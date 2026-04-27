@@ -281,26 +281,32 @@ def auto_connect_broker():
                     except Exception:
                         pass
 
-            # Auto-start only engines with proven edge or clear potential
-            # Others are hidden (not auto-started) but still available via UI/API
+            # Option 1 (approved 2026-04-21): swing on 4 backtested winners only.
+            # Replaces prior intraday + BTST configs. Backtest 2026-04-21 with
+            # charges showed these 4 earned +₹2,087/yr net on 1d bars (32 trades,
+            # 60-69% win rate). The dropped strategies (play3_vwap_pullback,
+            # play7_orb, play4_supertrend, etc.) lost money in the same backtest.
+            # Capital ₹8,000 = the 30% algo lab share; the 70% (~₹19k) is in
+            # NIFTY BEES already (owner-managed, executed 2026-04-22).
+            SWING_WINNERS = [
+                {"strategy": "play2_triple_ma",     "timeframe": "1d"},
+                {"strategy": "play1_ema_crossover", "timeframe": "1d"},
+                {"strategy": "play6_bb_contra",     "timeframe": "1d"},
+                {"strategy": "play5_bb_squeeze",    "timeframe": "1d"},
+            ]
             paper_configs = [
-                ("Equity Intraday Paper", lambda: paper_trader.start(
-                    strategies=detect_equity_regime().get("strategies", []),
-                    capital=75000)),
-                ("BTST Paper", lambda: btst_paper_trader.start(
-                    strategies=_btst_strategies(),
-                    capital=50000)),
-                # PAUSED 2026-04-22 — TradeJini options symbol format + NFO spot price
-                # endpoint not yet supported. Scanner hammers chart endpoint with bad
-                # symbols → 429 rate limits. Not in current strategic path (equity
-                # swing via Option 1 plan). Re-enable after Fix 11 lands.
-                # ("Options Intraday Paper", lambda: options_paper_trader.start(
-                #     capital=25000, underlyings=["NIFTY", "BANKNIFTY"])),
-                # Hidden — no proven edge yet. Can start manually from UI if needed:
-                # ("Equity Swing Paper", lambda: swing_paper_trader.start(...)),
-                # ("Options Swing Paper", lambda: options_swing_paper_trader.start(...)),
-                # ("Futures Intraday Paper", lambda: futures_paper_trader.start(...)),
-                # ("Futures Swing Paper", lambda: futures_swing_paper_trader.start(...)),
+                ("Equity Swing Paper", lambda: swing_paper_trader.start(
+                    strategies=SWING_WINNERS,
+                    capital=8000,
+                    scan_interval_minutes=0)),  # 0 -> daily mode (9:20 + 15:35 IST)
+                # Discontinued per Option 1 plan:
+                # ("Equity Intraday Paper", paper_trader, 75000) — losers play3/play7
+                # ("BTST Paper", btst_paper_trader, 50000) — overlaps with swing on 1d
+                # PAUSED 2026-04-22 (TradeJini scrip-master gap, not on critical path):
+                # ("Options Intraday Paper", options_paper_trader, 25000)
+                # ("Options Swing Paper", options_swing_paper_trader, ...)
+                # ("Futures Intraday Paper", futures_paper_trader, ...)
+                # ("Futures Swing Paper", futures_swing_paper_trader, ...)
             ]
 
             for name, start_fn in paper_configs:
