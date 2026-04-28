@@ -92,7 +92,9 @@ def get_excluded_stocks() -> list[str]:
             logger.info("[ResearchAnalyst] No corporate actions today — no exclusions")
         return excluded
     except Exception as e:
-        logger.warning(f"[ResearchAnalyst] Failed to fetch corporate actions: {e} — proceeding with no exclusions")
+        _cache = {today_str: []}
+        _cache_time = time.time()
+        logger.warning(f"[ResearchAnalyst] Failed to fetch corporate actions: {e} — proceeding with no exclusions for today")
         return []
 
 
