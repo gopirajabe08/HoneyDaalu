@@ -941,6 +941,12 @@ def get_quotes(symbols: list[str]) -> dict:
         latest = _latest_bar_from_chart(bs)
         if not latest:
             continue
+        if not isinstance(latest, dict):
+            logger.warning(
+                f"[get_quotes] Skipping {orig_symbol}: chart endpoint returned "
+                f"unexpected type {type(latest).__name__}={latest!r}"
+            )
+            continue
         lp = float(latest.get("close", 0) or 0)
         fyers_symbol = f"NSE:{orig_symbol}-EQ" if ":" not in orig_symbol else orig_symbol
         fyers_quotes.append({
