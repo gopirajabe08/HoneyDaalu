@@ -105,6 +105,7 @@ class PaperTrader:
 
         self._strategy_keys: list[str] = []
         self._timeframes: dict[str, str] = {}
+        self._configured_strategy_keys: set[str] = set()
         self._capital: float = 0.0
 
         self._active_trades: list[dict] = []
@@ -227,6 +228,8 @@ class PaperTrader:
 
             if not self._strategy_keys:
                 return {"error": "No valid strategies provided."}
+
+            self._configured_strategy_keys = set(self._strategy_keys)
 
             self._capital = capital
             self._running = True
@@ -433,22 +436,27 @@ class PaperTrader:
         return False
 
     def _execute_scan_cycle(self):
-        # Re-detect regime on each scan cycle (strategies adapt to intraday shifts)
+        # Re-detect regime on each scan cycle. Strategy list is LOCKED to the
+        # configured whitelist (set in start() from main.py INTRADAY_WINNERS).
+        # Regime can only mutate timeframes for whitelisted strategies — it
+        # CANNOT add proven losers (play3_vwap_pullback, play7_orb, etc.) that
+        # were excluded from the curated config. Bug fixed 2026-04-29 after
+        # losers crept in via regime shift to sideways_elevated.
         try:
             from services.equity_regime import detect_equity_regime
             new_regime = detect_equity_regime()
-            new_strategies = new_regime.get("strategies", [])
-            if new_strategies:
-                new_keys = [s["strategy"] for s in new_strategies]
-                new_tfs = {s["strategy"]: s["timeframe"] for s in new_strategies}
-                if set(new_keys) != set(self._strategy_keys):
-                    old_names = ", ".join(self._strategy_keys)
-                    new_names = ", ".join(new_keys)
-                    self._log("REGIME", f"Regime shifted → {new_regime.get('regime', '?')} | Strategies: {old_names} → {new_names}")
-                    self._strategy_keys = new_keys
+            new_strategies_raw = new_regime.get("strategies", [])
+            if new_strategies_raw and self._configured_strategy_keys:
+                allowed = [s for s in new_strategies_raw if s.get("strategy") in self._configured_strategy_keys]
+                if allowed:
+                    new_keys = [s["strategy"] for s in allowed]
+                    new_tfs = {s["strategy"]: s["timeframe"] for s in allowed}
+                    if set(new_keys) != set(self._strategy_keys):
+                        old_names = ", ".join(self._strategy_keys)
+                        new_names = ", ".join(new_keys)
+                        self._log("REGIME", f"Regime shifted → {new_regime.get('regime', '?')} | Strategies (whitelist-filtered): {old_names} → {new_names}")
+                        self._strategy_keys = new_keys
                     self._timeframes = new_tfs
-                # Always update timeframes even if keys haven't changed (VIX may have changed timeframe)
-                self._timeframes = new_tfs
         except Exception as e:
             pass  # Regime detection failed, keep current strategies
 
