@@ -89,12 +89,14 @@ def _format_engine_section(s: dict) -> str:
     if s["missing"]:
         return f"### {s['label']}\n_State file missing — engine likely never started today._\n"
 
-    if not s["running"]:
-        return f"### {s['label']}\n_Not running._\n"
+    has_activity = s["scan_count"] > 0 or s["order_count"] > 0 or s["closed_count"] > 0 or s["active_count"] > 0
+    if not s["running"] and not has_activity:
+        return f"### {s['label']}\n_Not running, no activity today._\n"
 
+    status_suffix = "" if s["running"] else " _(squared off, end-of-day)_"
     pnl_emoji = "+" if s["total_pnl"] >= 0 else ""
     lines = [
-        f"### {s['label']}",
+        f"### {s['label']}{status_suffix}",
         f"- Capital: ₹{s['capital']:,}",
         f"- Scans: {s['scan_count']} | Orders: {s['order_count']}",
         f"- Open positions: {s['active_count']}",
