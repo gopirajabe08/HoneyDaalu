@@ -164,6 +164,8 @@ class PaperTrader:
 
             self._strategy_keys = state.get("strategy_keys", [])
             self._configured_strategy_keys = set(state.get("configured_strategy_keys", []))
+            if self._strategy_keys and not self._configured_strategy_keys:
+                self._configured_strategy_keys = set(self._strategy_keys)
             self._timeframes = state.get("timeframes", {})
             self._capital = state.get("capital", 0.0)
             self._active_trades = state.get("active_trades", [])
