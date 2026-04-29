@@ -123,10 +123,44 @@ def _build_message() -> tuple[str, bool]:
     return "\n".join(msg_lines), healthy
 
 
+def _is_nse_holiday() -> tuple[bool, str]:
+    try:
+        sys.path.insert(0, str(BACKEND_DIR))
+        from config import NSE_HOLIDAYS
+        today = datetime.now(IST).strftime("%Y-%m-%d")
+        if today in NSE_HOLIDAYS:
+            return True, NSE_HOLIDAYS[today]
+    except Exception:
+        pass
+    return False, ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Morning alive ping")
     parser.add_argument("--dry-run", action="store_true", help="Print only, no Telegram")
     args = parser.parse_args()
+
+    is_holiday, holiday_name = _is_nse_holiday()
+    if is_holiday:
+        now = datetime.now(IST)
+        message = (
+            f"🌴 NSE Holiday — {now.strftime('%a %d %b')} {now.strftime('%H:%M IST')}\n\n"
+            f"Today: {holiday_name}\n"
+            f"Engines correctly NOT started. No trading today.\n"
+            f"Next trading day's ping arrives ~09:20 IST."
+        )
+        print(message)
+        if args.dry_run:
+            print("\n[dry-run] skipped Telegram")
+            return 0
+        try:
+            sys.path.insert(0, str(BACKEND_DIR))
+            from services import telegram_notify
+            telegram_notify.send(message)
+            print("\n[ok] sent holiday Telegram")
+        except Exception as e:
+            print(f"\n[warn] Telegram send failed: {e}", file=sys.stderr)
+        return 0
 
     message, healthy = _build_message()
     print(message)
