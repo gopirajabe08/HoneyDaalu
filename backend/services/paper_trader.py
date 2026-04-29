@@ -136,6 +136,7 @@ class PaperTrader:
             "date": now_ist().strftime("%Y-%m-%d"),
             "running": self._running,
             "strategy_keys": self._strategy_keys,
+            "configured_strategy_keys": sorted(self._configured_strategy_keys),
             "timeframes": self._timeframes,
             "capital": self._capital,
             "active_trades": self._active_trades,
@@ -162,6 +163,7 @@ class PaperTrader:
                 return
 
             self._strategy_keys = state.get("strategy_keys", [])
+            self._configured_strategy_keys = set(state.get("configured_strategy_keys", []))
             self._timeframes = state.get("timeframes", {})
             self._capital = state.get("capital", 0.0)
             self._active_trades = state.get("active_trades", [])
