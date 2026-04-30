@@ -308,14 +308,22 @@ def auto_connect_broker():
                 {"strategy": "play6_bb_contra",     "timeframe": "15m"},
                 {"strategy": "play5_bb_squeeze",    "timeframe": "15m"},
             ]
+            # Capital sized per engine 2026-04-30 (owner directive: per-engine
+            # need, cap ₹1L). Swing holds 5 concurrent positions on 1d in Nifty
+            # 100/500 (avg ~₹1.5k/share, NESTLEIND/MARUTI up to ₹25k) → 75k
+            # gives meaningful position sizing without over-concentrating in
+            # cheap stocks. Intraday holds 10 concurrent on 15m → 50k allows
+            # ~₹5k/position avg with room for higher-priced large-caps.
+            # Calibration band (10-18 swing trades / 20 days) unaffected —
+            # signal counts don't depend on capital, only P&L magnitudes scale.
             paper_configs = [
                 ("Equity Swing Paper", lambda: swing_paper_trader.start(
                     strategies=SWING_WINNERS,
-                    capital=8000,
+                    capital=75000,
                     scan_interval_minutes=0)),  # 0 -> daily mode (9:20 + 15:35 IST)
                 ("Equity Intraday Paper", lambda: paper_trader.start(
                     strategies=INTRADAY_WINNERS,
-                    capital=8000)),
+                    capital=50000)),
                 # Discontinued (proven losers in 2026-04-21 backtest):
                 # ("BTST Paper", btst_paper_trader, 50000) — overlaps with swing on 1d
                 # PAUSED 2026-04-22 (TradeJini scrip-master gap, not on critical path):
