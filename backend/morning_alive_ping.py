@@ -99,12 +99,22 @@ def _build_message() -> tuple[str, bool]:
 
     intraday_line = "—"
     if intraday and intraday.get("running"):
-        intraday_line = (
-            f"₹{intraday.get('capital', 0):,} | "
-            f"scans {intraday.get('scan_count', 0)} | "
-            f"orders {intraday.get('order_count', 0)} | "
-            f"open {len(intraday.get('active_trades', []))}"
+        intraday_pre_window = now.hour < 10 or (now.hour == 10 and now.minute < 30)
+        intraday_has_real_scan = any(
+            log.get("level") == "SCAN" for log in intraday.get("logs", [])
         )
+        if intraday_pre_window and not intraday_has_real_scan:
+            intraday_line = (
+                f"₹{intraday.get('capital', 0):,} | "
+                f"waiting for 10:30 IST scan window"
+            )
+        else:
+            intraday_line = (
+                f"₹{intraday.get('capital', 0):,} | "
+                f"scans {intraday.get('scan_count', 0)} | "
+                f"orders {intraday.get('order_count', 0)} | "
+                f"open {len(intraday.get('active_trades', []))}"
+            )
 
     msg_lines = [
         f"{prefix} Morning Alive — {today} {time_str}",

@@ -6,6 +6,13 @@
 backend/.env
 backend/.fyers_token
 .fyers_token
+.tradeselect-creds
+
+# Claude Code / agent runtime
+.claude/scheduled_tasks.lock
+
+# Tracking runtime state
+backend/tracking/regime_safety_state.json
 
 # ══════════════════════════════════════════════════════════════
 #  STATE FILES — contain trade data, tokens, session info
