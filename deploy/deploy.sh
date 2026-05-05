@@ -49,13 +49,51 @@ else
     log "No frontend changes — skipping build"
 fi
 
-# ── Restart backend ONLY during market hours (9:00-15:45 IST) ──
+# ── Determine if changed files require backend restart ──
+# Cron-spawned scripts (morning_alive_ping, intraday_started_ping,
+# paper_eod_report) run as fresh processes — no restart needed.
+# Documentation, reports, gitignore, GitHub workflows — no restart needed.
+# Anything else under backend/* requires restart to pick up changes.
+RESTART_NEEDED=false
+RESTART_REASON=""
+CHANGED_FILES=$(git diff HEAD~1 --name-only 2>/dev/null || echo "")
+
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in
+        # ── Safe list (no restart needed) ──
+        reports/*) ;;
+        *.md) ;;
+        .gitignore) ;;
+        .github/*) ;;
+        deploy/*) ;;
+        mobile/*) ;;
+        frontend/*) ;;  # frontend build runs separately above
+        backend/morning_alive_ping.py) ;;       # cron-spawned
+        backend/intraday_started_ping.py) ;;    # cron-spawned
+        backend/paper_eod_report.py) ;;         # cron-spawned
+        backend/regime_report_generator.py) ;;  # cron-spawned
+        backend/backtest_*.py) ;;                # offline scripts
+        backend/research_*.py) ;;                # offline scripts
+        backend/test_*.py) ;;                    # offline scripts
+        # ── Anything else triggers restart ──
+        *)
+            RESTART_NEEDED=true
+            RESTART_REASON="$f"
+            break
+            ;;
+    esac
+done <<< "$CHANGED_FILES"
+
+# ── Restart backend ONLY when needed AND during market hours (9:00-15:45 IST) ──
 HOUR=$(TZ="Asia/Kolkata" date +%H)
 MIN=$(TZ="Asia/Kolkata" date +%M)
 IST_TIME="${HOUR}${MIN}"
 
-if [ "$IST_TIME" -ge "0900" ] && [ "$IST_TIME" -le "1545" ] && systemctl is-active --quiet honeydaalu-backend; then
-    log "Market hours + backend running — restarting with new code..."
+if [ "$RESTART_NEEDED" = "false" ]; then
+    log "No engine code changed — backend restart NOT required (safe-list deploy)"
+elif [ "$IST_TIME" -ge "0900" ] && [ "$IST_TIME" -le "1545" ] && systemctl is-active --quiet honeydaalu-backend; then
+    log "Engine code changed ($RESTART_REASON) + market hours + backend running — restarting..."
     sudo systemctl restart honeydaalu-backend
     sleep 3
     if systemctl is-active --quiet honeydaalu-backend; then

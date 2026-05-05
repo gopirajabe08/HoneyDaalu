@@ -154,23 +154,35 @@ class SwingPaperTrader:
             self._capital = capital
             self._scan_interval = scan_interval_minutes * 60
             self._running = True
-            self._active_trades = []
-            self._trade_history = []
-            self._logger.clear()
-            self._total_pnl = 0.0
-            self._scan_count = 0
-            self._order_count = 0
-            self._started_at = now_ist().isoformat()
-            self._next_scan_at = None
-            self._next_order_id = 1
+
+            # 2026-05-05 — preserve trade data on same-day restart (parity with
+            # paper_trader.py). Mid-market deploy incident on 2026-05-04 caused
+            # state loss; this prevents recurrence.
+            is_same_day_restart = bool(self._active_trades or self._trade_history)
+            if not is_same_day_restart:
+                self._active_trades = []
+                self._trade_history = []
+                self._logger.clear()
+                self._total_pnl = 0.0
+                self._scan_count = 0
+                self._order_count = 0
+                self._started_at = now_ist().isoformat()
+                self._next_scan_at = None
+                self._next_order_id = 1
+            else:
+                self._next_scan_at = None
+                # Preserve trade data + counters across same-day restart.
 
             strat_names = ", ".join(f"{k}({self._timeframes[k]})" for k in self._strategy_keys)
-            if scan_interval_minutes == 0:
+            if is_same_day_restart:
+                self._log("RESUME", f"Same-day restart — preserving {len(self._active_trades)} active + {len(self._trade_history)} historical trades | {strat_names} | Capital=₹{capital:,.0f}")
+            elif scan_interval_minutes == 0:
                 times_str = ", ".join(f"{h}:{m:02d}" for h, m in SWING_DAILY_SCAN_TIMES)
                 self._log("START", f"Swing paper trader STARTED — {strat_names} | Capital=₹{capital:,.0f} | Daily scans at {times_str} IST")
             else:
                 self._log("START", f"Swing paper trader STARTED — {strat_names} | Capital=₹{capital:,.0f} | Scan every {scan_interval_minutes}min")
-            self._log("INFO", f"SWING MODE — Max {SWING_PAPER_MAX_POSITIONS} position | No time cutoff | Positions carry over days")
+            if not is_same_day_restart:
+                self._log("INFO", f"SWING MODE — Max {SWING_PAPER_MAX_POSITIONS} position | No time cutoff | Positions carry over days")
 
             self._save_state()
 

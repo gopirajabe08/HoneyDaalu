@@ -281,32 +281,26 @@ def auto_connect_broker():
                     except Exception:
                         pass
 
-            # Owner directive 2026-04-27: run BOTH swing (1d) and intraday (15m)
-            # paper this week — same 3 winners on different timeframes for
-            # apples-to-apples comparison. Swing gets the 4th winner play2 too
-            # (triple_ma needs longer lookback than 15m allows).
+            # 2026-05-04 — DROPPED play5_bb_squeeze (n=4) + play6_bb_contra (n=2)
+            # after Backtest Validator Role 16 audit declared sample sizes
+            # statistically meaningless. Full audit in
+            # reports/backtest_validator/2026-05-04_audit.md. Calibration band
+            # (10-18 swing trades) suspended pending new walk-forward backtest.
             #
-            # Backtest 2026-04-21 (charges-aware but DP-charge missing):
-            #   play2_triple_ma:   +₹1,248 (1d) — swing only
-            #   play1_ema_crossover:+₹584  (proven on 1d AND 15m)
-            #   play5_bb_squeeze:  +₹122  (proven on 1d AND 15m, small sample)
-            #   play6_bb_contra:   +₹133  (proven on 1d AND 15m, small sample)
-            # Dropped (proven losers): play3_vwap_pullback (-₹3,160),
-            #   play7_orb (-₹429), play4_supertrend (-₹591), play8/9/10/winning_horse
+            # Remaining winners (still pending re-validation against new
+            # backtest, Days 4-14 Path C rebuild):
+            #   play2_triple_ma:    +₹1,248 (1d, n=13) — swing only
+            #   play1_ema_crossover:+₹584   (1d n=13, also runs on 15m)
             #
             # Both engines run paper-only (HONEYDAALU_DISABLE_LIVE=1 stays on).
             # LUCKYNAVI_REGIME_FILTER removed from .env — intraday runs clean to
-            # produce real-trade data this week (filter ON = 0 trades again).
+            # produce real-trade data (filter ON historically = 0 trades).
             SWING_WINNERS = [
                 {"strategy": "play2_triple_ma",     "timeframe": "1d"},
                 {"strategy": "play1_ema_crossover", "timeframe": "1d"},
-                {"strategy": "play6_bb_contra",     "timeframe": "1d"},
-                {"strategy": "play5_bb_squeeze",    "timeframe": "1d"},
             ]
             INTRADAY_WINNERS = [
                 {"strategy": "play1_ema_crossover", "timeframe": "15m"},
-                {"strategy": "play6_bb_contra",     "timeframe": "15m"},
-                {"strategy": "play5_bb_squeeze",    "timeframe": "15m"},
             ]
             # Capital sized per engine 2026-04-30 (owner directive: per-engine
             # need, cap ₹1L). Swing holds 5 concurrent positions on 1d in Nifty

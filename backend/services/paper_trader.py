@@ -237,20 +237,38 @@ class PaperTrader:
 
             self._capital = capital
             self._running = True
-            self._active_trades = []
-            self._trade_history = []
-            self._logger.clear()
-            self._total_pnl = 0.0
-            self._scan_count = 0
-            self._order_count = 0
-            self._squared_off = False
-            self._started_at = now_ist().isoformat()
-            self._next_scan_at = None
-            self._next_order_id = 1
+
+            # 2026-05-05 — preserve trade data on same-day restart.
+            # _load_persisted_state restores active_trades + trade_history only
+            # for today's date. If they're non-empty here, this is a same-day
+            # restart (e.g. mid-market deploy) — preserve, don't wipe. Prevents
+            # state-loss incident from 2026-05-04 where mid-market push caused
+            # 3 in-flight paper trades to vanish.
+            is_same_day_restart = bool(self._active_trades or self._trade_history)
+            if not is_same_day_restart:
+                self._active_trades = []
+                self._trade_history = []
+                self._logger.clear()
+                self._total_pnl = 0.0
+                self._scan_count = 0
+                self._order_count = 0
+                self._squared_off = False
+                self._started_at = now_ist().isoformat()
+                self._next_scan_at = None
+                self._next_order_id = 1
+            else:
+                # Same-day restart — keep trade data intact, just refresh threading
+                self._squared_off = False
+                self._next_scan_at = None
+                # Preserve: active_trades, trade_history, total_pnl, scan_count,
+                # order_count, started_at, next_order_id, logger entries.
 
             strat_names = ", ".join(f"{k}({self._timeframes[k]})" for k in self._strategy_keys)
-            self._log("START", f"Paper trader STARTED — {len(self._strategy_keys)} strateg{'y' if len(self._strategy_keys) == 1 else 'ies'}: {strat_names} | Capital=₹{capital:,.0f}")
-            self._log("INFO", f"Virtual trading — NO real orders | Order cutoff: 2:00 PM | Square-off: 3:15 PM | Max positions: {INTRADAY_PAPER_MAX_POSITIONS}")
+            if is_same_day_restart:
+                self._log("RESUME", f"Same-day restart — preserving {len(self._active_trades)} active + {len(self._trade_history)} historical trades | Strategies: {strat_names} | Capital=₹{capital:,.0f}")
+            else:
+                self._log("START", f"Paper trader STARTED — {len(self._strategy_keys)} strateg{'y' if len(self._strategy_keys) == 1 else 'ies'}: {strat_names} | Capital=₹{capital:,.0f}")
+                self._log("INFO", f"Virtual trading — NO real orders | Order cutoff: 2:00 PM | Square-off: 3:15 PM | Max positions: {INTRADAY_PAPER_MAX_POSITIONS}")
 
             self._save_state()
 
