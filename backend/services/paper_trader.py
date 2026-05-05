@@ -91,6 +91,21 @@ def _is_squareoff_time() -> bool:
     return is_past_time(INTRADAY_SQUAREOFF_HOUR, INTRADAY_SQUAREOFF_MIN)
 
 
+def _is_past_dead_trade_cutoff() -> bool:
+    """14:30 IST — close stale trades that never moved >0.3% in our favor.
+    Avoids holding losers to forced 15:15 square-off at worst price.
+    Added 2026-05-05 (intraday realism fix)."""
+    return is_past_time(14, 30)
+
+
+# Per-position capital cap — never let a single trade consume more than
+# (capital / max_positions). Prevents the 2026-05-04 over-allocation
+# scenario where 3 trades each used ~100% of pool (2.6x leverage). At live
+# ₹2k equity this would become impossible.
+DEAD_TRADE_THRESHOLD_PCT = 0.003   # 0.3% — must show this much favorable move by 14:30
+BREAKEVEN_TRAIL_PROFIT_PCT = 0.005  # 0.5% — move SL to entry once trade is +0.5%
+
+
 class PaperTrader:
     """
     Virtual auto-trading engine.
@@ -766,6 +781,25 @@ class PaperTrader:
             self._log("WARN", f"{symbol} — incomplete signal data after regime override, skipping")
             return False
 
+        # 2026-05-05 — Cash-only realism cap. Each position ≤ pool/max_positions.
+        # Plus enforce remaining-capital ceiling (don't allocate more than pool).
+        per_position_cap = self._capital / max(1, INTRADAY_PAPER_MAX_POSITIONS)
+        deployed_capital = sum(t.get("capital_required", 0) for t in self._active_trades)
+        remaining_capital = self._capital - deployed_capital
+        effective_cap = min(per_position_cap, remaining_capital)
+
+        if effective_cap <= 0:
+            self._log("SKIP", f"{symbol} — pool exhausted (deployed ₹{deployed_capital:,.0f}/₹{self._capital:,.0f})")
+            return False
+
+        max_qty_for_cap = max(0, int(effective_cap / entry_price))
+        if max_qty_for_cap < qty:
+            if max_qty_for_cap == 0:
+                self._log("SKIP", f"{symbol} — entry ₹{entry_price:.2f} > position cap ₹{effective_cap:,.0f}")
+                return False
+            self._log("RESIZE", f"{symbol} — qty {qty}→{max_qty_for_cap} (cap ₹{effective_cap:,.0f})")
+            qty = max_qty_for_cap
+
         side = 1 if signal_type == "BUY" else -1
 
         # Net R:R filter after charges — parity with live auto_trader
@@ -945,8 +979,13 @@ class PaperTrader:
                 max_fav = max(trade.get("max_favorable_price", entry), ltp)
                 trade["max_favorable_price"] = max_fav
                 profit_pct = (max_fav - entry) / entry * 100 if entry > 0 else 0
-                if profit_pct >= 1.0:  # Only trail after 1% profit
-                    # Trail at 50% of max profit
+                # 2026-05-05 — Breakeven trail at +0.5%: lock in zero-loss before
+                # the +1% 50%-retrace trail kicks in.
+                if (BREAKEVEN_TRAIL_PROFIT_PCT * 100) <= profit_pct < 1.0 and trade["stop_loss"] < entry:
+                    old_sl = trade["stop_loss"]
+                    trade["stop_loss"] = round(entry, 2)
+                    self._log("BREAKEVEN", f"{symbol} — SL ₹{old_sl} → ₹{entry} (max ₹{max_fav}, +{profit_pct:.1f}%) — zero-loss locked")
+                elif profit_pct >= 1.0:  # Trail at 50% of max profit
                     trail_sl = round(entry + (max_fav - entry) * 0.5, 2)
                     if trail_sl > trade["stop_loss"]:
                         old_sl = trade["stop_loss"]
@@ -956,12 +995,31 @@ class PaperTrader:
                 max_fav = min(trade.get("max_favorable_price", entry), ltp)
                 trade["max_favorable_price"] = max_fav
                 profit_pct = (entry - max_fav) / entry * 100 if entry > 0 else 0
-                if profit_pct >= 1.0:  # Only trail after 1% profit
+                if (BREAKEVEN_TRAIL_PROFIT_PCT * 100) <= profit_pct < 1.0 and trade["stop_loss"] > entry:
+                    old_sl = trade["stop_loss"]
+                    trade["stop_loss"] = round(entry, 2)
+                    self._log("BREAKEVEN", f"{symbol} — SL ₹{old_sl} → ₹{entry} (max ₹{max_fav}, +{profit_pct:.1f}%) — zero-loss locked")
+                elif profit_pct >= 1.0:
                     trail_sl = round(entry - (entry - max_fav) * 0.5, 2)
                     if trail_sl < trade["stop_loss"]:
                         old_sl = trade["stop_loss"]
                         trade["stop_loss"] = trail_sl
                         self._log("TRAIL", f"{symbol} — SL trailed ₹{old_sl} → ₹{trail_sl} (max ₹{max_fav}, +{profit_pct:.1f}%)")
+
+            # 2026-05-05 — Dead-trade time-stop: at 14:30 IST, close trades
+            # that never moved >0.3% in our favor. Avoids 15:15 forced exit
+            # at worst price. Today's ITC trade lost ₹409 sitting dead for
+            # 2 hours; with this fix it would close ~14:30 with smaller loss.
+            if _is_past_dead_trade_cutoff():
+                if side == 1:
+                    is_dead = max_fav < entry * (1 + DEAD_TRADE_THRESHOLD_PCT)
+                else:
+                    is_dead = max_fav > entry * (1 - DEAD_TRADE_THRESHOLD_PCT)
+                if is_dead and trade.get("status") == "OPEN":
+                    self._log("TIME_STOP", f"{symbol} — dead trade @14:30 (max favorable {max_fav}, entry {entry}) — closing")
+                    trade["exit_reason"] = "TIME_STOP_DEAD"
+                    trades_to_close.append(trade)
+                    continue
 
             # Check SL hit
             if side == 1 and ltp <= trade["stop_loss"]:
