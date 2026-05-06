@@ -36,11 +36,19 @@ if [ -n "$IS_HOLIDAY" ]; then
     exit 0
 fi
 
-echo "[$TODAY] Trading day — starting HoneyDaalu backend" >> "$LOG"
-/usr/bin/sudo /usr/bin/systemctl start honeydaalu-backend >> "$LOG" 2>&1
+# 2026-05-06 — Use `restart` not `start`. systemd's `start` is a no-op
+# when service is already running, so AutoStart logic in main.py never
+# re-fires. That left engines silently dead today after backend was
+# accidentally left running overnight from yesterday's bot token swap.
+# `restart` is idempotent: starts if stopped, restarts if running.
+# Pre-market timing (09:00 IST, 15 min before market opens) means no
+# active trades to disturb. State-persistence fix (paper_trader.py +
+# swing_paper_trader.py) preserves any data across the restart.
+echo "[$TODAY] Trading day — restarting HoneyDaalu backend (forces AutoStart re-fire)" >> "$LOG"
+/usr/bin/sudo /usr/bin/systemctl restart honeydaalu-backend >> "$LOG" 2>&1
 
 if [ $? -eq 0 ]; then
-    echo "[$TODAY] Service started successfully" >> "$LOG"
+    echo "[$TODAY] Service restarted successfully — AutoStart will re-fire" >> "$LOG"
 else
-    echo "[$TODAY] ERROR: Failed to start service" >> "$LOG"
+    echo "[$TODAY] ERROR: Failed to restart service" >> "$LOG"
 fi
