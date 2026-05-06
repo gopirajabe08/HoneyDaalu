@@ -74,6 +74,7 @@ while IFS= read -r f; do
         backend/paper_eod_report.py) ;;         # cron-spawned
         backend/regime_report_generator.py) ;;  # cron-spawned
         backend/backtest_*.py) ;;                # offline scripts
+        backend/backtest_v2/*) ;;                # offline walk-forward backtest module
         backend/research_*.py) ;;                # offline scripts
         backend/test_*.py) ;;                    # offline scripts
         # ── Anything else triggers restart ──
