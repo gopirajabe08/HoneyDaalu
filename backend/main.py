@@ -251,10 +251,15 @@ def auto_connect_broker():
             # ── Clean stale state (live AND paper) BEFORE any engine start ──
             # Without this, yesterday's running=True flag causes start() to no-op
             # with "already running", leaving engines silently dead for the whole day.
+            # 2026-05-06 — Added swing_paper_trader. Without it, swing engine's
+            # auto-resume on backend restart left _running=True, and start()
+            # returned "already running" → engine kept yesterday's strategies
+            # (e.g., today swing booted with dropped play5/play6 still active).
             _stale_engines_all = [
                 ("Equity Live", auto_trader),
                 ("Options Live", options_auto_trader),
                 ("BTST Live", btst_trader),
+                ("Equity Swing Paper", swing_paper_trader),
                 ("Equity Paper", paper_trader),
                 ("Options Paper", options_paper_trader),
                 ("BTST Paper", btst_paper_trader),
