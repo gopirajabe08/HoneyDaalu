@@ -14,6 +14,10 @@ backend/.fyers_token
 # Tracking runtime state
 backend/tracking/regime_safety_state.json
 
+# Backtest v2 cache + heavy result CSVs
+backend/backtest_v2/.cache/
+backend/backtest_v2/results/
+
 # ══════════════════════════════════════════════════════════════
 #  STATE FILES — contain trade data, tokens, session info
 # ══════════════════════════════════════════════════════════════
