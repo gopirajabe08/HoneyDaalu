@@ -25,12 +25,34 @@ from dataclasses import dataclass
 import pandas as pd
 
 
-# ── Strategy parameters (fixed; sensitivity tested separately in audit.py) ──
+# ── Default strategy parameters ──
 EMA_FAST = 9
 EMA_SLOW = 21
 SMA_TREND = 50
 SL_ATR_MULTIPLIER = 2.0
 TARGET_RR = 2.0   # Risk:Reward ratio
+
+
+@dataclass
+class StrategyParams:
+    """Configurable parameters for parameter sweep / sensitivity testing."""
+    ema_fast: int = EMA_FAST
+    ema_slow: int = EMA_SLOW
+    sma_trend: int = SMA_TREND
+    sl_atr_mult: float = SL_ATR_MULTIPLIER
+    target_rr: float = TARGET_RR
+    require_volume_filter: bool = False  # signal vol > 1.5x avg
+    volume_filter_mult: float = 1.5
+    require_regime_filter: bool = False  # only BUY when bullish, SELL when bearish
+
+    def label(self) -> str:
+        parts = [f"({self.ema_fast},{self.ema_slow},{self.sma_trend})"]
+        parts.append(f"sl{self.sl_atr_mult:g}rr{self.target_rr:g}")
+        if self.require_volume_filter:
+            parts.append(f"vol{self.volume_filter_mult:g}")
+        if self.require_regime_filter:
+            parts.append("regime")
+        return "-".join(parts)
 
 
 @dataclass
@@ -58,36 +80,34 @@ def _calc_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return tr.rolling(period).mean()
 
 
-def _add_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Add EMA9, EMA21, SMA50, ATR14 to df. Returns new df (does not mutate)."""
+def _add_indicators(df: pd.DataFrame, params: StrategyParams = None) -> pd.DataFrame:
+    """Add EMAs, SMA, ATR, and volume average. Returns new df (does not mutate)."""
+    p = params or StrategyParams()
     out = df.copy()
-    out["ema_fast"] = out["Close"].ewm(span=EMA_FAST, adjust=False).mean()
-    out["ema_slow"] = out["Close"].ewm(span=EMA_SLOW, adjust=False).mean()
-    out["sma_trend"] = out["Close"].rolling(SMA_TREND).mean()
+    out["ema_fast"] = out["Close"].ewm(span=p.ema_fast, adjust=False).mean()
+    out["ema_slow"] = out["Close"].ewm(span=p.ema_slow, adjust=False).mean()
+    out["sma_trend"] = out["Close"].rolling(p.sma_trend).mean()
     out["atr14"] = _calc_atr(out, 14)
+    if "Volume" in out.columns:
+        out["vol_avg20"] = out["Volume"].rolling(20).mean()
     return out
 
 
-def play1_ema_crossover(symbol: str, df: pd.DataFrame) -> list[Signal]:
+def play1_ema_crossover(symbol: str, df: pd.DataFrame, params: StrategyParams = None) -> list[Signal]:
     """
-    Play 1: 9-EMA / 21-EMA crossover with 50-SMA trend filter.
-
-    BUY  : EMA fast crosses above EMA slow AND price above SMA50 (trend confirmation)
-    SELL : EMA fast crosses below EMA slow AND price below SMA50
-
-    Critical: signal generated at bar i using indicators computed up to bar i.
-    Entry happens at bar i+1 OPEN (handled by runner.py, not here).
+    Play 1: EMA-fast / EMA-slow crossover with SMA-trend filter.
+    Optional regime + volume filters.
     """
-    if df is None or len(df) < SMA_TREND + 5:
+    p = params or StrategyParams()
+    if df is None or len(df) < p.sma_trend + 5:
         return []
 
-    d = _add_indicators(df)
+    d = _add_indicators(df, p)
     signals: list[Signal] = []
+    label = f"play1_ema_crossover[{p.label()}]"
 
-    # Loop from where all indicators are valid; stop at penultimate bar
-    # so runner.py has bar i+1 to execute against.
-    start = SMA_TREND + 1
-    end = len(d) - 1  # Need bar i+1 for execution
+    start = p.sma_trend + 1
+    end = len(d) - 1
     for i in range(start, end):
         row = d.iloc[i]
         prev = d.iloc[i - 1]
@@ -102,48 +122,43 @@ def play1_ema_crossover(symbol: str, df: pd.DataFrame) -> list[Signal]:
         bullish = row["Close"] > row["sma_trend"]
         bearish = row["Close"] < row["sma_trend"]
 
+        if p.require_volume_filter and "vol_avg20" in d.columns:
+            if pd.isna(row["vol_avg20"]) or row["vol_avg20"] <= 0:
+                continue
+            if row["Volume"] < row["vol_avg20"] * p.volume_filter_mult:
+                continue
+
+        sig_kwargs = dict(
+            date=d.index[i],
+            symbol=symbol,
+            strategy=label,
+            signal_close=float(row["Close"]),
+            sl_distance=float(row["atr14"] * p.sl_atr_mult),
+            target_rr=p.target_rr,
+            conviction=0.0,
+        )
+
         if cross_up and bullish:
-            signals.append(Signal(
-                date=d.index[i],
-                symbol=symbol,
-                strategy="play1_ema_crossover",
-                side="BUY",
-                signal_close=float(row["Close"]),
-                sl_distance=float(row["atr14"] * SL_ATR_MULTIPLIER),
-                target_rr=TARGET_RR,
-                conviction=0.0,
-            ))
+            signals.append(Signal(side="BUY", **sig_kwargs))
         elif cross_dn and bearish:
-            signals.append(Signal(
-                date=d.index[i],
-                symbol=symbol,
-                strategy="play1_ema_crossover",
-                side="SELL",
-                signal_close=float(row["Close"]),
-                sl_distance=float(row["atr14"] * SL_ATR_MULTIPLIER),
-                target_rr=TARGET_RR,
-                conviction=0.0,
-            ))
+            if p.require_regime_filter:
+                continue  # only allow SELL in bearish regime; already checked
+            signals.append(Signal(side="SELL", **sig_kwargs))
 
     return signals
 
 
-def play2_triple_ma(symbol: str, df: pd.DataFrame) -> list[Signal]:
-    """
-    Play 2: Triple-MA alignment.
-
-    BUY  : EMA9 > EMA21 > SMA50 (just crossed into this state) — bullish alignment
-    SELL : EMA9 < EMA21 < SMA50 (just crossed into this state) — bearish alignment
-
-    Same execution rules as play1 (signal at bar i, entry at bar i+1 open).
-    """
-    if df is None or len(df) < SMA_TREND + 5:
+def play2_triple_ma(symbol: str, df: pd.DataFrame, params: StrategyParams = None) -> list[Signal]:
+    """Play 2: Triple-MA alignment crossover. Now parameter-configurable."""
+    p = params or StrategyParams()
+    if df is None or len(df) < p.sma_trend + 5:
         return []
 
-    d = _add_indicators(df)
+    d = _add_indicators(df, p)
     signals: list[Signal] = []
+    label = f"play2_triple_ma[{p.label()}]"
 
-    start = SMA_TREND + 1
+    start = p.sma_trend + 1
     end = len(d) - 1
     for i in range(start, end):
         row = d.iloc[i]
@@ -159,28 +174,209 @@ def play2_triple_ma(symbol: str, df: pd.DataFrame) -> list[Signal]:
         bear_now = (row["ema_fast"] < row["ema_slow"]) and (row["ema_slow"] < row["sma_trend"])
         bear_prev = (prev["ema_fast"] < prev["ema_slow"]) and (prev["ema_slow"] < prev["sma_trend"])
 
+        if p.require_volume_filter and "vol_avg20" in d.columns:
+            if pd.isna(row["vol_avg20"]) or row["vol_avg20"] <= 0:
+                continue
+            if row["Volume"] < row["vol_avg20"] * p.volume_filter_mult:
+                continue
+
+        sig_kwargs = dict(
+            date=d.index[i],
+            symbol=symbol,
+            strategy=label,
+            signal_close=float(row["Close"]),
+            sl_distance=float(row["atr14"] * p.sl_atr_mult),
+            target_rr=p.target_rr,
+            conviction=0.0,
+        )
+
         if bull_now and not bull_prev:
-            signals.append(Signal(
-                date=d.index[i],
-                symbol=symbol,
-                strategy="play2_triple_ma",
-                side="BUY",
-                signal_close=float(row["Close"]),
-                sl_distance=float(row["atr14"] * SL_ATR_MULTIPLIER),
-                target_rr=TARGET_RR,
-                conviction=0.0,
-            ))
+            signals.append(Signal(side="BUY", **sig_kwargs))
         elif bear_now and not bear_prev:
-            signals.append(Signal(
-                date=d.index[i],
-                symbol=symbol,
-                strategy="play2_triple_ma",
-                side="SELL",
-                signal_close=float(row["Close"]),
-                sl_distance=float(row["atr14"] * SL_ATR_MULTIPLIER),
-                target_rr=TARGET_RR,
-                conviction=0.0,
-            ))
+            if p.require_regime_filter:
+                continue
+            signals.append(Signal(side="SELL", **sig_kwargs))
+
+    return signals
+
+
+def hrvm(symbol: str, df: pd.DataFrame, params: StrategyParams = None) -> list[Signal]:
+    """
+    HRVM — High Relative Volume Momentum (candidate proposed 2026-04-29).
+
+    Entry conditions (all must pass):
+    1. RVOL >= 2.0 — today's volume / 20-day avg >= 2.0
+    2. Close in upper 30% of day's range — buyers controlled the close
+    3. Positive pChange — close > previous close
+    4. Annual range >= 1.3x — year_high / year_low >= 1.3 (skip chronic decliners)
+    5. Within 70-100% of 52-week high — not value-trap territory
+
+    BUY-only strategy (long bias). Exit on opposite-direction signal or SL/target.
+    """
+    p = params or StrategyParams()
+    if df is None or len(df) < 252 + 5:
+        return []  # Need 1 year for annual range
+
+    d = df.copy()
+    d["vol_avg20"] = d["Volume"].rolling(20).mean()
+    d["yr_high"] = d["High"].rolling(252).max()
+    d["yr_low"] = d["Low"].rolling(252).min()
+    d["atr14"] = _calc_atr(d, 14)
+
+    signals: list[Signal] = []
+    label = f"hrvm[{p.label()}]"
+
+    start = 252 + 1
+    end = len(d) - 1
+    for i in range(start, end):
+        row = d.iloc[i]
+        prev = d.iloc[i - 1]
+
+        if pd.isna(row["vol_avg20"]) or pd.isna(row["yr_high"]) or pd.isna(row["atr14"]):
+            continue
+        if row["vol_avg20"] <= 0 or row["yr_low"] <= 0 or row["atr14"] <= 0:
+            continue
+
+        rvol = row["Volume"] / row["vol_avg20"]
+        if rvol < 2.0:
+            continue
+
+        day_range = row["High"] - row["Low"]
+        if day_range <= 0:
+            continue
+        close_pos = (row["Close"] - row["Low"]) / day_range
+        if close_pos < 0.7:
+            continue
+
+        if row["Close"] <= prev["Close"]:
+            continue  # negative pChange, skip
+
+        annual_range = row["yr_high"] / row["yr_low"]
+        if annual_range < 1.3:
+            continue
+
+        pct_of_yr_high = row["Close"] / row["yr_high"]
+        if pct_of_yr_high < 0.7:
+            continue
+
+        signals.append(Signal(
+            date=d.index[i],
+            symbol=symbol,
+            strategy=label,
+            side="BUY",
+            signal_close=float(row["Close"]),
+            sl_distance=float(row["atr14"] * p.sl_atr_mult),
+            target_rr=p.target_rr,
+            conviction=float(rvol),
+        ))
+
+    return signals
+
+
+def atr_breakout(symbol: str, df: pd.DataFrame, params: StrategyParams = None) -> list[Signal]:
+    """
+    ATR Breakout — Donchian-channel-style 20-day high/low breakout.
+
+    BUY  : Close above 20-day high
+    SELL : Close below 20-day low
+    Entry next bar open with ATR-based SL.
+    """
+    p = params or StrategyParams()
+    if df is None or len(df) < 25:
+        return []
+
+    d = df.copy()
+    d["dc_high"] = d["High"].rolling(20).max().shift(1)  # exclude today
+    d["dc_low"] = d["Low"].rolling(20).min().shift(1)
+    d["atr14"] = _calc_atr(d, 14)
+    if "Volume" in d.columns:
+        d["vol_avg20"] = d["Volume"].rolling(20).mean()
+
+    signals: list[Signal] = []
+    label = f"atr_breakout[{p.label()}]"
+
+    start = 22
+    end = len(d) - 1
+    for i in range(start, end):
+        row = d.iloc[i]
+
+        if pd.isna(row["dc_high"]) or pd.isna(row["atr14"]) or row["atr14"] <= 0:
+            continue
+
+        if p.require_volume_filter and "vol_avg20" in d.columns:
+            if pd.isna(row["vol_avg20"]) or row["vol_avg20"] <= 0:
+                continue
+            if row["Volume"] < row["vol_avg20"] * p.volume_filter_mult:
+                continue
+
+        broke_up = row["Close"] > row["dc_high"]
+        broke_dn = row["Close"] < row["dc_low"]
+
+        sig_kwargs = dict(
+            date=d.index[i],
+            symbol=symbol,
+            strategy=label,
+            signal_close=float(row["Close"]),
+            sl_distance=float(row["atr14"] * p.sl_atr_mult),
+            target_rr=p.target_rr,
+            conviction=0.0,
+        )
+
+        if broke_up:
+            signals.append(Signal(side="BUY", **sig_kwargs))
+        elif broke_dn:
+            signals.append(Signal(side="SELL", **sig_kwargs))
+
+    return signals
+
+
+def rsi2_mean_reversion(symbol: str, df: pd.DataFrame, params: StrategyParams = None) -> list[Signal]:
+    """
+    RSI-2 Mean Reversion — Larry Connors-style 2-period RSI extremes.
+
+    BUY  : RSI(2) < 10 AND price > SMA200 (buy-the-dip in uptrend)
+    SELL : RSI(2) > 90 AND price < SMA200 (short-the-rip in downtrend)
+    """
+    p = params or StrategyParams()
+    if df is None or len(df) < 205:
+        return []
+
+    d = df.copy()
+    delta = d["Close"].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    rs = gain.rolling(2).mean() / loss.rolling(2).mean()
+    d["rsi2"] = 100 - (100 / (1 + rs))
+    d["sma200"] = d["Close"].rolling(200).mean()
+    d["atr14"] = _calc_atr(d, 14)
+
+    signals: list[Signal] = []
+    label = f"rsi2_mean_reversion[{p.label()}]"
+
+    start = 202
+    end = len(d) - 1
+    for i in range(start, end):
+        row = d.iloc[i]
+
+        if pd.isna(row["rsi2"]) or pd.isna(row["sma200"]) or pd.isna(row["atr14"]):
+            continue
+        if row["atr14"] <= 0:
+            continue
+
+        sig_kwargs = dict(
+            date=d.index[i],
+            symbol=symbol,
+            strategy=label,
+            signal_close=float(row["Close"]),
+            sl_distance=float(row["atr14"] * p.sl_atr_mult),
+            target_rr=p.target_rr,
+            conviction=0.0,
+        )
+
+        if row["rsi2"] < 10 and row["Close"] > row["sma200"]:
+            signals.append(Signal(side="BUY", **sig_kwargs))
+        elif row["rsi2"] > 90 and row["Close"] < row["sma200"]:
+            signals.append(Signal(side="SELL", **sig_kwargs))
 
     return signals
 
@@ -189,6 +385,9 @@ def play2_triple_ma(symbol: str, df: pd.DataFrame) -> list[Signal]:
 STRATEGIES = {
     "play1_ema_crossover": play1_ema_crossover,
     "play2_triple_ma": play2_triple_ma,
+    "hrvm": hrvm,
+    "atr_breakout": atr_breakout,
+    "rsi2_mean_reversion": rsi2_mean_reversion,
 }
 
 
