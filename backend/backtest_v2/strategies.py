@@ -200,22 +200,41 @@ def play2_triple_ma(symbol: str, df: pd.DataFrame, params: StrategyParams = None
     return signals
 
 
-def hrvm(symbol: str, df: pd.DataFrame, params: StrategyParams = None) -> list[Signal]:
+@dataclass
+class HrvmParams:
+    """HRVM-specific tunable filters (separate from generic StrategyParams)."""
+    min_rvol: float = 2.0          # min relative volume
+    min_close_pos: float = 0.7     # close must be in upper N% of day range
+    min_annual_range: float = 1.3  # year_high / year_low >=
+    min_pct_of_yr_high: float = 0.7  # close >= N% of 52-week high
+
+    sl_atr_mult: float = 2.0
+    target_rr: float = 2.0
+
+    def label(self) -> str:
+        return (
+            f"rvol{self.min_rvol:g}-clp{self.min_close_pos:g}-"
+            f"yr{self.min_annual_range:g}-yh{self.min_pct_of_yr_high:g}-"
+            f"sl{self.sl_atr_mult:g}rr{self.target_rr:g}"
+        )
+
+
+def hrvm(symbol: str, df: pd.DataFrame, params=None) -> list[Signal]:
     """
     HRVM — High Relative Volume Momentum (candidate proposed 2026-04-29).
 
-    Entry conditions (all must pass):
-    1. RVOL >= 2.0 — today's volume / 20-day avg >= 2.0
-    2. Close in upper 30% of day's range — buyers controlled the close
-    3. Positive pChange — close > previous close
-    4. Annual range >= 1.3x — year_high / year_low >= 1.3 (skip chronic decliners)
-    5. Within 70-100% of 52-week high — not value-trap territory
-
-    BUY-only strategy (long bias). Exit on opposite-direction signal or SL/target.
+    Now accepts HrvmParams for filter tuning. Defaults match original spec.
     """
-    p = params or StrategyParams()
+    if params is None:
+        p = HrvmParams()
+    elif isinstance(params, StrategyParams):
+        # Caller passed generic params; bridge to HRVM defaults using sl/rr only
+        p = HrvmParams(sl_atr_mult=params.sl_atr_mult, target_rr=params.target_rr)
+    else:
+        p = params
+
     if df is None or len(df) < 252 + 5:
-        return []  # Need 1 year for annual range
+        return []
 
     d = df.copy()
     d["vol_avg20"] = d["Volume"].rolling(20).mean()
@@ -238,25 +257,25 @@ def hrvm(symbol: str, df: pd.DataFrame, params: StrategyParams = None) -> list[S
             continue
 
         rvol = row["Volume"] / row["vol_avg20"]
-        if rvol < 2.0:
+        if rvol < p.min_rvol:
             continue
 
         day_range = row["High"] - row["Low"]
         if day_range <= 0:
             continue
         close_pos = (row["Close"] - row["Low"]) / day_range
-        if close_pos < 0.7:
+        if close_pos < p.min_close_pos:
             continue
 
         if row["Close"] <= prev["Close"]:
-            continue  # negative pChange, skip
+            continue
 
         annual_range = row["yr_high"] / row["yr_low"]
-        if annual_range < 1.3:
+        if annual_range < p.min_annual_range:
             continue
 
         pct_of_yr_high = row["Close"] / row["yr_high"]
-        if pct_of_yr_high < 0.7:
+        if pct_of_yr_high < p.min_pct_of_yr_high:
             continue
 
         signals.append(Signal(
