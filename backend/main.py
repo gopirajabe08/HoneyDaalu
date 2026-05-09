@@ -300,8 +300,13 @@ def auto_connect_broker():
             # Both engines run paper-only (HONEYDAALU_DISABLE_LIVE=1 stays on).
             # LUCKYNAVI_REGIME_FILTER removed from .env — intraday runs clean to
             # produce real-trade data (filter ON historically = 0 trades).
+            # 2026-05-09 — DROPPED play2_triple_ma. v2 24mo audit: -₹101/trade
+            # across n=698, only 1/6 quarters positive. Worse than play1.
+            # Was supposedly a "winner" in 2026-04-21 backtest but that was a
+            # 45-day same-bar-close look-ahead artifact. Now confirmed loser.
+            # Kept play1 ONLY — also pending re-validation but at least it has
+            # the better edge of the two (-₹96/trade vs -₹101).
             SWING_WINNERS = [
-                {"strategy": "play2_triple_ma",     "timeframe": "1d"},
                 {"strategy": "play1_ema_crossover", "timeframe": "1d"},
             ]
             INTRADAY_WINNERS = [

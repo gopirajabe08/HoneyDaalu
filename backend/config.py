@@ -53,7 +53,7 @@ NSE_HOLIDAYS = {
 # Previously hard-coded in auto_trader.py and paper_trader.py
 
 INTRADAY_ORDER_START_HOUR, INTRADAY_ORDER_START_MIN = 10, 30   # 10:30 AM — start placing orders
-INTRADAY_ORDER_CUTOFF_HOUR, INTRADAY_ORDER_CUTOFF_MIN = 13, 30  # 1:30 PM — stop placing new orders (need 1.75h for trade to develop)
+INTRADAY_ORDER_CUTOFF_HOUR, INTRADAY_ORDER_CUTOFF_MIN = 13, 0  # 1:00 PM — 2026-05-09: tightened from 13:30 after week-1 analysis showed all 5 trades placed 13:20-13:25 closed at 15:20 square-off (no time to develop). 13:00 cutoff gives 2.3h vs prior 1.7h for trade to play out.
 INTRADAY_SQUAREOFF_HOUR, INTRADAY_SQUAREOFF_MIN = 15, 20       # 3:20 PM — square off (before broker auto-square at 3:25)
 INTRADAY_MARKET_CLOSE_HOUR, INTRADAY_MARKET_CLOSE_MIN = 15, 30 # 3:30 PM — market closes
 
